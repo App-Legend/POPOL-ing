@@ -12,23 +12,68 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+typedef _Project = ({
+  String name,
+  String desc,
+  (String, (Color, Color), bool) status,
+  List<String> stack,
+  String? last,
+  int? idleDays,
+  bool ok,
+  List<String> actions,
+  bool focus,
+});
+
 // shortcut: 목업용 고정 데이터, 프로젝트 모듈이 생기면 그 인터페이스에서 받아온다.
-const _projects = [
-  (name: 'my-team-project', desc: '동아리 행사 예약 웹서비스 (2025 캡스톤)', status: ('실행 중 3/3', C.ok, true), stack: ['Spring Boot', 'React', 'MySQL'], last: '마지막 실행 오늘 14:02 · ', ok: true, actions: ['전체 종료'], focus: true),
-  (name: 'ppoling', desc: '포폴링 데스크톱 앱', status: ('중지', C.idle, true), stack: ['Flutter'], last: '마지막 실행 어제 · ', ok: true, actions: ['전체 실행'], focus: false),
-  (name: 'weather-bot', desc: '날씨 알림 디스코드 봇', status: ('오래됨 · 8개월', C.warn, false), stack: ['Node.js'], last: '마지막 실행 2026-03-12 · ', ok: false, actions: ['실행 점검'], focus: false),
-  (name: 'shop-clone', desc: '쇼핑몰 클론 코딩', status: ('오래됨 · 11개월', C.warn, false), stack: ['Next.js', 'PostgreSQL'], last: '마지막 실행 2025-12-02 · ', ok: true, actions: ['실행 점검'], focus: false),
-  (name: 'algo-study', desc: '설명이 없어요 — README에서 가져오거나 직접 적어 주세요.', status: ('실행 기록 없음', C.idle, false), stack: ['Python'], last: null, ok: true, actions: <String>[], focus: false),
+// idleDays: 마지막 실행 뒤 지난 날수(목업 기준일 2026-11-11). null 은 실행 기록 없음.
+const List<_Project> _projects = [
+  (name: 'my-team-project', desc: '동아리 행사 예약 웹서비스 (2025 캡스톤)', status: ('실행 중 3/3', C.ok, true), stack: ['Spring Boot', 'React', 'MySQL'], last: '마지막 실행 오늘 14:02 · ', idleDays: 0, ok: true, actions: ['전체 종료'], focus: true),
+  (name: 'ppoling', desc: '포폴링 데스크톱 앱', status: ('중지', C.idle, true), stack: ['Flutter'], last: '마지막 실행 어제 · ', idleDays: 1, ok: true, actions: ['전체 실행'], focus: false),
+  (name: 'weather-bot', desc: '날씨 알림 디스코드 봇', status: ('오래됨 · 8개월', C.warn, false), stack: ['Node.js'], last: '마지막 실행 2026-03-12 · ', idleDays: 244, ok: false, actions: ['실행 점검'], focus: false),
+  (name: 'shop-clone', desc: '쇼핑몰 클론 코딩', status: ('오래됨 · 11개월', C.warn, false), stack: ['Next.js', 'PostgreSQL'], last: '마지막 실행 2025-12-02 · ', idleDays: 344, ok: true, actions: ['실행 점검'], focus: false),
+  (name: 'algo-study', desc: '설명이 없어요 — README에서 가져오거나 직접 적어 주세요.', status: ('실행 기록 없음', C.idle, false), stack: ['Python'], last: null, idleDays: null, ok: true, actions: <String>[], focus: false),
 ];
+
+/// 필터 칩 이름에 맞는 프로젝트인지. 상태 필터가 아니면 기술 스택 이름으로 본다.
+bool _passesFilter(_Project p, String filter) => switch (filter) {
+      '전체' => true,
+      '실행 중' => p.status.$1.startsWith('실행 중'),
+      '오래됨' => p.status.$1.startsWith('오래됨'),
+      _ => p.stack.contains(filter),
+    };
+
+/// 실행 기록이 없는 프로젝트는 어느 쪽으로 정렬해도 맨 뒤에 둔다.
+int _compareIdle(_Project a, _Project b, {required bool oldestFirst}) {
+  final (x, y) = (a.idleDays, b.idleDays);
+  if (x == null || y == null) return (x == null ? 1 : 0) - (y == null ? 1 : 0);
+  return oldestFirst ? y.compareTo(x) : x.compareTo(y);
+}
 
 const _filters = ['전체', '실행 중', '오래됨', 'Spring Boot', 'React'];
 
 class _HomeScreenState extends State<HomeScreen> {
   var _filter = 0;
   var _sort = '최근 실행순';
+  var _query = '';
+
+  /// 검색어·필터에 맞는 프로젝트를 고른 정렬 순서로.
+  List<_Project> get _visible {
+    final q = _query.trim().toLowerCase();
+    final shown = [
+      for (final p in _projects)
+        if (_passesFilter(p, _filters[_filter]) && (q.isEmpty || [p.name, p.desc, ...p.stack].any((t) => t.toLowerCase().contains(q)))) p,
+    ];
+    final int Function(_Project, _Project) compare = switch (_sort) {
+      '이름순' => (a, b) => a.name.compareTo(b.name),
+      '오래 방치된 순' => (a, b) => _compareIdle(a, b, oldestFirst: true),
+      _ => (a, b) => _compareIdle(a, b, oldestFirst: false),
+    };
+    return shown..sort(compare);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final visible = _visible;
     return AppPage(
       crumbs: const [('개발', null)],
       trailing: const StatusChip('Docker 연결됨', C.ok),
@@ -41,10 +86,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
         Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
-          const SizedBox(
+          SizedBox(
             width: 320,
             child: TextField(
-              decoration: InputDecoration(
+              onChanged: (v) => setState(() => _query = v),
+              decoration: const InputDecoration(
                 hintText: '이름, 설명, 기술 스택으로 검색',
                 prefixIcon: Icon(Icons.search, size: 18),
                 isDense: true,
@@ -73,12 +119,18 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ]),
         ]),
-        AutoGrid(minItemWidth: 340, children: [for (final p in _projects) _card(context, p)]),
+        if (visible.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 48),
+            child: Center(child: Text('조건에 맞는 프로젝트가 없어요. 검색어나 필터를 바꿔 보세요.', style: TextStyle(fontSize: 14, color: C.muted))),
+          )
+        else
+          AutoGrid(minItemWidth: 340, children: [for (final p in visible) _card(context, p)]),
       ],
     );
   }
 
-  Widget _card(BuildContext context, ({String name, String desc, (String, (Color, Color), bool) status, List<String> stack, String? last, bool ok, List<String> actions, bool focus}) p) {
+  Widget _card(BuildContext context, _Project p) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
