@@ -27,7 +27,61 @@ void main() {
         ));
   });
 
+  group('FakePortProbe', () {
+    portProbeContract(() async => PortProbeFixture(
+          probe: FakePortProbe(inUse: [const PortInUse(8080, pid: 4321, processName: 'java')]),
+          freePort: 5173,
+          busyPort: 8080,
+        ));
+  });
+
+  group('FakeHttpProbe', () {
+    httpProbeContract(() async => HttpProbeFixture(
+          probe: FakeHttpProbe(responses: {'http://localhost:8080/health': 200, 'http://localhost:8080/boom': 500}),
+          okUrl: 'http://localhost:8080/health',
+          errorUrl: 'http://localhost:8080/boom',
+          downUrl: 'http://localhost:9/health',
+        ));
+  });
+
+  group('FakeEnvChecker', () {
+    envCheckerContract(() async => EnvCheckerFixture(
+          checker: FakeEnvChecker(installed: {'node': '22.3.0'}),
+          installedCli: 'node',
+          dockerRunning: true,
+        ));
+  });
+
+  group('FakeEnvChecker (Docker 꺼짐)', () {
+    envCheckerContract(() async => EnvCheckerFixture(
+          checker: FakeEnvChecker(installed: {'node': '22.3.0'}, dockerRunning: false),
+          installedCli: 'node',
+          dockerRunning: false,
+        ));
+  });
+
   group('가짜 구현만의 동작', () {
+    test('FakeEnvChecker 는 버전 범위를 규칙대로 비교한다', () async {
+      final env = FakeEnvChecker(installed: {'node': 'v20.11.1'});
+      Future<EnvStatus> status(String range) async =>
+          (await env.check([CliRequirement('node', version: range)])).single.status;
+      expect(await status('>=20'), EnvStatus.passed);
+      expect(await status('20'), EnvStatus.passed);
+      expect(await status('=20.11'), EnvStatus.passed);
+      expect(await status('>=17 <20'), EnvStatus.versionMismatch);
+      expect(await status('>20.11.1'), EnvStatus.versionMismatch);
+      expect(await status('<=20.11.1'), EnvStatus.passed);
+      expect(await status('18'), EnvStatus.versionMismatch);
+    });
+
+    test('FakePortProbe 는 포트를 비우면 바로 PortFree 가 되고, 원격은 넣은 주소만 연결된다', () async {
+      final ports = FakePortProbe(inUse: [const PortInUse(5173)], reachableRemotes: {'db.example.com:3306'});
+      ports.inUse.remove(5173);
+      expect(await ports.whoUses(5173), isA<PortFree>());
+      expect((await ports.connect(3306, host: 'db.example.com')).ok, isTrue);
+      expect((await ports.connect(3307, host: 'db.example.com')).ok, isFalse);
+    });
+
     test('FakeProjectRepository 는 폴더 이름으로 ID 를 만들고, 겹치면 숫자를 붙인다', () async {
       final repo = FakeProjectRepository(existingFolders: [r'C:\work\My App', '/home/me/my-app', '/x/포폴링']);
       expect((await repo.addProject(r'C:\work\My App')).id, 'my-app');

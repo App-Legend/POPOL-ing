@@ -3,6 +3,9 @@
 library;
 
 export 'contracts/config_validator.dart';
+export 'contracts/env_checker.dart';
+export 'contracts/http_probe.dart';
+export 'contracts/port_probe.dart';
 export 'contracts/project_repository.dart';
 export 'contracts/qa_runner.dart';
 export 'models.dart';
