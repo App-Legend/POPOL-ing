@@ -1,0 +1,17 @@
+name: ppoling_core
+description: "포폴링 기능들이 함께 쓰는 데이터 모델, 계약(인터페이스), 가짜 구현, 약속 테스트."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 약속 테스트 묶음(lib/testing.dart)을 다른 기능 패키지의 테스트에서 불러 쓰려고 dependencies 에 둔다.
+  flutter_test:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
