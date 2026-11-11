@@ -64,7 +64,7 @@ class QaScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(spacing: 16, children: [
-            SizedBox(width: 84, child: Align(alignment: Alignment.centerLeft, child: chip)),
+            SizedBox(width: 100, child: Align(alignment: Alignment.centerLeft, child: chip)),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
