@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+env:
+  FLUTTER_VERSION: 3.47.6
+
+jobs:
+  check:
+    name: import 규칙 · 분석 · 테스트
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: import 규칙 검사
+        run: .github/scripts/check-imports.sh
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      # 맨 위 폴더 중 pubspec.yaml 이 있는 패키지를 모두 검사한다. 새 기능 폴더도 자동으로 들어온다.
+      - name: 패키지별 analyze · test
+        run: |
+          for pub in */pubspec.yaml; do
+            dir=${pub%/pubspec.yaml}
+            echo "::group::$dir"
+            (cd "$dir" && flutter pub get && flutter analyze && { [ ! -d test ] || flutter test; })
+            echo "::endgroup::"
+          done
+
+  build:
+    name: ${{ matrix.target }} 빌드
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: macos
+          - os: windows-latest
+            target: windows
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ${{ matrix.target }} --debug
