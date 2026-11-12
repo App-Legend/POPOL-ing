@@ -67,6 +67,7 @@
 - `compose/`: Docker Compose 제어, 원격 연결 항목
 - `catalog/`: 카테고리 선택, 프로젝트 카탈로그, 오래된 프로젝트 점검
 - `qa/`: 기본 QA
+- `ai/`: AI 프로젝트 검사(Gemini API). Gemini 호출은 여기 `LlmClient` 한 곳에서만 한다
 - `samples/`: 인수 테스트·데모용 샘플 프로젝트
 
 ## 실행
@@ -90,6 +91,7 @@ flutter build macos        # 빌드 (Windows는 build windows)
 - Compose는 `-p ppoling-<프로젝트ID>`로만 띄운다. 사용자가 직접 띄운 같은 compose와 섞이지 않게 하려고. `down -v`(볼륨 삭제)는 기본 실행하지 않는다.
 - 명령은 인자 배열로 넘기고 셸 해석을 쓰지 않는다. 작업 폴더가 프로젝트 폴더 하위인지 확인한다.
 - `.env` 값은 로그·화면에 평문으로 남기지 않는다.
+- Gemini API로는 사용자가 보낼 내용을 보고 [보내기]를 누른 뒤에만 보낸다. `.env` 값·API 키는 보내지 않는다. API 키는 앱에 넣어 배포하지 않는다(누구나 꺼낼 수 있다).
 - 프로젝트 삭제는 앱 목록에서만 뺀다. 폴더·설정 파일은 지우지 않는다.
 - 남이 만든 `ppoling.yaml`은 처음 열 때 실행될 명령 목록을 보여주고 확인받은 뒤 실행한다.
 - 상태는 색만으로 구분하지 않고 텍스트 라벨을 함께 쓴다.
@@ -124,6 +126,6 @@ flutter build macos        # 빌드 (Windows는 build windows)
 
 ## MVP 제외 항목
 
-- AI 기능(로컬 LLM 기반 AI 프로젝트 검사). MVP 직후 첫 확장으로 넣는다.
+- AI 프로젝트 파악(AI-01)·코드 점검(AI-04), 로컬 LLM 전환. MVP에는 Gemini API로 AI-02·03만 넣는다.
 - 실행 프로필
 - 개발 외 카테고리(디자인·투자 등)
