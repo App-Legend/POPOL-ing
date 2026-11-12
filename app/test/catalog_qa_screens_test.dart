@@ -10,7 +10,7 @@ Future<void> _open(WidgetTester tester, String route) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(const PpolingApp());
+  await tester.pumpWidget(PpolingApp(registry: buildRegistry()));
   tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
   await tester.pumpAndSettle();
 }

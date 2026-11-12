@@ -2,6 +2,7 @@
 /// `import 'package:ppoling_core/contracts.dart';`
 library;
 
+export 'contracts/app_registry.dart';
 export 'contracts/config_validator.dart';
 export 'contracts/project_repository.dart';
 export 'contracts/qa_runner.dart';
