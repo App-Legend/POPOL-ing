@@ -3,6 +3,9 @@
 library;
 
 export 'fakes/fake_config_validator.dart';
+export 'fakes/fake_env_checker.dart';
+export 'fakes/fake_http_probe.dart';
+export 'fakes/fake_port_probe.dart';
 export 'fakes/fake_project_repository.dart';
 export 'fakes/fake_qa_runner.dart';
 export 'fakes/sample_projects.dart';
