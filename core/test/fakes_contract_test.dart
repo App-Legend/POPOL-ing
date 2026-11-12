@@ -65,6 +65,21 @@ void main() {
         ));
   });
 
+  group('FakeRuntimeQuery', () {
+    runtimeQueryContract(() async => RuntimeQueryFixture(
+          query: FakeRuntimeQuery(owned: [
+            (port: 5173, pid: 4321, item: (projectId: 'shop-clone', serviceId: 'web')),
+            (port: 3306, pid: null, item: (projectId: 'my-team-project', serviceId: 'db')),
+          ]),
+          processPort: 5173,
+          processPid: 4321,
+          processItem: (projectId: 'shop-clone', serviceId: 'web'),
+          composePort: 3306,
+          composeItem: (projectId: 'my-team-project', serviceId: 'db'),
+          unownedPort: 8080,
+        ));
+  });
+
   group('FakeHttpProbe', () {
     httpProbeContract(() async => HttpProbeFixture(
           probe: FakeHttpProbe(responses: {'http://localhost:8080/health': 200, 'http://localhost:8080/boom': 500}),
@@ -118,6 +133,12 @@ void main() {
       expect(await ports.whoUses(5173), isA<PortFree>());
       expect((await ports.connect(3306, host: 'db.example.com')).ok, isTrue);
       expect((await ports.connect(3307, host: 'db.example.com')).ok, isFalse);
+    });
+
+    test('FakeRuntimeQuery 는 항목을 목록에서 빼면 바로 null 이 된다', () async {
+      final runtime = FakeRuntimeQuery(owned: [(port: 5173, pid: 4321, item: (projectId: 'shop-clone', serviceId: 'web'))]);
+      runtime.owned.clear();
+      expect(await runtime.ownerOf(const PortInUse(5173, pid: 4321)), isNull);
     });
 
     test('FakeProjectRepository 는 폴더 이름으로 ID 를 만들고, 겹치면 숫자를 붙인다', () async {

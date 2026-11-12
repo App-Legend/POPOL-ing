@@ -11,4 +11,5 @@ export 'fakes/fake_log_excerpt.dart';
 export 'fakes/fake_port_probe.dart';
 export 'fakes/fake_project_repository.dart';
 export 'fakes/fake_qa_runner.dart';
+export 'fakes/fake_runtime_query.dart';
 export 'fakes/sample_projects.dart';
