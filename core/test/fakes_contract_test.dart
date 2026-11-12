@@ -27,7 +27,45 @@ void main() {
         ));
   });
 
+  group('FakeLlmClient', () {
+    llmClientContract(() async => LlmClientFixture(
+          configured: FakeLlmClient(),
+          unconfigured: FakeLlmClient(configured: false),
+        ));
+  });
+
+  group('FakeLogExcerpt', () {
+    const log = ['DB_PASSWORD=hunter2', 'Started', 'Connection refused: localhost:3306'];
+    logExcerptContract(() async => LogExcerptFixture(
+          excerpt: FakeLogExcerpt(FakeProjectRepository.withSamples(),
+              logs: {('my-team-project', 'api'): log}, secrets: {'hunter2'}),
+          projectId: 'my-team-project',
+          serviceId: 'api',
+          logLines: log,
+          secret: 'hunter2',
+        ));
+  });
+
+  group('FakeEnvDiff', () {
+    envDiffContract(() async => EnvDiffFixture(
+          diff: FakeEnvDiff(FakeProjectRepository.withSamples(), changes: {
+            'my-team-project': const [EnvChange(name: 'node', before: '20.11.0', after: '22.3.0')],
+          }),
+          changedProjectId: 'my-team-project',
+          changedNames: {'node'},
+          noRecordProjectId: 'ppoling',
+        ));
+  });
+
   group('가짜 구현만의 동작', () {
+    test('FakeLlmClient 는 보낸 prompt 를 남기고, 키가 없으면 보내지 않는다', () async {
+      final ai = FakeLlmClient(failWith: LlmFailure.quotaExceeded);
+      await expectLater(ai.complete('a'), throwsA(isA<LlmException>()));
+      ai.configured = false;
+      await expectLater(ai.complete('b'), throwsA(isA<LlmException>()));
+      expect(ai.sent, ['a']);
+    });
+
     test('FakeProjectRepository 는 폴더 이름으로 ID 를 만들고, 겹치면 숫자를 붙인다', () async {
       final repo = FakeProjectRepository(existingFolders: [r'C:\work\My App', '/home/me/my-app', '/x/포폴링']);
       expect((await repo.addProject(r'C:\work\My App')).id, 'my-app');

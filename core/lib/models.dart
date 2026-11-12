@@ -3,7 +3,9 @@ library;
 
 export 'models/check_config.dart';
 export 'models/config_issue.dart';
+export 'models/env_change.dart';
 export 'models/errors.dart';
+export 'models/llm.dart';
 export 'models/project.dart';
 export 'models/project_config.dart';
 export 'models/qa.dart';

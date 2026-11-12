@@ -1,4 +1,5 @@
 import 'config_issue.dart';
+import 'llm.dart';
 
 /// 포폴링 계약 함수가 던지는 예외의 공통 부모.
 ///
@@ -46,4 +47,18 @@ class ConfigFormatException extends PpolingException {
         super('ppoling.yaml 에서 고칠 곳이 ${issues.length}군데 있어요.');
 
   final List<ConfigIssue> issues;
+}
+
+/// AI(LlmClient) 호출이 실패했을 때. [failure] 로 이유를 구분한다.
+class LlmException extends PpolingException {
+  LlmException(this.failure) : super(_messages[failure]!);
+
+  final LlmFailure failure;
+
+  static const _messages = {
+    LlmFailure.missingKey: 'AI를 쓰려면 API 키를 먼저 넣어 주세요.',
+    LlmFailure.invalidKey: 'API 키가 맞지 않아요. 키를 다시 확인해 주세요.',
+    LlmFailure.quotaExceeded: 'AI 사용량 제한을 넘었어요. 잠시 뒤 다시 시도해 주세요.',
+    LlmFailure.network: 'AI 서버에 연결하지 못했어요. 인터넷 연결을 확인해 주세요.',
+  };
 }

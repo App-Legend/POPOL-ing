@@ -3,5 +3,8 @@
 library;
 
 export 'testing/config_validator_contract.dart';
+export 'testing/env_diff_contract.dart';
+export 'testing/llm_client_contract.dart';
+export 'testing/log_excerpt_contract.dart';
 export 'testing/project_repository_contract.dart';
 export 'testing/qa_runner_contract.dart';
