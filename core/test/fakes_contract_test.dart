@@ -68,14 +68,15 @@ void main() {
   group('FakeRuntimeQuery', () {
     runtimeQueryContract(() async => RuntimeQueryFixture(
           query: FakeRuntimeQuery(owned: [
-            (port: 5173, pid: 4321, item: (projectId: 'shop-clone', serviceId: 'web')),
-            (port: 3306, pid: null, item: (projectId: 'my-team-project', serviceId: 'db')),
+            (port: 5173, pid: 4321, item: const ItemRef(projectId: 'shop-clone', serviceId: 'web')),
+            (port: 3306, pid: null, item: const ItemRef(projectId: 'my-team-project', serviceId: 'db')),
           ]),
           processPort: 5173,
           processPid: 4321,
-          processItem: (projectId: 'shop-clone', serviceId: 'web'),
+          processItem: const ItemRef(projectId: 'shop-clone', serviceId: 'web'),
+          foreignPid: 9876,
           composePort: 3306,
-          composeItem: (projectId: 'my-team-project', serviceId: 'db'),
+          composeItem: const ItemRef(projectId: 'my-team-project', serviceId: 'db'),
           unownedPort: 8080,
         ));
   });
@@ -135,8 +136,15 @@ void main() {
       expect((await ports.connect(3307, host: 'db.example.com')).ok, isFalse);
     });
 
+    test('ItemRef 는 ID 가 같으면 같은 항목이다', () {
+      expect(const ItemRef(projectId: 'shop-clone', serviceId: 'web'), const ItemRef(projectId: 'shop-clone', serviceId: 'web'));
+      expect(const ItemRef(projectId: 'shop-clone', serviceId: 'web').hashCode,
+          const ItemRef(projectId: 'shop-clone', serviceId: 'web').hashCode);
+      expect(const ItemRef(projectId: 'shop-clone', serviceId: 'web'), isNot(const ItemRef(projectId: 'shop-clone', serviceId: 'api')));
+    });
+
     test('FakeRuntimeQuery 는 항목을 목록에서 빼면 바로 null 이 된다', () async {
-      final runtime = FakeRuntimeQuery(owned: [(port: 5173, pid: 4321, item: (projectId: 'shop-clone', serviceId: 'web'))]);
+      final runtime = FakeRuntimeQuery(owned: [(port: 5173, pid: 4321, item: const ItemRef(projectId: 'shop-clone', serviceId: 'web'))]);
       runtime.owned.clear();
       expect(await runtime.ownerOf(const PortInUse(5173, pid: 4321)), isNull);
     });

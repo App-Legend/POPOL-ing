@@ -10,7 +10,7 @@ typedef OwnedPort = ({int port, int? pid, ItemRef item});
 /// 테스트 중에 [owned] 를 바꿔도 된다(예: 항목을 중지하면 목록에서 빼기).
 /// ```dart
 /// final runtime = FakeRuntimeQuery(owned: [
-///   (port: 5173, pid: 4321, item: (projectId: 'shop-clone', serviceId: 'web')),
+///   (port: 5173, pid: 4321, item: const ItemRef(projectId: 'shop-clone', serviceId: 'web')),
 /// ]);
 /// await runtime.ownerOf(const PortInUse(5173, pid: 4321));   // shop-clone / web
 /// await runtime.ownerOf(const PortInUse(5173, pid: 999));    // null (외부 프로그램)

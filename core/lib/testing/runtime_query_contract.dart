@@ -11,6 +11,7 @@ class RuntimeQueryFixture {
     required this.processPort,
     required this.processPid,
     required this.processItem,
+    required this.foreignPid,
     required this.composePort,
     required this.composeItem,
     required this.unownedPort,
@@ -22,6 +23,10 @@ class RuntimeQueryFixture {
   final int processPort;
   final int processPid;
   final ItemRef processItem;
+
+  /// 포폴링과 무관한 프로세스의 PID. 진짜 구현 테스트에서는 테스트가 따로 띄운 프로세스의 PID 를 쓴다
+  /// ([processPid] 의 자식 PID 와 겹치면 안 된다).
+  final int foreignPid;
 
   /// 포폴링이 띄운 Compose 항목 [composeItem] 이 쓰는 포트.
   final int composePort;
@@ -40,7 +45,7 @@ void runtimeQueryContract(Future<RuntimeQueryFixture> Function() setUp) {
 
   test('포트만 맞고 PID 가 다르면 null 이다(외부 프로그램)', () async {
     final f = await setUp();
-    expect(await f.query.ownerOf(PortInUse(f.processPort, pid: f.processPid + 1)), isNull);
+    expect(await f.query.ownerOf(PortInUse(f.processPort, pid: f.foreignPid)), isNull);
   });
 
   test('프로세스 항목인데 PID 를 모르면 null 이다', () async {
