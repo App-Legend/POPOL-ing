@@ -2,10 +2,14 @@
 /// `import 'package:ppoling_core/contracts.dart';`
 library;
 
+export 'contracts/app_registry.dart';
 export 'contracts/config_validator.dart';
+export 'contracts/env_checker.dart';
 export 'contracts/env_diff.dart';
+export 'contracts/http_probe.dart';
 export 'contracts/llm_client.dart';
 export 'contracts/log_excerpt.dart';
+export 'contracts/port_probe.dart';
 export 'contracts/project_repository.dart';
 export 'contracts/qa_runner.dart';
 export 'models.dart';

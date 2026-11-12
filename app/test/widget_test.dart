@@ -12,7 +12,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(const PpolingApp());
+      await tester.pumpWidget(PpolingApp(registry: buildRegistry()));
       if (route != '/') {
         tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
         await tester.pumpAndSettle();
