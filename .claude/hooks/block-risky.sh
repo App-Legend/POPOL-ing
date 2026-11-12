@@ -8,19 +8,44 @@ block() {
   exit 2
 }
 
+# 이 push가 main으로 가는지. 브랜치를 생략했거나 HEAD면 현재 브랜치로 판단한다.
+pushes_main() {
+  local a skip= args=()
+  for a in "$@"; do
+    if [[ $skip ]]; then skip=; continue; fi
+    case $a in
+      --all | --mirror) return 0 ;;
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      -*) ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  local refs=("${args[@]:1}") # 첫 번째는 원격 이름
+  if ((${#refs[@]} == 0)) || [[ " ${refs[*]} " == *" HEAD "* ]]; then
+    [[ $(git ${dir:+-C "$dir"} branch --show-current 2>/dev/null) == main ]] && return 0
+  fi
+  for a in "${refs[@]}"; do
+    a=${a#+}
+    [[ ${a##*:} == main || ${a##*:} == refs/heads/main ]] && return 0
+  done
+  return 1
+}
+
 # 명령 구분자(; & | ( ) `)와 줄바꿈 기준으로 나눠 각 명령의 첫 단어를 본다.
 while read -r -a w; do
   i=0
   while [[ ${w[i]} == sudo || ${w[i]} == *=* ]]; do ((i++)); done
   case ${w[i]##*/} in
     git | docker)
-      j=$((i + 1))
+      j=$((i + 1)) dir=
       # git -C <경로>, docker --context <이름> 같은 전역 옵션을 건너뛴다.
       while [[ ${w[j]} == -* ]]; do
+        [[ ${w[j]} == -C ]] && dir=${w[j + 1]}
         case ${w[j]} in -C | -c | --context | --config | -H | --host) ((j += 2)) ;; *) ((j++)) ;; esac
       done
       if [[ ${w[j]} == push ]]; then
         [[ ${w[i]##*/} == docker ]] && block "docker push"
+        pushes_main "${w[@]:j+1}" && block "main 브랜치에 직접 push — feat/ → dev → main은 PR로 합친다"
         ask=1
       fi
       ;;
