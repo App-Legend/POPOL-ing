@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 import 'dialogs_screen.dart';
 
 /// 1. 개발 홈 — 프로젝트 카탈로그

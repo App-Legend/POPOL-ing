@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 0. 카테고리 선택
 class CategoryScreen extends StatelessWidget {

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 3. 실행 항목 상세 · 로그
 class DetailScreen extends StatefulWidget {

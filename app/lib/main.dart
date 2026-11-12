@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
+import 'package:ppoling_core/ui.dart';
 import 'package:ppoling_runner/runner.dart' as runner;
 
 import 'registry.dart';
@@ -13,7 +14,6 @@ import 'screens/env_check_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/qa_screen.dart';
 import 'screens/settings_screen.dart';
-import 'ui/theme.dart';
 
 void main() => runApp(PpolingApp(registry: buildRegistry()));
 

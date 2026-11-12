@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling/main.dart';
-import 'package:ppoling/ui/common.dart';
+import 'package:ppoling_core/ui.dart';
 
 const _names = ['my-team-project', 'ppoling', 'weather-bot', 'shop-clone', 'algo-study'];
 
