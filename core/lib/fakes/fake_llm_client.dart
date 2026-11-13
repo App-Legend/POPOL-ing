@@ -11,7 +11,11 @@ import '../models/llm.dart';
 /// final busy = FakeLlmClient(failWith: LlmFailure.quotaExceeded);
 /// ```
 class FakeLlmClient implements LlmClient {
-  FakeLlmClient({this.configured = true, this.reply = 'AI 답변 예시예요.', this.failWith});
+  FakeLlmClient({this.configured = true, this.reply = 'AI 답변 예시예요.', this.failWith, this.modelName = 'fake-model'});
+
+  /// 분석 기록에 남을 가짜 모델 이름.
+  @override
+  final String modelName;
 
   /// API 키가 들어 있는 것으로 칠지. 테스트 중에 바꿔도 된다.
   bool configured;

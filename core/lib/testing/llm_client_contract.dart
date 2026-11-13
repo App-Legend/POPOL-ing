@@ -17,6 +17,12 @@ class LlmClientFixture {
 
 /// [LlmClient] 구현이 계약을 지키는지 확인하는 테스트 묶음. [setUp] 은 테스트마다 불린다.
 void llmClientContract(Future<LlmClientFixture> Function() setUp) {
+  test('modelName 은 키가 없어도 비어 있지 않다 (분석 기록의 "사용 모델")', () async {
+    final f = await setUp();
+    expect(f.configured.modelName.trim(), isNotEmpty);
+    expect(f.unconfigured.modelName.trim(), isNotEmpty);
+  });
+
   test('키가 없으면 isConfigured 는 false, complete 는 missingKey', () async {
     final f = await setUp();
     expect(await f.unconfigured.isConfigured(), isFalse);

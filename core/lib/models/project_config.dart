@@ -27,6 +27,14 @@ class About {
 
   /// 자유 메모. 비밀값은 적지 않는다.
   final String? memo;
+
+  /// [ProjectConfig.fromMap] 이 읽는 about 모양으로 되돌린다. 비어 있는 값은 뺀다.
+  Map<String, Object?> toMap() => {
+        if (summary != null) 'summary': summary,
+        if (stack.isNotEmpty) 'stack': List<String>.of(stack),
+        if (links.isNotEmpty) 'links': Map<String, String>.of(links),
+        if (memo != null) 'memo': memo,
+      };
 }
 
 /// ppoling.yaml 한 개의 내용 (스키마 v1).
@@ -68,4 +76,18 @@ class ProjectConfig {
   /// 밖을 가리키는 경로)를 끝까지 모아 [ConfigFormatException] 하나로 던진다.
   /// 항목 사이의 관계(중복 id, 없는 의존 대상, 순환 의존)는 ConfigValidator 가 검사한다.
   factory ProjectConfig.fromMap(Map<Object?, Object?> map) => readProjectConfig(map);
+
+  /// [fromMap] 이 읽는 키 이름 그대로 Map 으로 되돌린다(YAML 로 저장할 때 쓴다).
+  /// 없는 값·빈 목록·기본값은 넣지 않고, 시간은 초 숫자로 쓴다.
+  Map<String, Object?> toMap() {
+    final aboutMap = about.toMap();
+    return {
+      'version': version,
+      if (name != null) 'name': name,
+      if (aboutMap.isNotEmpty) 'about': aboutMap,
+      if (requires.isNotEmpty) 'requires': [for (final r in requires) r.toMap()],
+      if (services.isNotEmpty) 'services': [for (final s in services) s.toMap()],
+      if (checks.isNotEmpty) 'checks': [for (final c in checks) c.toMap()],
+    };
+  }
 }
