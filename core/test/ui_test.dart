@@ -9,6 +9,32 @@ Widget _host(Widget child, {Map<String, WidgetBuilder> routes = const {}}) => Ma
     );
 
 void main() {
+  testWidgets('DialogBody·closeDialog: 대화상자로 열면 결과를 돌려주며 닫히고, 화면에 박혀 있으면 그대로 있다', (tester) async {
+    Widget body(BuildContext context) => DialogBody('제목', [Btn('확인', onPressed: () => closeDialog(context, 'ok'))]);
+
+    String? result;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Builder(builder: (context) => Scaffold(body: Column(children: [
+            Btn('열기', onPressed: () async => result = await showDialog<String>(context: context, builder: (c) => Dialog(child: body(c)))),
+            body(context),
+          ]))),
+    ));
+
+    // 화면에 박힌 본문의 [확인]은 아무것도 닫지 않는다.
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+    expect(find.text('열기'), findsOneWidget);
+
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('제목'), findsNWidgets(2));
+    await tester.tap(find.text('확인').last);
+    await tester.pumpAndSettle();
+    expect(find.text('제목'), findsOneWidget);
+    expect(result, 'ok');
+  });
+
   testWidgets('AppPage: 경로를 보여주고, 로고를 누르면 첫 화면으로 간다', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
@@ -157,6 +183,11 @@ void main() {
     expect(find.textContaining('이름'), findsOneWidget);
     expect(find.textContaining('필수'), findsOneWidget);
     expect(find.text('my-app'), findsOneWidget);
+  });
+
+  testWidgets('field: obscure 면 값을 가린다', (tester) async {
+    await tester.pumpWidget(_host(Padding(padding: const EdgeInsets.all(16), child: field('API 키', 'AIza-secret', obscure: true))));
+    expect(tester.widget<EditableText>(find.byType(EditableText)).obscureText, isTrue);
   });
 
   testWidgets('dropdown: 라벨과 첫 항목이 보인다', (tester) async {
