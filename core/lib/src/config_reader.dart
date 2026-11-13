@@ -18,7 +18,7 @@ ProjectConfig readProjectConfig(Map<Object?, Object?> raw) {
 }
 
 ProjectConfig _config(MapReader r, Map<String, Object?> map) {
-  r.onlyKeys(map, '', const {'version', 'name', 'about', 'requires', 'services', 'checks'});
+  r.onlyKeys(map, '', const {'version', 'name', 'about', 'requires', 'git', 'services', 'checks'});
   final version = r.integer(map, 'version', '', required: true);
   if (version != null && version != ProjectConfig.supportedVersion) {
     r.report('version', '이 앱은 version: ${ProjectConfig.supportedVersion} 설정만 읽을 수 있어요.');
@@ -28,6 +28,7 @@ ProjectConfig _config(MapReader r, Map<String, Object?> map) {
     name: r.string(map, 'name', ''),
     about: _about(r, map['about'], 'about'),
     requires: _items(r, map, 'requires', _requirement),
+    git: _git(r, map['git'], 'git'),
     services: _items(r, map, 'services', _service),
     checks: _items(r, map, 'checks', _check),
   );
@@ -70,6 +71,18 @@ About _about(MapReader r, Object? value, String path) {
     links: r.stringMap(map, 'links', path),
     memo: r.string(map, 'memo', path),
   );
+}
+
+GitConfig _git(MapReader r, Object? value, String path) {
+  if (value == null) {
+    return const GitConfig();
+  }
+  final map = r.asMap(value, path);
+  if (map == null) {
+    return const GitConfig();
+  }
+  r.onlyKeys(map, path, const {'pullBeforeRun'});
+  return GitConfig(pullBeforeRun: r.boolean(map, 'pullBeforeRun', path) ?? true);
 }
 
 Requirement? _requirement(MapReader r, Map<String, Object?> map, String path) {

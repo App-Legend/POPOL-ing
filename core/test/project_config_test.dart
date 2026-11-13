@@ -16,6 +16,7 @@ Map<String, Object?> planExample() => {
         {'cli': 'java', 'version': '>=17'},
         {'docker': true},
       ],
+      'git': {'pullBeforeRun': true},
       'services': [
         {
           'id': 'db',
@@ -88,6 +89,11 @@ void main() {
       expect((config.requires.first as CliRequirement).version, '>=20');
     });
 
+    test('Git 설정을 읽는다 (FR-19)', () {
+      expect(config.git.pullBeforeRun, isTrue);
+      expect(ProjectConfig.fromMap({'version': 1, 'git': {'pullBeforeRun': false}}).git.pullBeforeRun, isFalse);
+    });
+
     test('실행 항목 4개를 종류에 맞게 읽는다', () {
       final [db, api, web, storage] = config.services;
       expect(db, isA<ComposeService>().having((s) => s.services, 'services', ['mysql']));
@@ -119,6 +125,7 @@ void main() {
       expect(config.services, isEmpty);
       expect(config.checks, isEmpty);
       expect(config.about.stack, isEmpty);
+      expect(config.git.pullBeforeRun, isTrue, reason: '전체 실행 전 pull 은 기본 켬');
     });
 
     test('process 의 cwd·ready·stopTimeout 기본값', () {
@@ -161,6 +168,12 @@ void main() {
         issuePaths(withService({'id': 'web', 'type': 'process', 'command': ['npm'], 'dependOn': ['api']})),
         ['services[0].dependOn'],
       );
+    });
+
+    test('git 의 이름 오타와 true/false 가 아닌 값', () {
+      expect(issuePaths({'version': 1, 'git': {'pullBeforeRun': 'yes'}}), ['git.pullBeforeRun']);
+      expect(issuePaths({'version': 1, 'git': {'pull': true}}), ['git.pull']);
+      expect(issuePaths({'version': 1, 'git': true}), ['git']);
     });
 
     test('process 에 command 가 없거나, 목록이 아니거나, 비어 있으면', () {
@@ -256,8 +269,8 @@ void main() {
       expect(second, equals(first));
     }
 
-    test('기획서 §7 예시는 그대로 돌아온다', () {
-      expectRoundTrip(planExample(), planExample());
+    test('기획서 §7 예시는 그대로 돌아온다 (기본값인 git.pullBeforeRun: true 만 빠진다)', () {
+      expectRoundTrip(planExample(), planExample()..remove('git'));
     });
 
     test('모든 종류를 쓴 설정은 그대로 돌아온다', () {
@@ -275,6 +288,7 @@ void main() {
           {'cli': 'git'},
           {'docker': true},
         ],
+        'git': {'pullBeforeRun': false},
         'services': [
           {
             'id': 'p1',
@@ -339,6 +353,7 @@ void main() {
         'version': 1,
         'about': <String, Object?>{'stack': <Object?>[], 'links': <String, Object?>{}},
         'requires': <Object?>[],
+        'git': {'pullBeforeRun': true},
         'services': [
           {
             'id': 'a',

@@ -37,6 +37,24 @@ class About {
       };
 }
 
+/// Git 연동 설정(FR-19).
+///
+/// ```yaml
+/// git:
+///   pullBeforeRun: true  # 전체 실행 전 git pull --ff-only (기본 켬)
+/// ```
+class GitConfig {
+  const GitConfig({this.pullBeforeRun = true});
+
+  /// 전체 실행 전에 fast-forward 로만 최신 코드를 받을지. 받을 수 없으면 건너뛰고 지금 코드로 실행한다.
+  final bool pullBeforeRun;
+
+  /// [ProjectConfig.fromMap] 이 읽는 git 모양으로 되돌린다. 기본값은 뺀다.
+  Map<String, Object?> toMap() => {
+        if (!pullBeforeRun) 'pullBeforeRun': false,
+      };
+}
+
 /// ppoling.yaml 한 개의 내용 (스키마 v1).
 ///
 /// ```yaml
@@ -44,6 +62,7 @@ class About {
 /// name: my-team-project  # 선택
 /// about: ...             # 선택. [About]
 /// requires: [...]        # 선택. 환경 점검 대상. [Requirement]
+/// git: ...               # 선택. Git 연동. [GitConfig]
 /// services: [...]        # 선택. 실행 항목. [ServiceConfig]
 /// checks: [...]          # 선택. 기본 QA 대상. [CheckConfig]
 /// ```
@@ -56,6 +75,7 @@ class ProjectConfig {
     this.name,
     this.about = const About(),
     this.requires = const [],
+    this.git = const GitConfig(),
     this.services = const [],
     this.checks = const [],
   });
@@ -67,6 +87,7 @@ class ProjectConfig {
   final String? name;
   final About about;
   final List<Requirement> requires;
+  final GitConfig git;
   final List<ServiceConfig> services;
   final List<CheckConfig> checks;
 
@@ -81,11 +102,13 @@ class ProjectConfig {
   /// 없는 값·빈 목록·기본값은 넣지 않고, 시간은 초 숫자로 쓴다.
   Map<String, Object?> toMap() {
     final aboutMap = about.toMap();
+    final gitMap = git.toMap();
     return {
       'version': version,
       if (name != null) 'name': name,
       if (aboutMap.isNotEmpty) 'about': aboutMap,
       if (requires.isNotEmpty) 'requires': [for (final r in requires) r.toMap()],
+      if (gitMap.isNotEmpty) 'git': gitMap,
       if (services.isNotEmpty) 'services': [for (final s in services) s.toMap()],
       if (checks.isNotEmpty) 'checks': [for (final c in checks) c.toMap()],
     };
