@@ -1,0 +1,5 @@
+.dart_tool/
+.flutter-plugins-dependencies
+build/
+# 라이브러리 패키지라 버전 고정 파일은 올리지 않는다(앱이 고정한다).
+pubspec.lock
