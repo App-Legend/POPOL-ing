@@ -49,6 +49,25 @@ class ConfigFormatException extends PpolingException {
   final List<ConfigIssue> issues;
 }
 
+/// Docker 데몬에 연결할 수 없어 Compose 항목을 다룰 수 없을 때(AT-08).
+class DockerNotRunningException extends PpolingException {
+  DockerNotRunningException() : super('Docker 가 꺼져 있어요. Docker Desktop 을 실행한 뒤 다시 시도해 주세요.');
+}
+
+/// `docker compose` 명령이 실패했을 때. 예: compose 파일 오류, 이미지를 받지 못함.
+class ComposeCommandException extends PpolingException {
+  ComposeCommandException({required this.action, required this.exitCode, this.output = ''})
+      : super('Compose 를 $action 못했어요 (종료 코드 $exitCode).');
+
+  /// 하려던 일. 메시지에 그대로 들어간다. 예: `시작하지`, `멈추지`
+  final String action;
+
+  final int exitCode;
+
+  /// 명령 출력의 마지막 부분. 원인을 보여줄 때 쓴다. `.env` 값이 섞이지 않게 가린 뒤 담는다.
+  final String output;
+}
+
 /// AI(LlmClient) 호출이 실패했을 때. [failure] 로 이유를 구분한다.
 class LlmException extends PpolingException {
   LlmException(this.failure) : super(_messages[failure]!);
