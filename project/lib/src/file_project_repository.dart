@@ -46,11 +46,15 @@ class FileProjectRepository implements ProjectRepository {
   @override
   Future<Project> addProject(String folderPath, {String? name}) async {
     final projects = await _projects();
+    folderPath = _trimTrailingSeparators(folderPath);
     if (!await Directory(folderPath).exists()) {
       throw FolderNotFoundException(folderPath);
     }
+    // 표기가 달라도(끝의 /, .., 바로가기) 실제 위치가 같으면 같은 폴더다.
+    // shortcut: 대소문자만 다른 경로는 다른 폴더로 본다. macOS·Windows 기본 설정에서 문제가 되면 비교를 소문자로 바꾼다.
+    final real = await _realPath(folderPath);
     for (final p in projects) {
-      if (p.folderPath == folderPath) {
+      if (p.folderPath == folderPath || await _realPath(p.folderPath) == real) {
         throw ProjectAlreadyRegisteredException(folderPath, projectId: p.id);
       }
     }
@@ -181,6 +185,21 @@ class FileProjectRepository implements ProjectRepository {
       id = '$base-$n';
     }
     return id;
+  }
+
+  /// 실제 위치. 폴더가 없어졌으면 적힌 경로 그대로.
+  static Future<String> _realPath(String path) async {
+    try {
+      return await Directory(path).resolveSymbolicLinks();
+    } on FileSystemException {
+      return path;
+    }
+  }
+
+  /// `/a/b/` → `/a/b`. 드라이브·루트(`/`, `C:\`)는 그대로 둔다.
+  static String _trimTrailingSeparators(String path) {
+    final trimmed = path.replaceAll(RegExp(r'[\\/]+$'), '');
+    return (trimmed.isEmpty || RegExp(r'^[A-Za-z]:$').hasMatch(trimmed)) ? path : trimmed;
   }
 
   static String _folderName(String path) {

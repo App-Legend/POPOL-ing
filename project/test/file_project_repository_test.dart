@@ -95,6 +95,18 @@ services:
     expect(await listFile.readAsString(), '{망가진 파일');
   });
 
+  test('끝에 / 를 붙이거나 바로가기로 같은 폴더를 다시 등록하면 막는다', () async {
+    final dir = await folder('same');
+    final r = repo();
+    final first = await r.addProject('${dir.path}/');
+    expect(first.folderPath, dir.path);
+
+    await expectLater(r.addProject(dir.path), throwsA(isA<ProjectAlreadyRegisteredException>()));
+    await expectLater(r.addProject('${root.path}/same/../same'), throwsA(isA<ProjectAlreadyRegisteredException>()));
+    final link = await Link('${root.path}/link').create(dir.path);
+    await expectLater(r.addProject(link.path), throwsA(isA<ProjectAlreadyRegisteredException>()));
+  });
+
   test('한글만 있는 폴더 이름이면 ID 는 project 로 시작한다', () async {
     final project = await repo().addProject((await folder('내프로젝트')).path);
     expect(project.id, 'project');
