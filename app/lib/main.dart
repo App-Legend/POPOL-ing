@@ -32,6 +32,8 @@ void _registerFakes(AppRegistry app) {
   app.provide<ProjectRepository>(projects);
   app.provide<ConfigValidator>(FakeConfigValidator());
   app.provide<QaRunner>(FakeQaRunner(projects));
+  app.provide<PortProbe>(FakePortProbe());
+  app.provide<RuntimeQuery>(FakeRuntimeQuery());
 }
 
 void _registerMockups(AppRegistry app) {

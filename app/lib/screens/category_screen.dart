@@ -16,7 +16,7 @@ class CategoryScreen extends StatelessWidget {
             const Row(mainAxisSize: MainAxisSize.min, spacing: 12, children: [
               Logo(size: 44),
               Text('포폴링', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700, letterSpacing: -0.5)),
-              Padding(padding: EdgeInsets.only(top: 8), child: Text('PPOL-ing', style: TextStyle(fontFamily: 'Menlo', fontSize: 14, color: C.muted))),
+              Padding(padding: EdgeInsets.only(top: 8), child: Text('POPOL-ing', style: TextStyle(fontFamily: 'Menlo', fontSize: 14, color: C.muted))),
             ]),
             const SizedBox(height: 28),
             const Text('어떤 포트폴리오를 관리할까요?', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),

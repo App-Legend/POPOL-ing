@@ -23,6 +23,21 @@ class DashboardScreen extends StatelessWidget {
                 SizedBox(width: 2),
                 LinkText('저장소 열기', size: 13),
               ]),
+              Wrap(spacing: 16, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+                  const Icon(Icons.call_split, size: 14, color: C.text2, semanticLabel: 'Git 브랜치'),
+                  const Text('브랜치', style: TextStyle(fontSize: 13, color: C.text2)),
+                  Text('dev', style: mono.copyWith(fontSize: 13, fontWeight: FontWeight.w500)),
+                ]),
+                const Text.rich(TextSpan(style: TextStyle(fontSize: 13, color: C.text2), children: [
+                  TextSpan(text: '커밋하지 않은 변경 '),
+                  TextSpan(text: '2개', style: TextStyle(fontWeight: FontWeight.w500, color: C.text)),
+                ])),
+                Text.rich(TextSpan(style: const TextStyle(fontSize: 13, color: C.text2), children: [
+                  const TextSpan(text: '원격보다 '),
+                  TextSpan(text: '3커밋 뒤처짐', style: TextStyle(fontWeight: FontWeight.w500, color: C.warn.$2)),
+                ])),
+              ]),
               const Text('메모: 관리자 계정은 .env 의 ADMIN_* 참고', style: TextStyle(fontSize: 13, color: C.muted)),
             ]),
           ),
@@ -115,6 +130,7 @@ class DashboardScreen extends StatelessWidget {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
               const Text('이번 전체 실행', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               for (final (label, tone, msg) in [
+                ('건너뜀', C.idle, 'Git pull — 커밋하지 않은 변경 2개가 있어 받지 않고 지금 코드로 실행했어요'),
                 ('성공', C.ok, 'db — 12초 만에 준비 완료'),
                 ('진행 중', C.warn, 'api — 준비 대기 중'),
                 ('건너뜀', C.idle, 'web — 포트 5173 을 shop-clone 이 사용 중'),

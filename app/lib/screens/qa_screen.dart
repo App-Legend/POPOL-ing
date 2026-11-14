@@ -34,11 +34,28 @@ class QaScreen extends StatelessWidget {
             margin: const EdgeInsets.only(top: 12),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(color: C.headBg, borderRadius: BorderRadius.circular(8)),
-            child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
-              const Text('원인 후보: web 항목이 시작되지 않았어요 (포트 5173 을 내 프로젝트 shop-clone / web 이 사용 중). ', style: TextStyle(fontSize: 13, color: C.text2)),
-              LinkText('대시보드에서 확인', size: 13, onTap: () => go(context, '/dashboard')),
+            child: Row(spacing: 10, children: [
+              Expanded(
+                child: Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+                  const Text('원인 후보: web 항목이 시작되지 않았어요 (포트 5173 을 내 프로젝트 shop-clone / web 이 사용 중). ', style: TextStyle(fontSize: 13, color: C.text2)),
+                  LinkText('대시보드에서 확인', size: 13, onTap: () => go(context, '/dashboard')),
+                ]),
+              ),
+              Btn('원인 분석', small: true, onPressed: () => Navigator.pushNamed(context, '/dialogs')),
             ]),
           ),
+        ),
+        Panel(
+          child: Row(spacing: 16, children: [
+            const Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
+                Text('AI 요약', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                Text('이번 검사 결과를 Gemini 로 짧게 정리해요. 누르면 보낼 내용을 먼저 보여주고, [보내기]를 눌러야 전송해요. 통과·실패 판정은 바뀌지 않아요.',
+                    style: TextStyle(fontSize: 13, color: C.muted, height: 1.6)),
+              ]),
+            ),
+            Btn('AI 요약', primary: true, onPressed: () => Navigator.pushNamed(context, '/dialogs')),
+          ]),
         ),
         _check(
           const StatusChip('설정 필요', C.idle),
