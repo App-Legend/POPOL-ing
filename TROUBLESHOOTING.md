@@ -14,3 +14,10 @@
 ```
 
 ---
+
+## `flutter analyze`가 "FormatException: Unterminated string"으로 멈춤
+
+- **날짜:** 2026-11-14
+- **문제:** `project/`에서 `flutter analyze`를 실행하면 결과 없이 `Unhandled exception: FormatException: Unterminated string (at character 644)` … `analysis server exited with code 255`가 나온다. 오류 위치에 퍼센트 인코딩된 폴더 경로(`...%E1%84%92...POPOL-ing/project/`)가 보인다.
+- **원인:** 확인하지 못함. 저장소 경로의 한글 폴더명(`모바일 통합구현2`)이 분석 서버에 넘어가며 깨진 것으로 추정한다. 코드 문제는 아니다(`dart analyze`는 정상 동작).
+- **해결:** 같은 폴더에서 `dart analyze`로 대신 검사한다. CI(영문 경로)에서는 `flutter analyze`가 그대로 돈다. 근본 해결은 저장소를 영문 경로로 옮기는 것(미확인).
