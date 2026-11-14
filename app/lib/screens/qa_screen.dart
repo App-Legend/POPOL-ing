@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 5. QA 결과 (헬스체크)
 class QaScreen extends StatelessWidget {

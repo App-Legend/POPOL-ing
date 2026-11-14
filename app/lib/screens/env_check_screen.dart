@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 4. 환경 점검
 class EnvCheckScreen extends StatelessWidget {

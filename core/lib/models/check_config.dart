@@ -29,4 +29,13 @@ class CheckConfig {
 
   /// 검사할 주소가 있는가. 없으면 QA 결과는 '설정 필요'다.
   bool get hasTarget => url != null || port != null;
+
+  /// [ProjectConfig.fromMap] 이 읽는 checks 한 칸 모양으로 되돌린다. 없는 값은 뺀다.
+  Map<String, Object?> toMap() => {
+        'name': name,
+        if (url != null) 'url': url,
+        if (port != null) 'port': port,
+        if (host != null) 'host': host,
+        if (expectStatus != null) 'expectStatus': expectStatus,
+      };
 }

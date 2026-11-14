@@ -305,6 +305,31 @@ TextSpan logLine(String time, String level, String msg, {String? note}) {
   ]);
 }
 
+/// 대화상자 본문: 제목 + 내용. `showDialog(builder: (_) => Dialog(child: ...))` 안이나 시안 화면에 그대로 넣는다.
+class DialogBody extends StatelessWidget {
+  const DialogBody(this.title, this.children, {super.key, this.maxWidth = 440});
+  final String title;
+  final List<Widget> children;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 14, children: [
+            Text(title, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700)),
+            ...children,
+          ]),
+        ),
+      );
+}
+
+/// 대화상자로 열렸을 때만 [result] 를 돌려주며 닫는다. 시안 화면에 박혀 있을 땐 닫을 대화상자가 없다.
+void closeDialog<T>(BuildContext context, [T? result]) {
+  if (ModalRoute.of(context) is DialogRoute) Navigator.pop<T>(context, result);
+}
+
 /// 너비에 맞춰 [minItemWidth] 이상으로 칸을 나누는 그리드 (CSS auto-fit 대체).
 class AutoGrid extends StatelessWidget {
   const AutoGrid({super.key, required this.minItemWidth, required this.children, this.gap = 16});

@@ -10,6 +10,10 @@ import '../models/errors.dart';
 /// - 보내는 내용에 `.env` 값·API 키를 넣지 않는다.
 /// - API 키는 로그·화면에 평문으로 남기지 않는다.
 abstract interface class LlmClient {
+  /// 요청에 쓰는 모델 이름. 분석 기록의 "사용 모델"(기획서 §7)에 남긴다.
+  /// 비어 있지 않고, 키 같은 비밀값은 넣지 않는다. 예: Gemini Flash 계열 모델 이름
+  String get modelName;
+
   /// API 키가 들어 있는지. false 면 화면은 "API 키 필요"와 [키 입력]을 보여준다.
   Future<bool> isConfigured();
 

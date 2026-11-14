@@ -1,3 +1,4 @@
+import '../src/map_writer.dart';
 import 'ready_condition.dart';
 
 /// 실행 항목 하나. ppoling.yaml 의 `services` 목록 한 칸이다.
@@ -15,6 +16,20 @@ sealed class ServiceConfig {
 
   /// 준비 완료로 보는 기준.
   final ReadyCondition ready;
+
+  /// [ProjectConfig.fromMap] 이 읽는 services 한 칸 모양으로 되돌린다. 기본값·빈 값은 뺀다.
+  Map<String, Object?> toMap();
+
+  /// 공통 항목. ready 는 기본값(NoneReady, 기본 timeout·interval)이면 뺀다.
+  Map<String, Object?> _common(String type) => {
+        'id': id,
+        'type': type,
+        if (dependsOn.isNotEmpty) 'dependsOn': List<String>.of(dependsOn),
+        if (!(ready is NoneReady &&
+            ready.timeout == ReadyCondition.defaultTimeout &&
+            ready.interval == ReadyCondition.defaultInterval))
+          'ready': ready.toMap(),
+      };
 }
 
 /// 내 컴퓨터에서 명령으로 띄우는 항목. `type: process`
@@ -62,6 +77,17 @@ final class ProcessService extends ServiceConfig {
 
   /// 종료 신호를 보낸 뒤 이 시간을 기다리고, 그래도 살아 있으면 강제 종료한다.
   final Duration stopTimeout;
+
+  @override
+  Map<String, Object?> toMap() => {
+        ..._common('process'),
+        if (cwd != '.') 'cwd': cwd,
+        'command': List<String>.of(command),
+        if (env.isNotEmpty) 'env': Map<String, String>.of(env),
+        if (envFile != null) 'envFile': envFile,
+        if (ports.isNotEmpty) 'ports': List<int>.of(ports),
+        if (stopTimeout != defaultStopTimeout) 'stopTimeout': durationToSeconds(stopTimeout),
+      };
 }
 
 /// Docker Compose 로 띄우는 항목. `type: compose`
@@ -86,6 +112,13 @@ final class ComposeService extends ServiceConfig {
 
   /// 띄울 compose 서비스 이름. 비어 있으면 파일 전체.
   final List<String> services;
+
+  @override
+  Map<String, Object?> toMap() => {
+        ..._common('compose'),
+        'file': file,
+        if (services.isNotEmpty) 'services': List<String>.of(services),
+      };
 }
 
 /// 클라우드·배포 서버처럼 내 컴퓨터 밖에서 도는 항목. `type: remote`
@@ -94,4 +127,7 @@ final class ComposeService extends ServiceConfig {
 /// host 가 있는 [PortReady] 만 쓸 수 있다.
 final class RemoteService extends ServiceConfig {
   const RemoteService({required super.id, required super.ready, super.dependsOn});
+
+  @override
+  Map<String, Object?> toMap() => _common('remote');
 }

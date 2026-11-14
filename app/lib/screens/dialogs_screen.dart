@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
-import 'settings_screen.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 7. 확인 대화상자 — 여섯 대화상자를 나란히 보여주는 시안 화면.
 class DialogsScreen extends StatelessWidget {

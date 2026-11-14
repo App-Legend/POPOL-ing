@@ -58,6 +58,19 @@ class MapReader {
     return _intAt(value, path, min: min, max: max);
   }
 
+  /// true/false 를 읽는다. YAML 의 "yes" 같은 글자는 받지 않는다.
+  bool? boolean(Map<String, Object?> map, String key, String parent) {
+    final value = map[key];
+    if (value == null) {
+      return null;
+    }
+    if (value is! bool) {
+      report(child(parent, key), 'true 또는 false 로 적어 주세요.');
+      return null;
+    }
+    return value;
+  }
+
   /// 초 단위 숫자를 읽는다. 소수도 된다. 예: `timeout: 90`, `interval: 0.5`
   Duration? seconds(Map<String, Object?> map, String key, String parent) {
     final path = child(parent, key);

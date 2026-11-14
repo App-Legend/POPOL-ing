@@ -16,6 +16,7 @@ Map<String, Object?> planExample() => {
         {'cli': 'java', 'version': '>=17'},
         {'docker': true},
       ],
+      'git': {'pullBeforeRun': true},
       'services': [
         {
           'id': 'db',
@@ -88,6 +89,11 @@ void main() {
       expect((config.requires.first as CliRequirement).version, '>=20');
     });
 
+    test('Git 설정을 읽는다 (FR-19)', () {
+      expect(config.git.pullBeforeRun, isTrue);
+      expect(ProjectConfig.fromMap({'version': 1, 'git': {'pullBeforeRun': false}}).git.pullBeforeRun, isFalse);
+    });
+
     test('실행 항목 4개를 종류에 맞게 읽는다', () {
       final [db, api, web, storage] = config.services;
       expect(db, isA<ComposeService>().having((s) => s.services, 'services', ['mysql']));
@@ -119,6 +125,7 @@ void main() {
       expect(config.services, isEmpty);
       expect(config.checks, isEmpty);
       expect(config.about.stack, isEmpty);
+      expect(config.git.pullBeforeRun, isTrue, reason: '전체 실행 전 pull 은 기본 켬');
     });
 
     test('process 의 cwd·ready·stopTimeout 기본값', () {
@@ -161,6 +168,12 @@ void main() {
         issuePaths(withService({'id': 'web', 'type': 'process', 'command': ['npm'], 'dependOn': ['api']})),
         ['services[0].dependOn'],
       );
+    });
+
+    test('git 의 이름 오타와 true/false 가 아닌 값', () {
+      expect(issuePaths({'version': 1, 'git': {'pullBeforeRun': 'yes'}}), ['git.pullBeforeRun']);
+      expect(issuePaths({'version': 1, 'git': {'pull': true}}), ['git.pull']);
+      expect(issuePaths({'version': 1, 'git': true}), ['git']);
     });
 
     test('process 에 command 가 없거나, 목록이 아니거나, 비어 있으면', () {
@@ -244,6 +257,157 @@ void main() {
             .having((e) => e.message, 'message', 'ppoling.yaml 에서 고칠 곳이 1군데 있어요.')
             .having((e) => e.issues.single.path, 'path', 'services')),
       );
+    });
+  });
+
+  group('toMap 왕복', () {
+    /// fromMap → toMap → fromMap → toMap 이 같고, 첫 toMap 이 [normalized] 와 같은지 본다.
+    void expectRoundTrip(Map<String, Object?> source, Map<String, Object?> normalized) {
+      final first = ProjectConfig.fromMap(source).toMap();
+      expect(first, equals(normalized));
+      final second = ProjectConfig.fromMap(first).toMap();
+      expect(second, equals(first));
+    }
+
+    test('기획서 §7 예시는 그대로 돌아온다 (기본값인 git.pullBeforeRun: true 만 빠진다)', () {
+      expectRoundTrip(planExample(), planExample()..remove('git'));
+    });
+
+    test('모든 종류를 쓴 설정은 그대로 돌아온다', () {
+      final all = <String, Object?>{
+        'version': 1,
+        'name': 'all-kinds',
+        'about': {
+          'summary': '모든 종류',
+          'stack': ['Dart'],
+          'links': {'repo': 'https://example.com/r'},
+          'memo': '메모',
+        },
+        'requires': [
+          {'cli': 'node', 'version': '>=20'},
+          {'cli': 'git'},
+          {'docker': true},
+        ],
+        'git': {'pullBeforeRun': false},
+        'services': [
+          {
+            'id': 'p1',
+            'type': 'process',
+            'cwd': './a',
+            'command': ['npm', 'run', 'dev'],
+            'env': {'PORT': '8080'},
+            'envFile': './a/.env',
+            'ports': [8080, 8081],
+            'stopTimeout': 2.5,
+            'dependsOn': ['c1'],
+            'ready': {'type': 'log', 'pattern': 'Started .* in', 'timeout': 30, 'interval': 0.5},
+          },
+          {
+            'id': 'p2',
+            'type': 'process',
+            'command': ['echo'],
+            'ready': {'type': 'port', 'port': 3000, 'host': '127.0.0.1'},
+          },
+          {
+            'id': 'p3',
+            'type': 'process',
+            'command': ['echo'],
+            'ready': {'type': 'none', 'timeout': 5},
+          },
+          {
+            'id': 'c1',
+            'type': 'compose',
+            'file': './docker-compose.yml',
+            'ready': {'type': 'http', 'url': 'http://localhost:9000/h', 'expectStatus': 204},
+          },
+          {
+            'id': 'c2',
+            'type': 'compose',
+            'file': './c2.yml',
+            'services': ['db', 'cache'],
+            'ready': {'type': 'compose-healthy', 'interval': 2},
+          },
+          {
+            'id': 'r1',
+            'type': 'remote',
+            'ready': {'type': 'http', 'url': 'https://r.example.com/health'},
+          },
+          {
+            'id': 'r2',
+            'type': 'remote',
+            'ready': {'type': 'port', 'port': 5432, 'host': 'db.example.com'},
+            'dependsOn': ['r1'],
+          },
+        ],
+        'checks': [
+          {'name': 'URL', 'url': 'http://localhost:1/', 'expectStatus': 200},
+          {'name': 'PORT', 'port': 3306, 'host': 'db.local'},
+          {'name': '주소 없음'},
+        ],
+      };
+      expectRoundTrip(all, all);
+    });
+
+    test('기본값을 적어도 toMap 에서는 빠진다', () {
+      final explicit = <String, Object?>{
+        'version': 1,
+        'about': <String, Object?>{'stack': <Object?>[], 'links': <String, Object?>{}},
+        'requires': <Object?>[],
+        'git': {'pullBeforeRun': true},
+        'services': [
+          {
+            'id': 'a',
+            'type': 'process',
+            'cwd': '.',
+            'command': ['x'],
+            'env': <String, Object?>{},
+            'ports': <Object?>[],
+            'stopTimeout': 10,
+            'dependsOn': <Object?>[],
+            'ready': {'type': 'none', 'timeout': 60, 'interval': 1},
+          },
+          {
+            'id': 'b',
+            'type': 'process',
+            'command': ['y'],
+            'ready': {'type': 'port', 'port': 1, 'timeout': 60.0, 'interval': 1.0},
+          },
+        ],
+      };
+      final expected = <String, Object?>{
+        'version': 1,
+        'services': [
+          {'id': 'a', 'type': 'process', 'command': ['x']},
+          {
+            'id': 'b',
+            'type': 'process',
+            'command': ['y'],
+            'ready': {'type': 'port', 'port': 1},
+          },
+        ],
+      };
+      expectRoundTrip(explicit, expected);
+    });
+
+    test('시간은 딱 떨어지면 정수, 아니면 소수로 쓴다', () {
+      const service = ProcessService(
+        id: 'a',
+        command: ['x'],
+        stopTimeout: Duration(milliseconds: 1500),
+        ready: LogReady(pattern: 'ok', timeout: Duration(seconds: 90)),
+      );
+      final map = service.toMap();
+      expect(map['stopTimeout'], isA<double>().having((v) => v, 'value', 1.5));
+      expect((map['ready']! as Map)['timeout'], isA<int>().having((v) => v, 'value', 90));
+    });
+
+    test('반환한 Map 을 고쳐도 원본 설정은 그대로다', () {
+      final config = ProjectConfig.fromMap(planExample());
+      final map = config.toMap();
+      ((map['services']! as List).first as Map)['id'] = 'changed';
+      ((map['about']! as Map)['stack']! as List).add('X');
+      expect(config.services.first.id, 'db');
+      expect(config.about.stack, ['Spring Boot', 'React', 'MySQL']);
     });
   });
 }

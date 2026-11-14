@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../ui/common.dart';
-import '../ui/theme.dart';
+import 'package:ppoling_core/ui.dart';
 
 /// 6. 프로젝트 설정
 class SettingsScreen extends StatelessWidget {
