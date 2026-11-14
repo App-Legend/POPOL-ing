@@ -5,6 +5,7 @@ export 'models/check_config.dart';
 export 'models/config_issue.dart';
 export 'models/env_change.dart';
 export 'models/env_check.dart';
+export 'models/item_ref.dart';
 export 'models/errors.dart';
 export 'models/llm.dart';
 export 'models/probe.dart';

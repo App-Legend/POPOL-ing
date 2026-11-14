@@ -12,4 +12,5 @@ export 'contracts/log_excerpt.dart';
 export 'contracts/port_probe.dart';
 export 'contracts/project_repository.dart';
 export 'contracts/qa_runner.dart';
+export 'contracts/runtime_query.dart';
 export 'models.dart';
