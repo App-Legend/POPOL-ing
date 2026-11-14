@@ -106,7 +106,50 @@ void main() {
         ));
   });
 
+  ItemLauncherFixture launcherFixture({required bool dockerRunning}) {
+    final services = SampleProjects.myTeamProject.config!.services;
+    return ItemLauncherFixture(
+      launcher: FakeItemLauncher(
+        FakeProjectRepository.withSamples(),
+        ports: {'mysql': [3306]},
+        reachable: {'storage'},
+        dockerRunning: dockerRunning,
+      ),
+      projectId: SampleProjects.myTeamProject.id,
+      compose: services.whereType<ComposeService>().single,
+      composePort: 3306,
+      process: services.whereType<ProcessService>().first,
+      remoteUp: services.whereType<RemoteService>().single,
+      remoteDown: const RemoteService(id: 'old-api', ready: HttpReady(url: 'https://old-api.example.com/health')),
+      dockerRunning: dockerRunning,
+    );
+  }
+
+  group('FakeItemLauncher', () {
+    itemLauncherContract(() async => launcherFixture(dockerRunning: true));
+  });
+
+  group('FakeItemLauncher (Docker 꺼짐)', () {
+    itemLauncherContract(() async => launcherFixture(dockerRunning: false));
+  });
+
   group('가짜 구현만의 동작', () {
+    test('FakeItemLauncher 는 Compose 항목마다 따로 멈추고, 원격은 reachable 을 바꾸면 바로 끊긴다', () async {
+      final launcher = FakeItemLauncher(FakeProjectRepository.withSamples(),
+          ports: {'mysql': [3306], 'redis': [6379]}, reachable: {'storage'});
+      const db = ComposeService(id: 'db', file: './docker-compose.yml', services: ['mysql']);
+      const cache = ComposeService(id: 'cache', file: './docker-compose.yml', services: ['redis']);
+      await launcher.start('my-team-project', db);
+      await launcher.start('my-team-project', cache);
+      await launcher.stop('my-team-project', db);
+      expect(await launcher.composeOwnerOf(3306), isNull);
+      expect(await launcher.composeOwnerOf(6379), const ItemRef(projectId: 'my-team-project', serviceId: 'cache'));
+
+      final storage = SampleProjects.myTeamProject.config!.services.whereType<RemoteService>().single;
+      launcher.reachable.clear();
+      expect(((await launcher.status('my-team-project', storage)) as RemoteStatus).connected, isFalse);
+    });
+
     test('FakeLlmClient 는 보낸 prompt 를 남기고, 키가 없으면 보내지 않는다', () async {
       final ai = FakeLlmClient(failWith: LlmFailure.quotaExceeded);
       await expectLater(ai.complete('a'), throwsA(isA<LlmException>()));

@@ -6,6 +6,7 @@ export 'fakes/fake_config_validator.dart';
 export 'fakes/fake_env_checker.dart';
 export 'fakes/fake_env_diff.dart';
 export 'fakes/fake_http_probe.dart';
+export 'fakes/fake_item_launcher.dart';
 export 'fakes/fake_llm_client.dart';
 export 'fakes/fake_log_excerpt.dart';
 export 'fakes/fake_port_probe.dart';
