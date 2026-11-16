@@ -34,6 +34,7 @@ void _registerFakes(AppRegistry app) {
   app.provide<QaRunner>(FakeQaRunner(projects));
   app.provide<PortProbe>(FakePortProbe());
   app.provide<RuntimeQuery>(FakeRuntimeQuery());
+  app.provide<Orchestrator>(FakeOrchestrator(projects));
 }
 
 void _registerMockups(AppRegistry app) {

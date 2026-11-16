@@ -15,4 +15,5 @@ export 'models/project_config.dart';
 export 'models/qa.dart';
 export 'models/ready_condition.dart';
 export 'models/requirement.dart';
+export 'models/run.dart';
 export 'models/service_config.dart';

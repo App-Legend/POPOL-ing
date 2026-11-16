@@ -9,6 +9,7 @@ export 'testing/http_probe_contract.dart';
 export 'testing/item_launcher_contract.dart';
 export 'testing/llm_client_contract.dart';
 export 'testing/log_excerpt_contract.dart';
+export 'testing/orchestrator_contract.dart';
 export 'testing/port_probe_contract.dart';
 export 'testing/project_repository_contract.dart';
 export 'testing/qa_runner_contract.dart';
