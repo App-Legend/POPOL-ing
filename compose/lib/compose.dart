@@ -4,6 +4,17 @@ library;
 
 import 'package:ppoling_core/contracts.dart';
 
+import 'src/docker_item_launcher.dart';
+
+export 'src/docker_item_launcher.dart' show DockerItemLauncher;
+
 /// Docker Compose 제어와 원격 연결 항목의 구현을 앱에 등록한다.
-// 3주차에 ItemLauncher 구현(Compose `ppoling-<프로젝트ID>` 제어, 원격 연결 확인)을 여기서 등록한다.
-void register(AppRegistry app) {}
+///
+/// [ItemLauncher] 는 [ProjectRepository]·[HttpProbe]·[PortProbe] 를 쓴다. 등록이 다 끝난 뒤 처음 쓸 때 꺼낸다.
+void register(AppRegistry app) {
+  app.provide<ItemLauncher>(DockerItemLauncher(
+    projects: () => app.read<ProjectRepository>(),
+    http: () => app.read<HttpProbe>(),
+    ports: () => app.read<PortProbe>(),
+  ));
+}
