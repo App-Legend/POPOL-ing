@@ -1,0 +1,19 @@
+name: ppoling_ai
+description: "AI 프로젝트 검사(D): Gemini API 로 실행 실패 원인 분석(AI-02)과 QA 결과 요약(AI-03)."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_secure_storage: ^11.2.0
+  ppoling_core:
+    path: ../core
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
