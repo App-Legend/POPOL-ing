@@ -81,6 +81,18 @@ void main() {
         ));
   });
 
+  group('FakeOrchestrator', () {
+    final project = SampleProjects.myTeamProject;
+    orchestratorContract(() async => OrchestratorFixture(
+          orchestrator: FakeOrchestrator(FakeProjectRepository.withSamples()),
+          failingOrchestrator: FakeOrchestrator(FakeProjectRepository.withSamples(),
+              failing: {ItemRef(projectId: project.id, serviceId: 'api')}),
+          projectId: project.id,
+          services: project.config!.services,
+          failingServiceId: 'api',
+        ));
+  });
+
   group('FakeHttpProbe', () {
     httpProbeContract(() async => HttpProbeFixture(
           probe: FakeHttpProbe(responses: {'http://localhost:8080/health': 200, 'http://localhost:8080/boom': 500}),
