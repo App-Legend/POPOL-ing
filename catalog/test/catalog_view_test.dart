@@ -26,6 +26,8 @@ List<String> names(List<CatalogEntry> entries) => [for (final e in entries) e.pr
 Future<CatalogEntry> sample(String id) async => (await samples()).firstWhere((e) => e.project.id == id);
 
 void main() {
+  runProblemTests();
+
   test('실행 중이면 실행 중 n/m', () async {
     final e = await sample('my-team-project');
     expect(cardStateOf(e, now), CardState.running);
@@ -107,5 +109,31 @@ void main() {
       ['a'],
       ['b'],
     ]);
+  });
+}
+
+RunSummary summary(Map<String, ItemOutcome> outcomes) => RunSummary(
+      projectId: 'my-team-project',
+      startedAt: now,
+      finishedAt: now,
+      items: [
+        for (final MapEntry(:key, :value) in outcomes.entries)
+          ItemResult(item: ItemRef(projectId: 'my-team-project', serviceId: key), outcome: value),
+      ],
+    );
+
+void runProblemTests() {
+  test('전체 실행이 모두 성공하면 요약할 문제가 없다', () {
+    expect(runProblemText(summary({'db': ItemOutcome.ok, 'api': ItemOutcome.ok}), stopping: false), isNull);
+  });
+
+  test('실패·건너뜀 항목을 한 줄로 요약한다', () {
+    final s = summary({'db': ItemOutcome.ok, 'api': ItemOutcome.failed, 'web': ItemOutcome.skipped});
+    expect(runProblemText(s, stopping: false), '시작하지 못한 항목: api · 건너뜀: web');
+  });
+
+  test('전체 종료에서 실패한 항목은 멈추지 못한 항목', () {
+    final s = summary({'web': ItemOutcome.failed, 'api': ItemOutcome.failed, 'db': ItemOutcome.ok});
+    expect(runProblemText(s, stopping: true), '멈추지 못한 항목: web, api');
   });
 }

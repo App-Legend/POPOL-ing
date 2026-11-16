@@ -60,6 +60,22 @@ String? lastRunText(RunInfo run, DateTime now) {
   };
 }
 
+/// 전체 실행·종료 결과를 카드에 남길 한 줄. 모두 성공했으면 null.
+/// 예: `시작하지 못한 항목: api · 건너뜀: web`. 항목 이름은 ppoling.yaml 의 id 그대로 쓴다.
+String? runProblemText(RunSummary summary, {required bool stopping}) {
+  List<String> idsOf(ItemOutcome outcome) => [
+        for (final r in summary.items)
+          if (r.outcome == outcome) r.item.serviceId,
+      ];
+  final failed = idsOf(ItemOutcome.failed);
+  final skipped = idsOf(ItemOutcome.skipped);
+  final parts = [
+    if (failed.isNotEmpty) '${stopping ? '멈추지' : '시작하지'} 못한 항목: ${failed.join(', ')}',
+    if (skipped.isNotEmpty) '건너뜀: ${skipped.join(', ')}',
+  ];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
 enum _FilterKind { all, running, stale, tag }
 
 /// 필터 칩 하나. 한 번에 하나만 고른다.

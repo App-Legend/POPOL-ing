@@ -11,11 +11,13 @@ import 'run_info.dart';
 ///
 /// 다른 화면으로는 경로 이름으로만 넘어간다: [열기] `/dashboard`, [실행 방법 설정하기] `/settings`
 /// (둘 다 `arguments` 로 프로젝트 ID), [프로젝트 추가] `/add-project`.
+/// 카드의 [전체 실행]·[전체 종료]는 [runner] 에 맡기고, 실패하면 카드에 한 줄로 남긴다.
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key, required this.projects, required this.runs, this.clock});
+  const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.clock});
 
   final ProjectRepository projects;
   final RunInfoSource runs;
+  final Orchestrator runner;
 
   /// 지금 시각. 테스트에서 고정한다.
   final DateTime Function()? clock;
@@ -34,6 +36,12 @@ class _CatalogScreenState extends State<CatalogScreen> {
   var _query = '';
   var _filter = CatalogFilter.all;
   var _sort = CatalogSort.recent;
+
+  /// 전체 실행·종료를 기다리는 프로젝트 ID → 종료 중인지.
+  final Map<String, bool> _busy = {};
+
+  /// 마지막 전체 실행·종료에서 생긴 문제(프로젝트 ID → 한 줄). 그 카드에서 다시 누르면 지운다.
+  final Map<String, String> _problems = {};
 
   @override
   void initState() {
@@ -63,6 +71,30 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void _open(String route, [Object? arguments]) => Navigator.pushNamed(context, route, arguments: arguments);
 
   void _addProject() => _open('/add-project');
+
+  /// 전체 실행([stop] 이 false) 또는 전체 종료. 카드 상태는 실행 정보 스트림으로 따로 바뀐다.
+  Future<void> _runAll(Project p, {required bool stop}) async {
+    setState(() {
+      _busy[p.id] = stop;
+      _problems.remove(p.id);
+    });
+    String? problem;
+    try {
+      final summary = stop ? await widget.runner.stopAll(p.id) : await widget.runner.runAll(p.id);
+      problem = runProblemText(summary, stopping: stop);
+    } catch (e) {
+      final what = stop ? '멈추지' : '실행하지';
+      problem = e is PpolingException ? '$what 못했어요. ${e.message}' : '$what 못했어요.';
+    }
+    if (!mounted) return;
+    setState(() {
+      _busy.remove(p.id);
+      if (problem != null) _problems[p.id] = problem;
+    });
+    if (problem == null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('${p.name}: ${stop ? '모두 멈췄어요.' : '모두 실행됐어요.'}')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -167,6 +199,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final hasServices = p.config?.services.isNotEmpty ?? false;
     final last = lastRunText(e.run, now);
     final succeeded = e.run.lastSucceeded;
+    final problem = _problems[p.id];
     const small = TextStyle(fontSize: 13, color: C.muted);
 
     return Container(
@@ -195,15 +228,31 @@ class _CatalogScreenState extends State<CatalogScreen> {
             TextSpan(text: succeeded == null ? last : '$last · '),
             if (succeeded != null) TextSpan(text: succeeded ? '성공' : '실패', style: TextStyle(color: succeeded ? C.ok.$2 : C.bad.$2)),
           ])),
+        if (problem != null)
+          Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+            Icon(Icons.error_outline, size: 16, color: C.bad.$2),
+            Expanded(child: Text(problem, style: TextStyle(fontSize: 13, color: C.bad.$2))),
+          ]),
         const SizedBox(height: 4),
-        Row(children: [
-          Expanded(
-            child: hasServices
-                ? Btn('열기', primary: e.isRunning, onPressed: () => _open('/dashboard', p.id))
-                : Btn('실행 방법 설정하기', onPressed: () => _open('/settings', p.id)),
-          ),
+        Row(spacing: 8, children: [
+          if (!hasServices)
+            Expanded(child: Btn('실행 방법 설정하기', onPressed: () => _open('/settings', p.id)))
+          else ...[
+            Expanded(
+              child: Btn(problem == null ? '열기' : '대시보드에서 보기', primary: e.isRunning && problem == null, onPressed: () => _open('/dashboard', p.id)),
+            ),
+            Expanded(child: _runButton(p, running: e.isRunning)),
+          ],
         ]),
       ]),
     );
   }
+
+  /// 떠 있으면 [전체 종료], 아니면 [전체 실행]. 기다리는 동안은 눌리지 않는다.
+  Widget _runButton(Project p, {required bool running}) => switch (_busy[p.id]) {
+        true => const Btn('멈추는 중…', onPressed: null),
+        false => const Btn('시작하는 중…', onPressed: null),
+        null when running => Btn('전체 종료', onPressed: () => _runAll(p, stop: true)),
+        null => Btn('전체 실행', onPressed: () => _runAll(p, stop: false)),
+      };
 }

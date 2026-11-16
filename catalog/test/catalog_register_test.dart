@@ -76,6 +76,18 @@ void main() {
     expect(find.descendant(of: card, matching: find.textContaining('마지막 실행 오늘')), findsOneWidget);
   });
 
+  testWidgets('카드의 [전체 실행]은 등록된 Orchestrator 로 실행하고 카드에 바로 반영된다', (tester) async {
+    final (:app, repo: _, :runner) = setUpApp();
+    await openApp(tester, app);
+    await tester.tap(find.byKey(const Key('category-dev')));
+    await tester.pumpAndSettle();
+    final card = find.byKey(const ValueKey('catalog-card-ppoling'));
+    await tester.tap(find.descendant(of: card, matching: find.text('전체 실행')));
+    await tester.pumpAndSettle();
+    expect(runner.stateOf(const ItemRef(projectId: 'ppoling', serviceId: 'app')), ItemState.ready);
+    expect(find.descendant(of: card, matching: find.text('실행 중 1/1')), findsOneWidget);
+  });
+
   testWidgets('register 뒤에 바뀐 ProjectRepository 를 쓴다', (tester) async {
     final (:app, repo: _, runner: _) = setUpApp();
     app.provide<ProjectRepository>(FakeProjectRepository());

@@ -18,5 +18,5 @@ void register(AppRegistry app) {
   RunInfoSource runInfo() => runs ??= OrchestratorRunInfoSource(app.read<Orchestrator>(), app.read<ProjectRepository>());
 
   app.route('/', (_) => CategoryScreen(projects: app.read<ProjectRepository>(), runs: runInfo()));
-  app.route('/home', (_) => CatalogScreen(projects: app.read<ProjectRepository>(), runs: runInfo()));
+  app.route('/home', (_) => CatalogScreen(projects: app.read<ProjectRepository>(), runs: runInfo(), runner: app.read<Orchestrator>()));
 }
