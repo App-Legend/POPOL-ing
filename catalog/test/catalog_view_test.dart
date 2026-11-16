@@ -29,7 +29,7 @@ void main() {
   test('실행 중이면 실행 중 n/m', () async {
     final e = await sample('my-team-project');
     expect(cardStateOf(e, now), CardState.running);
-    expect(cardStateLabel(e, now), '실행 중 4/4');
+    expect(cardStateLabel(e, now), '실행 중 3/3'); // 원격 항목(storage)은 세지 않는다
   });
 
   test('90일 넘게 실행하지 않으면 오래됨', () async {

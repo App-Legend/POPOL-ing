@@ -12,8 +12,8 @@ class CatalogEntry {
   final Project project;
   final RunInfo run;
 
-  /// 실행 항목 수. 설정이 없으면 0.
-  int get serviceCount => project.config?.services.length ?? 0;
+  /// 띄우는 실행 항목 수. 원격 항목은 연결만 확인하고 전체 종료에서도 그대로라 세지 않는다. 설정이 없으면 0.
+  int get serviceCount => project.config?.services.where((s) => s is! RemoteService).length ?? 0;
 
   bool get isRunning => run.running > 0;
 

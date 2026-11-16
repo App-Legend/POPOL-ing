@@ -15,7 +15,7 @@ class RunInfo {
   /// 마지막 실행이 성공했는지. 실행 기록이 없으면 null.
   final bool? lastSucceeded;
 
-  /// 지금 실행 중인 항목 수.
+  /// 지금 떠 있는 항목 수(원격 항목은 세지 않는다).
   final int running;
 }
 
@@ -35,7 +35,7 @@ class FakeRunInfoSource implements RunInfoSource {
     final now = (clock ?? DateTime.now)();
     DateTime ago(Duration d) => now.subtract(d);
     return FakeRunInfoSource({
-      'my-team-project': RunInfo(lastRunAt: ago(const Duration(hours: 1)), lastSucceeded: true, running: 4),
+      'my-team-project': RunInfo(lastRunAt: ago(const Duration(hours: 1)), lastSucceeded: true, running: 3),
       'ppoling': RunInfo(lastRunAt: ago(const Duration(days: 1)), lastSucceeded: true),
       'weather-bot': RunInfo(lastRunAt: ago(const Duration(days: 249)), lastSucceeded: false),
       'shop-clone': RunInfo(lastRunAt: ago(const Duration(days: 349)), lastSucceeded: true),
