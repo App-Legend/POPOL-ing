@@ -28,9 +28,14 @@ class OrchestratorRunInfoSource implements RunInfoSource {
 
     Future<void> refresh() async {
       final ticket = ++latest;
-      final info = await _read(current);
-      // 늦게 끝난 옛 계산이 새 결과를 덮지 않게, 마지막으로 시작한 것만 보낸다.
-      if (ticket == latest && !controller.isClosed) controller.add(info);
+      try {
+        final info = await _read(current);
+        // 늦게 끝난 옛 계산이 새 결과를 덮지 않게, 마지막으로 시작한 것만 보낸다.
+        if (ticket == latest && !controller.isClosed) controller.add(info);
+      } catch (e, st) {
+        // 이벤트마다 부르고 기다리지 않는 계산이라, 오류를 여기서 잡아 구독자에게 넘긴다.
+        if (!controller.isClosed) controller.addError(e, st);
+      }
     }
 
     controller = StreamController(
