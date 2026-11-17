@@ -95,7 +95,7 @@ flutter build macos        # 빌드 (Windows는 build windows)
 - 프로젝트 삭제는 앱 목록에서만 뺀다. 폴더·설정 파일은 지우지 않는다.
 - 남이 만든 `ppoling.yaml`은 처음 열 때 실행될 명령 목록을 보여주고 확인받은 뒤 실행한다.
 - 상태는 색만으로 구분하지 않고 텍스트 라벨을 함께 쓴다.
-- 지원 OS는 macOS·Windows. OS별 코드는 `runner/` 안의 OS별 구현에만 둔다.
+- 지원 OS는 macOS·Windows. OS별 코드는 `runner/`(프로세스 실행·종료)와 `checks/`(포트 사용자 조회 등)의 OS별 구현 파일에만 둔다. 화면·계약에 OS 분기가 퍼지면 한쪽 OS에서만 깨진다.
 
 ## 작업 기록·문서
 

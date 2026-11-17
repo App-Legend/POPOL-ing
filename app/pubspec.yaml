@@ -36,6 +36,16 @@ dependencies:
   cupertino_icons: ^1.0.8
   ppoling_core:
     path: ../core
+  ppoling_ai:
+    path: ../ai
+  ppoling_catalog:
+    path: ../catalog
+  ppoling_checks:
+    path: ../checks
+  ppoling_compose:
+    path: ../compose
+  ppoling_project:
+    path: ../project
   ppoling_runner:
     path: ../runner
 

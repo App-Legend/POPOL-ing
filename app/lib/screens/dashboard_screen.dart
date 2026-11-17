@@ -2,21 +2,22 @@ import 'package:flutter/material.dart';
 
 import 'package:ppoling_core/ui.dart';
 
-/// 2. 프로젝트 대시보드
+/// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다(목업이라 이름에만 쓴다).
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     void open(String r) => Navigator.pushNamed(context, r);
+    final projectId = ModalRoute.of(context)?.settings.arguments as String? ?? 'my-team-project';
     return AppPage(
-      crumbs: const [('개발', '/home'), ('my-team-project', null)],
+      crumbs: [('개발', '/home'), (projectId, null)],
       children: [
         Wrap(spacing: 20, runSpacing: 16, alignment: WrapAlignment.spaceBetween, children: [
           ConstrainedBox(
             constraints: const BoxConstraints(minWidth: 420, maxWidth: 640),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
-              const Text('my-team-project', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+              Text(projectId, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
               const Text('동아리 행사 예약 웹서비스 (2025 캡스톤)', style: TextStyle(fontSize: 15, color: C.text2)),
               const Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                 Tag('Spring Boot'), Tag('React'), Tag('MySQL'),
