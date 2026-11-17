@@ -48,18 +48,31 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
       setState(() => _error = 'API 키를 넣어 주세요.');
       return;
     }
-    setState(() => _busy = true);
-    await widget.store.write(key);
-    if (mounted) {
-      closeDialog(context, ApiKeyChange.saved);
-    }
+    await _change(() => widget.store.write(key), ApiKeyChange.saved, '키를 저장하지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.');
   }
 
-  Future<void> _delete() async {
-    setState(() => _busy = true);
-    await widget.store.delete();
+  Future<void> _delete() =>
+      _change(widget.store.delete, ApiKeyChange.deleted, '키를 지우지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.');
+
+  /// 저장소를 바꾸고 창을 닫는다. 실패하면 창에 [failure] 를 보이고 다시 누를 수 있게 둔다.
+  Future<void> _change(Future<void> Function() action, ApiKeyChange done, String failure) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = failure;
+        });
+      }
+      return;
+    }
     if (mounted) {
-      closeDialog(context, ApiKeyChange.deleted);
+      closeDialog(context, done);
     }
   }
 

@@ -134,6 +134,25 @@ void main() {
       expect(change, ApiKeyChange.deleted);
     });
 
+    testWidgets('보안 저장소에 쓰지 못하면 창에 알리고 다시 시도할 수 있다', (tester) async {
+      desktop(tester);
+      final keys = _ReadOnlyStore('AQ.old-key');
+      await tester.pumpWidget(host((c) => showApiKeyDialog(c, keys)));
+
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.new-key');
+      await tester.tap(btn('저장'));
+      await tester.pumpAndSettle();
+      expect(find.text('키를 저장하지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.'), findsOneWidget);
+      expect(tester.widget<Btn>(btn('저장')).onPressed, isNotNull);
+
+      await tester.tap(btn('키 지우기'));
+      await tester.pumpAndSettle();
+      expect(find.text('키를 지우지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.'), findsOneWidget);
+      expect(find.text('Gemini API 키 입력'), findsOneWidget, reason: '창은 닫히지 않는다');
+    });
+
     testWidgets('[취소]하면 아무것도 바꾸지 않는다', (tester) async {
       desktop(tester);
       final keys = MemoryApiKeyStore('AQ.old-key');
@@ -166,4 +185,20 @@ void main() {
     expect(withObjectParticle('오류 정리'), '오류 정리를');
     expect(withObjectParticle('Summary'), 'Summary을(를)');
   });
+}
+
+/// 읽기만 되고 쓰기·지우기는 실패하는 보안 저장소.
+class _ReadOnlyStore implements ApiKeyStore {
+  _ReadOnlyStore(this._key);
+
+  final String _key;
+
+  @override
+  Future<String?> read() async => _key;
+
+  @override
+  Future<void> write(String key) async => throw StateError('keychain locked');
+
+  @override
+  Future<void> delete() async => throw StateError('keychain locked');
 }
