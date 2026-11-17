@@ -97,7 +97,9 @@ void main() {
       await tester.tap(find.text('열기'));
       await tester.pumpAndSettle();
       expect(find.text('Gemini API 키 입력'), findsOneWidget);
+      expect(find.text('https://aistudio.google.com/apikey'), findsOneWidget, reason: '키 만드는 주소');
       expect(btn('키 지우기'), findsNothing);
+      expect(btn('연결 확인'), findsNothing, reason: '확인할 방법을 주지 않으면 버튼이 없다');
       expect(tester.widget<TextField>(find.byKey(const Key('api-key-field'))).obscureText, isTrue);
 
       await tester.enterText(find.byKey(const Key('api-key-field')), '  AQ.new-key  ');
@@ -151,6 +153,72 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('키를 지우지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.'), findsOneWidget);
       expect(find.text('Gemini API 키 입력'), findsOneWidget, reason: '창은 닫히지 않는다');
+    });
+
+    group('[연결 확인]', () {
+      /// 확인한 키를 남기고, [fail] 이 있으면 그 이유로 실패한다.
+      List<String> checked = [];
+      Future<void> Function(String) checker({LlmFailure? fail}) => (key) async {
+            checked.add(key);
+            if (fail != null) throw LlmException(fail);
+          };
+
+      setUp(() => checked = []);
+
+      Future<void> openWith(WidgetTester tester, ApiKeyStore keys, Future<void> Function(String) check) async {
+        desktop(tester);
+        await tester.pumpWidget(host((c) => showApiKeyDialog(c, keys, check: check)));
+        await tester.tap(find.text('열기'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('넣은 키로 확인만 하고 저장하지 않는다', (tester) async {
+        final keys = MemoryApiKeyStore();
+        await openWith(tester, keys, checker());
+        expect(find.textContaining('다른 내용은 보내지 않아요'), findsOneWidget);
+        await tester.enterText(find.byKey(const Key('api-key-field')), '  AQ.typed-key  ');
+        await tester.tap(btn('연결 확인'));
+        await tester.pumpAndSettle();
+        expect(checked, ['AQ.typed-key']);
+        expect(find.text('연결됐어요. [저장]을 누르면 이 키를 써요.'), findsOneWidget);
+        expect(await keys.read(), isNull);
+        expect(find.text('Gemini API 키 입력'), findsOneWidget, reason: '창은 그대로');
+      });
+
+      testWidgets('키가 맞지 않으면 키 오류 안내를 보여 준다', (tester) async {
+        await openWith(tester, MemoryApiKeyStore(), checker(fail: LlmFailure.invalidKey));
+        await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.wrong');
+        await tester.tap(btn('연결 확인'));
+        await tester.pumpAndSettle();
+        expect(find.text(llmErrorText(LlmFailure.invalidKey).title), findsOneWidget);
+        expect(find.text(llmErrorText(LlmFailure.invalidKey).body), findsOneWidget);
+      });
+
+      testWidgets('칸이 비어 있으면 저장된 키로 확인한다', (tester) async {
+        await openWith(tester, MemoryApiKeyStore('AQ.old-key'), checker());
+        await tester.tap(btn('연결 확인'));
+        await tester.pumpAndSettle();
+        expect(checked, ['AQ.old-key']);
+        expect(find.text('연결됐어요. 저장된 키로 AI 분석을 쓸 수 있어요.'), findsOneWidget);
+      });
+
+      testWidgets('칸도 비고 저장된 키도 없으면 보내지 않고 안내만 한다', (tester) async {
+        await openWith(tester, MemoryApiKeyStore(), checker());
+        await tester.tap(btn('연결 확인'));
+        await tester.pumpAndSettle();
+        expect(checked, isEmpty);
+        expect(find.text('API 키를 넣어 주세요.'), findsOneWidget);
+      });
+
+      testWidgets('키를 고치면 전 확인 결과를 지운다', (tester) async {
+        await openWith(tester, MemoryApiKeyStore(), checker());
+        await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.first');
+        await tester.tap(btn('연결 확인'));
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.second');
+        await tester.pump();
+        expect(find.textContaining('연결됐어요'), findsNothing);
+      });
     });
 
     testWidgets('[취소]하면 아무것도 바꾸지 않는다', (tester) async {

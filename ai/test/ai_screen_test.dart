@@ -7,13 +7,13 @@ import 'package:ppoling_core/ui.dart';
 
 const fullKey = 'AQ.stored-key-abcdefghijklmnop';
 
-Future<void> open(WidgetTester tester, ApiKeyStore keys, {String model = 'gemini-flash-latest'}) async {
+Future<void> open(WidgetTester tester, ApiKeyStore keys, {String model = 'gemini-flash-latest', Future<void> Function(String)? checkKey}) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(MaterialApp(
     theme: buildTheme(),
-    home: AiScreen(keys: keys, client: FakeLlmClient(modelName: model)),
+    home: AiScreen(keys: keys, client: FakeLlmClient(modelName: model), checkKey: checkKey),
   ));
   await tester.pumpAndSettle();
 }
@@ -89,6 +89,16 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('gemini-flash-latest · 키 ••••••••mnop'), findsOneWidget);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('키 확인 방법을 넘겨받으면 키 창에 [연결 확인]이 생긴다', (tester) async {
+    final checked = <String>[];
+    await open(tester, MemoryApiKeyStore(fullKey), checkKey: (k) async => checked.add(k));
+    await tester.tap(btn('키 바꾸기'));
+    await tester.pumpAndSettle();
+    await tester.tap(btn('연결 확인'));
+    await tester.pumpAndSettle();
+    expect(checked, [fullKey]);
   });
 
   testWidgets('보안 저장소를 읽지 못하면 그렇게 알리고, 키 입력 창 대신 안내를 띄운다', (tester) async {

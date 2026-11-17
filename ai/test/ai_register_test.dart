@@ -43,6 +43,9 @@ void main() {
     ai.register(app);
     await openAi(tester, app);
     expect(find.text('${ai.GeminiLlmClient.defaultModel} · 키 ••••••••9876'), findsOneWidget);
+    await tester.tap(find.text('키 바꾸기'));
+    await tester.pumpAndSettle();
+    expect(find.text('연결 확인'), findsOneWidget, reason: 'Gemini 로 키를 확인할 수 있다');
   });
 
   testWidgets('/ai 는 register 뒤에 바꿔 끼운 LlmClient 의 모델 이름을 쓴다', (tester) async {

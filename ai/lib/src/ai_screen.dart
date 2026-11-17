@@ -11,12 +11,15 @@ String maskedApiKey(String key) => key.length <= 8 ? '••••••••' 
 /// 8. AI 검사. 지금은 머리(API 키 상태와 [키 입력]·[키 바꾸기])만 있다.
 // 4주차에 실행 실패 원인 분석(AI-02)·QA 결과 요약(AI-03) 카드를 아래에 붙인다.
 class AiScreen extends StatefulWidget {
-  const AiScreen({super.key, required this.keys, required this.client});
+  const AiScreen({super.key, required this.keys, required this.client, this.checkKey});
 
   final ApiKeyStore keys;
 
   /// 모델 이름(`modelName`)을 보여 준다.
   final LlmClient client;
+
+  /// 키 입력 창의 [연결 확인]. null 이면 버튼이 없다.
+  final ApiKeyCheck? checkKey;
 
   @override
   State<AiScreen> createState() => _AiScreenState();
@@ -58,7 +61,7 @@ class _AiScreenState extends State<AiScreen> {
     final messenger = ScaffoldMessenger.of(context);
     ApiKeyChange? change;
     try {
-      change = await showApiKeyDialog(context, widget.keys);
+      change = await showApiKeyDialog(context, widget.keys, check: widget.checkKey);
     } catch (_) {
       messenger.showSnackBar(const SnackBar(content: Text('보안 저장소를 쓰지 못해 키 입력 창을 열지 못했어요.')));
       return;

@@ -12,9 +12,9 @@ import 'src/api_key_store.dart';
 import 'src/gemini_client.dart';
 
 export 'src/ai_sender.dart' show AiSender;
-export 'src/api_key_dialog.dart' show ApiKeyChange, ApiKeyDialog, showApiKeyDialog;
+export 'src/api_key_dialog.dart' show ApiKeyChange, ApiKeyCheck, ApiKeyDialog, showApiKeyDialog;
 export 'src/api_key_store.dart' show ApiKeyStore, MemoryApiKeyStore, SecureApiKeyStore;
-export 'src/gemini_client.dart' show GeminiHttpResponse, GeminiLlmClient, GeminiTransport;
+export 'src/gemini_client.dart' show GeminiFetch, GeminiHttpResponse, GeminiLlmClient, GeminiTransport;
 export 'src/messages.dart' show LlmErrorText, llmErrorText;
 export 'src/send_confirm_dialog.dart' show SendConfirmDialog;
 
@@ -25,6 +25,8 @@ export 'src/send_confirm_dialog.dart' show SendConfirmDialog;
 // 4주차에 AI-03 QA 결과 요약·AI-02 실행 실패 원인 분석을 여기서 더한다.
 void register(AppRegistry app) {
   final keys = SecureApiKeyStore();
-  app.provide<LlmClient>(GeminiLlmClient(keys: keys));
-  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>()));
+  final gemini = GeminiLlmClient(keys: keys);
+  app.provide<LlmClient>(gemini);
+  // 키는 늘 Gemini 키라, 나중에 LlmClient 를 바꿔 끼워도 [연결 확인]은 Gemini 로 한다.
+  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey));
 }
