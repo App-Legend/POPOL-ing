@@ -12,7 +12,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(PpolingApp(registry: buildRegistry()));
+      await tester.pumpWidget(PpolingApp(registry: buildRegistry(features: false)));
       if (route != '/') {
         tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
         await tester.pumpAndSettle();
@@ -20,4 +20,15 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('대시보드는 넘겨받은 프로젝트 ID 를 보여준다', (tester) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(PpolingApp(registry: buildRegistry(features: false)));
+    tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/dashboard', arguments: 'weather-bot');
+    await tester.pumpAndSettle();
+    expect(find.text('weather-bot'), findsWidgets);
+  });
 }

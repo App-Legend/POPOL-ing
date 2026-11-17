@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/ui.dart';
+import 'package:ppoling_ai/ai.dart' as ai;
+import 'package:ppoling_catalog/catalog.dart' as catalog;
+import 'package:ppoling_checks/checks.dart' as checks;
+import 'package:ppoling_compose/compose.dart' as compose;
+import 'package:ppoling_project/project.dart' as project;
 import 'package:ppoling_runner/runner.dart' as runner;
 
 import 'registry.dart';
@@ -19,20 +24,30 @@ void main() => runApp(PpolingApp(registry: buildRegistry()));
 
 /// 가짜 구현과 목업 화면을 먼저 깔고, 기능의 `register()` 로 덮어쓴다.
 /// 진짜 기능이 생기면 아래 목록에 `<기능>.register(app);` 한 줄을 더한다.
-Registry buildRegistry() {
+/// [features] 가 false 면 가짜와 목업만 깐다(목업 화면 테스트용. 진짜 구현은 파일·OS 보안 저장소를 쓴다).
+Registry buildRegistry({bool features = true}) {
   final app = Registry();
   _registerFakes(app);
   _registerMockups(app);
-  runner.register(app);
+  if (features) {
+    project.register(app);
+    runner.register(app);
+    checks.register(app);
+    compose.register(app);
+    catalog.register(app);
+    ai.register(app);
+  }
   return app;
 }
 
 void _registerFakes(AppRegistry app) {
-  final projects = FakeProjectRepository.withSamples();
-  app.provide<ProjectRepository>(projects);
+  app.provide<ProjectRepository>(FakeProjectRepository.withSamples());
+  // 다른 가짜도 진짜 ProjectRepository 로 바뀐 뒤의 프로젝트를 보게 한다.
+  final projects = _LazyProjects(app.read<ProjectRepository>);
   app.provide<ConfigValidator>(FakeConfigValidator());
   app.provide<QaRunner>(FakeQaRunner(projects));
   app.provide<PortProbe>(FakePortProbe());
+  app.provide<HttpProbe>(FakeHttpProbe());
   app.provide<RuntimeQuery>(FakeRuntimeQuery());
   app.provide<Orchestrator>(FakeOrchestrator(projects));
 }
@@ -61,4 +76,29 @@ class PpolingApp extends StatelessWidget {
         theme: buildTheme(),
         routes: registry.routes,
       );
+}
+
+/// 쓸 때마다 등록된 [ProjectRepository] 를 꺼내 넘긴다. 가짜 구현이 만들어질 때 아직 교체 전이라서.
+class _LazyProjects implements ProjectRepository {
+  _LazyProjects(this._read);
+
+  final ProjectRepository Function() _read;
+
+  @override
+  Future<List<Project>> listProjects() => _read().listProjects();
+
+  @override
+  Stream<List<Project>> watchProjects() => _read().watchProjects();
+
+  @override
+  Future<Project> getProject(String id) => _read().getProject(id);
+
+  @override
+  Future<Project> addProject(String folderPath, {String? name}) => _read().addProject(folderPath, name: name);
+
+  @override
+  Future<Project> updateProject(Project project) => _read().updateProject(project);
+
+  @override
+  Future<void> removeProject(String id) => _read().removeProject(id);
 }
