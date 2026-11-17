@@ -52,6 +52,15 @@ void main() {
     expect(r.ok, isTrue);
   });
 
+  test('log 출력을 읽다 오류가 나면 제한 시간을 기다리지 않고 그 이유로 실패한다', () async {
+    final lines = StreamController<String>();
+    later(Duration(milliseconds: 20), () => lines.addError(DockerNotRunningException()));
+    final r = await readiness.wait(const LogReady(pattern: 'Started', timeout: Duration(seconds: 5)), lines: lines.stream)
+        .timeout(const Duration(seconds: 1));
+    expect(r.ok, isFalse);
+    expect(r.reason, contains('출력을 읽지 못했어요'));
+  });
+
   test('log 는 제한 시간 안에 안 나타나면 실패', () async {
     final lines = StreamController<String>()..add('Booting');
     final r = await readiness.wait(const LogReady(pattern: 'Started', timeout: Duration(milliseconds: 100)), lines: lines.stream);

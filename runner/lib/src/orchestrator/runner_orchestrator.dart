@@ -37,6 +37,9 @@ class RunnerOrchestrator implements Orchestrator {
 
   /// 진행 중인 시작. 멈추면 완료해서 그 시작을 끊는다.
   final _starting = <ItemRef, Completer<void>>{};
+
+  /// 진행 중인 시작의 결과. 같은 항목을 또 시작하면(전체 실행과 단일 시작이 겹칠 때 등) 이걸 같이 기다린다.
+  final _ups = <ItemRef, Future<ItemResult>>{};
   final _stopping = <ItemRef>{};
   final _lastRuns = <String, RunSummary>{};
 
@@ -93,16 +96,23 @@ class RunnerOrchestrator implements Orchestrator {
   Future<RunSummary> stopAll(String projectId) async {
     _stopAlls.update(projectId, (n) => n + 1, ifAbsent: () => 1);
     _runAlls.remove(projectId); // 진행 중인 실행은 남은 항목을 건너뛰고 끝난다. 다음 [전체 실행]은 새로 시작한다
-    final project = await _project(projectId, checkConfig: false);
     final startedAt = DateTime.now();
-    final current = inStartOrder(_services(project)).reversed.where((s) => s is! RemoteService).toList();
+    List<ServiceConfig> current;
+    try {
+      final project = await _project(projectId, checkConfig: false);
+      current = inStartOrder(_services(project)).reversed.where((s) => s is! RemoteService).toList();
+    } on ProjectNotFoundException {
+      // 실행 중에 목록에서 뺐어도 띄운 것은 멈춰야 고아 프로세스가 남지 않는다
+      if (!_launched.keys.any((k) => k.projectId == projectId)) rethrow;
+      current = const [];
+    }
     final ids = {for (final s in current) s.id};
     // 설정에서 빠졌지만 띄워 둔 항목을 먼저 멈춘다
     final removed = [
       for (final MapEntry(:key, :value) in _launched.entries)
         if (key.projectId == projectId && !ids.contains(key.serviceId)) value,
     ];
-    final items = [for (final s in [...removed, ...current]) await _down(project, s)];
+    final items = [for (final s in [...removed.reversed, ...current]) await _down(projectId, s)];
     return RunSummary(projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: items);
   }
 
@@ -114,10 +124,10 @@ class RunnerOrchestrator implements Orchestrator {
 
   @override
   Future<ItemResult> stop(ItemRef item) async {
-    final project = await _project(item.projectId, checkConfig: false);
-    final service = _launched[item] ?? _service(project, item.serviceId);
+    // 띄운 항목은 프로젝트를 목록에서 뺐어도 멈출 수 있게 프로젝트를 찾지 않는다
+    final service = _launched[item] ?? _service(await _project(item.projectId, checkConfig: false), item.serviceId);
     if (service is RemoteService) return ItemResult(item: item, outcome: ItemOutcome.ok);
-    return _down(project, service);
+    return _down(item.projectId, service);
   }
 
   @override
@@ -128,13 +138,22 @@ class RunnerOrchestrator implements Orchestrator {
 
   // ---- 띄우기 ----
 
-  Future<ItemResult> _up(Project project, ServiceConfig service) async {
+  Future<ItemResult> _up(Project project, ServiceConfig service) {
     final item = _ref(project, service);
+    if (_ups[item] case final up?) return up;
+    late final Future<ItemResult> up;
+    up = _upOnce(project, service, item).whenComplete(() {
+      if (identical(_ups[item], up)) _ups.remove(item);
+    });
+    return _ups[item] = up;
+  }
+
+  Future<ItemResult> _upOnce(Project project, ServiceConfig service, ItemRef item) async {
     final state = stateOf(item);
     // 원격 항목(connected)은 그사이 끊겼을 수 있으니 매번 다시 확인한다.
     if (state == ItemState.ready) return ItemResult(item: item, outcome: ItemOutcome.ok);
-    if (_starting.containsKey(item) || _stopping.contains(item)) {
-      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: '이미 시작하거나 멈추는 중이에요.');
+    if (_stopping.contains(item)) {
+      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: '멈추는 중이에요. 다 멈춘 뒤 다시 시작해 주세요.');
     }
     // 띄운 뒤에 알면 부작용(DB 마이그레이션 등)만 남기고 멈추게 되니 먼저 확인한다.
     if (service.ready case LogReady(:final pattern)) {
@@ -214,7 +233,7 @@ class RunnerOrchestrator implements Orchestrator {
     // 준비 시간을 넘겨 실패했지만 아직 살아 있는 이전 실행은 내가 띄운 것이니 먼저 멈춘다.
     // 포트 확인보다 먼저 해야 내 프로세스가 잡은 포트를 "다른 프로그램"으로 잘못 알리지 않는다.
     if (_running.containsKey(item)) {
-      final halted = await _halt(project, service, item);
+      final halted = await _halt(project.id, service, item);
       if (halted.outcome != ItemOutcome.ok) return halted;
       if (cancel.isCompleted) return _cancelled(item);
     }
@@ -303,7 +322,8 @@ class RunnerOrchestrator implements Orchestrator {
           final who = processName == null ? '' : '($processName${pid == null ? '' : ', PID $pid'})';
           return '포트 $port 를 다른 프로그램$who이 쓰고 있어요.';
         }
-      } on Exception {
+      } on Object catch (e) {
+        if (e is! Exception && e is! UnimplementedError) rethrow;
         continue; // shortcut: whoUses 가 아직 없는 OS 에서는 건너뛴다. C 의 진짜 구현이 들어오면 지운다.
       }
     }
@@ -313,17 +333,20 @@ class RunnerOrchestrator implements Orchestrator {
   // ---- 멈추기 ----
 
   /// 사용자가 멈췄다. 진행 중인 시작이 있으면 끊고 멈춘다.
-  Future<ItemResult> _down(Project project, ServiceConfig service) async {
-    final item = _ref(project, service);
+  Future<ItemResult> _down(String projectId, ServiceConfig service) async {
+    final item = ItemRef(projectId: projectId, serviceId: service.id);
+    _ups.remove(item); // 끊긴 시작을 다음 시작이 같이 기다리지 않게
     _starting.remove(item)?.complete();
     if (_stopping.contains(item)) {
       return ItemResult(item: item, outcome: ItemOutcome.failed, reason: '이미 멈추는 중이에요.');
     }
-    return _halt(project, service, item);
+    final r = await _halt(projectId, service, item);
+    if (r.outcome == ItemOutcome.ok) _launched.remove(item); // 다 멈췄으니 더 멈출 게 없다
+    return r;
   }
 
-  Future<ItemResult> _halt(Project project, ServiceConfig service, ItemRef item) async {
-    if (stateOf(item) == ItemState.stopped && !_running.containsKey(item) && !await _composeLeftUp(project, service)) {
+  Future<ItemResult> _halt(String projectId, ServiceConfig service, ItemRef item) async {
+    if (stateOf(item) == ItemState.stopped && !_running.containsKey(item) && !await _composeLeftUp(projectId, service)) {
       return ItemResult(item: item, outcome: ItemOutcome.ok);
     }
     _stopping.add(item);
@@ -332,7 +355,7 @@ class RunnerOrchestrator implements Orchestrator {
     try {
       var forced = false;
       if (service is ComposeService) {
-        await launcher().stop(project.id, service);
+        await launcher().stop(projectId, service);
       } else if (process != null) {
         forced = (await process.stop((service as ProcessService).stopTimeout)).forced;
       }
@@ -348,10 +371,10 @@ class RunnerOrchestrator implements Orchestrator {
 
   /// 상태는 멈춤인데 `ppoling-<프로젝트ID>` 컨테이너가 남아 있다(앱을 다시 켜기 전에 띄운 것).
   /// 확인할 수 없으면(Docker 꺼짐 등) 남은 게 없다고 본다.
-  Future<bool> _composeLeftUp(Project project, ServiceConfig service) async {
+  Future<bool> _composeLeftUp(String projectId, ServiceConfig service) async {
     if (service is! ComposeService) return false;
     try {
-      final status = await launcher().status(project.id, service);
+      final status = await launcher().status(projectId, service);
       return status is ComposeStatus && status.containers.isNotEmpty;
     } on Exception {
       return false;

@@ -34,6 +34,12 @@ class _RecordingPortProbe extends FakePortProbe {
   }
 }
 
+/// [whoUses] 가 아직 없는 OS(checks 의 SystemPortProbe 와 같다).
+class _NoWhoUsesPortProbe extends FakePortProbe {
+  @override
+  Future<PortUsage> whoUses(int port) async => throw UnimplementedError();
+}
+
 /// 멈추기가 예상 못 한 예외를 던진다.
 class _BrokenStopLauncher extends FakeItemLauncher {
   _BrokenStopLauncher(super.projects);
@@ -246,6 +252,27 @@ void main() {
       expect(o.stateOf(item), ItemState.portBusy);
     });
 
+    test('포트를 쓰는 프로그램을 아직 찾을 수 없는 OS 면 포트 확인을 건너뛰고 시작한다', () async {
+      final (o, item) = await setUpItem(
+        const ProcessService(id: 'x', command: ['sleep', '34'], ports: [8080]),
+        ports: _NoWhoUsesPortProbe(),
+      );
+      expect((await o.start(item)).outcome, ItemOutcome.ok);
+    });
+
+    test('실행 중에 프로젝트를 목록에서 빼도 띄운 프로세스를 멈출 수 있다', () async {
+      final o = orchestrator(demo(tempProject(), extra: [const ProcessService(id: 'x', command: ['sleep', '35'])]));
+      const item = ItemRef(projectId: 'demo', serviceId: 'x');
+      addTearDown(() => o.stop(item).catchError((_) => ItemResult(item: item, outcome: ItemOutcome.ok)));
+      expect((await o.start(item)).outcome, ItemOutcome.ok);
+      await (o.projects() as FakeProjectRepository).removeProject('demo');
+
+      final summary = await o.stopAll('demo');
+      expect(summary.items.single.outcome, ItemOutcome.ok);
+      expect(await count('sleep 35'), 0);
+      await expectLater(o.stopAll('demo'), throwsA(isA<ProjectNotFoundException>()), reason: '띄운 게 없으면 약속대로 예외');
+    });
+
     test('작업 폴더가 프로젝트 폴더 밖이면 시작하지 않는다', () async {
       final (o, item) = await setUpItem(const ProcessService(id: 'x', command: ['sleep', '30'], cwd: '..'));
       final r = await o.start(item);
@@ -294,7 +321,7 @@ void main() {
       final (o, item) = await setUpItem(const ProcessService(
           id: 'x', command: ['sh', '-c', 'echo ready; exec sleep 31'], ports: [4321], ready: LogReady(pattern: 'ready', timeout: _s5)));
       final results = await Future.wait([o.start(item), o.start(item)]);
-      expect(results.map((r) => r.outcome), unorderedEquals([ItemOutcome.ok, ItemOutcome.failed]));
+      expect(results.map((r) => r.outcome), [ItemOutcome.ok, ItemOutcome.ok], reason: '두 번째는 진행 중인 시작을 같이 기다린다');
       expect(await count('sleep 31'), 1);
       await o.stop(item);
       expect(await count('sleep 31'), 0);
