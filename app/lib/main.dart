@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/ui.dart';
-import 'package:ppoling_runner/runner.dart' as runner;
+// 진짜 실행 제어는 B·C 의 진짜 ProjectRepository·PortProbe·HttpProbe·ItemLauncher 가 들어온 뒤 켠다.
+// 지금 켜면 가짜 샘플 프로젝트(없는 폴더)를 진짜로 실행하려다 모두 실패한다.
+// import 'package:ppoling_runner/runner.dart' as runner;
 
 import 'registry.dart';
 import 'screens/ai_screen.dart';
@@ -23,7 +25,7 @@ Registry buildRegistry() {
   final app = Registry();
   _registerFakes(app);
   _registerMockups(app);
-  runner.register(app);
+  // runner.register(app);
   return app;
 }
 
