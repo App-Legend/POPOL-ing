@@ -1,14 +1,16 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'posix_process_launcher.dart';
+import 'windows_process_launcher.dart';
 
 /// 실행 항목 프로세스를 띄우는 부품. OS별 구현이 프로세스 트리를 통째로 멈출 수 있게 띄운다.
 ///
 /// `runner/` 안에서만 쓴다. 다른 기능은 `Orchestrator` 계약으로 실행을 맡긴다.
 abstract interface class ProcessLauncher {
-  /// 이 OS 의 구현. 아직 없는 OS 면 null. OS 를 고르는 곳은 여기 한 곳이다.
-  // shortcut: Windows(Job Object) 구현이 아직 없다. 3주차 Windows 검증 때 추가한다.
-  static ProcessLauncher? forPlatform() => Platform.isWindows ? null : PosixProcessLauncher();
+  /// 이 OS 의 구현. OS 를 고르는 곳은 여기 한 곳이다.
+  static ProcessLauncher forPlatform() => Platform.isWindows ? WindowsProcessLauncher() : PosixProcessLauncher();
 
   /// [command] 를 셸 해석 없이 실행한다. [command] 의 첫 칸은 PATH 에서 찾는다.
   ///
@@ -63,4 +65,23 @@ class StopResult {
 
   /// 종료 신호로 멈추지 않아 강제 종료했다(전체 종료 결과에 표시).
   final bool forced;
+}
+
+/// [process] 의 stdout·stderr 를 줄 단위로, 나온 순서대로. 둘 다 닫히면 끝난다.
+/// 바로 읽기 시작해 둔다. 안 읽으면 출력 버퍼가 차서 프로세스가 멈춘다.
+Stream<OutputLine> outputLines(Process process) {
+  final out = StreamController<OutputLine>();
+  var open = 2;
+  void pipe(Stream<List<int>> bytes, {required bool isError}) {
+    bytes
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .transform(const LineSplitter())
+        .listen((line) => out.add(OutputLine(line, isError: isError, at: DateTime.now())), onDone: () {
+      if (--open == 0) out.close();
+    });
+  }
+
+  pipe(process.stdout, isError: false);
+  pipe(process.stderr, isError: true);
+  return out.stream;
 }

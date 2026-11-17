@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'process_launcher.dart';
@@ -41,24 +40,11 @@ class PosixProcessLauncher implements ProcessLauncher {
 }
 
 class _PosixProcess implements RunningProcess {
-  _PosixProcess(this._process, this.startedAt) {
-    var open = 2;
-    void pipe(Stream<List<int>> bytes, {required bool isError}) {
-      bytes
-          .transform(const Utf8Decoder(allowMalformed: true))
-          .transform(const LineSplitter())
-          .listen((line) => _output.add(OutputLine(line, isError: isError, at: DateTime.now())), onDone: () {
-        if (--open == 0) _output.close();
-      });
-    }
-
-    pipe(_process.stdout, isError: false);
-    pipe(_process.stderr, isError: true);
+  _PosixProcess(this._process, this.startedAt) : output = outputLines(_process) {
     _process.exitCode.then((_) => _exited = true);
   }
 
   final Process _process;
-  final _output = StreamController<OutputLine>();
 
   /// 리더가 끝났다(Dart 가 거뒀다). 그 뒤로 그룹 번호를 지켜 주는 건 남은 자식뿐이다.
   var _exited = false;
@@ -76,7 +62,7 @@ class _PosixProcess implements RunningProcess {
   int get pgid => _process.pid;
 
   @override
-  Stream<OutputLine> get output => _output.stream;
+  final Stream<OutputLine> output;
 
   @override
   Future<int> get exitCode => _process.exitCode;
