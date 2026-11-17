@@ -7,16 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_runner/src/process/process_launcher.dart';
 import 'package:ppoling_runner/src/process/windows_process_launcher.dart';
 
-/// 명령줄에 [marker] 가 든 ping 프로세스의 수.
-Future<int> countProcesses(String marker) async {
-  final r = await Process.run('powershell', [
-    '-NoProfile',
-    '-Command',
-    "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -like '*$marker*' -and \$_.Name -eq 'ping.exe' }).Count",
-  ]);
-  return int.tryParse((r.stdout as String).trim()) ?? 0;
-}
-
 void main() {
   final launcher = WindowsProcessLauncher();
   late Directory dir;
@@ -64,17 +54,22 @@ void main() {
   });
 
   test('멈추면 Job 째 멈춘다: 부모가 먼저 끝나고 손자만 남아도 멈춘다', () async {
-    final marker = '-l ${1000 + pid % 50000}'; // 이 테스트가 띄운 ping 만 세려고 보낼 크기를 표시로 쓴다
-    // cmd 가 (Job 에 들어갈 때까지 1초쯤 기다린 뒤) ping 을 따로 띄우고 바로 끝난다. ping 은 손자로 남는다.
-    final p = await start(['cmd', '/d', '/c', 'ping -n 2 127.0.0.1 > nul & start /b ping -n 60 $marker 127.0.0.1 > nul']);
+    // cmd 가 (Job 에 들어갈 때까지 1초쯤 기다린 뒤) ping 을 따로 띄우고 바로 끝난다.
+    // 손자 ping 은 1초마다 ping.txt 에 한 줄씩 쓰니, 파일이 자라는지로 살아 있는지 Job 과 따로 확인한다.
+    final out = File('${dir.path}\\ping.txt');
+    final p = await start(['cmd', '/d', '/c', 'ping -n 2 127.0.0.1 > nul & start /b ping -n 60 127.0.0.1 > ping.txt']);
     await p.exitCode;
     expect(await p.groupAlive, isTrue);
-    expect(await countProcesses(marker), 1);
+    final before = out.lengthSync();
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    expect(out.lengthSync(), greaterThan(before), reason: '손자 ping 이 아직 돌고 있어야 한다');
 
     final r = await p.stop(const Duration(seconds: 1));
     expect(r.forced, isTrue);
     expect(await p.groupAlive, isFalse);
-    expect(await countProcesses(marker), 0);
+    final after = out.lengthSync();
+    await Future<void>.delayed(const Duration(milliseconds: 2500));
+    expect(out.lengthSync(), after, reason: '멈춘 뒤에는 손자 ping 도 더 쓰지 않아야 한다');
   });
 
   test('이미 끝난 프로세스를 멈추면 아무것도 하지 않는다', () async {
