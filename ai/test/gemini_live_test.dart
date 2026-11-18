@@ -30,4 +30,23 @@ void main() {
     skip: key == null || key.isEmpty ? 'GEMINI_API_KEY 가 없어서 건너뜀' : false,
     timeout: const Timeout(Duration(minutes: 2)),
   );
+
+  test(
+    '[연결 확인]: 내 키는 통과하고, 지어낸 키는 키 오류로 나온다',
+    () async {
+      final client = GeminiLlmClient(keys: MemoryApiKeyStore());
+      try {
+        await client.checkKey(key!);
+        await expectLater(
+          client.checkKey('AQ.not-a-real-key-for-ppoling-test'),
+          throwsA(isA<LlmException>().having((e) => e.failure, 'failure', LlmFailure.invalidKey)),
+        );
+      } on LlmException catch (e) {
+        if (e.failure != LlmFailure.network) rethrow;
+        markTestSkipped('Gemini 서버가 붐벼서 확인하지 못했어요: ${e.message}');
+      }
+    },
+    skip: key == null || key.isEmpty ? 'GEMINI_API_KEY 가 없어서 건너뜀' : false,
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
 }
