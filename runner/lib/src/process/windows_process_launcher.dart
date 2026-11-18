@@ -98,9 +98,8 @@ class _WindowsProcess implements RunningProcess {
   @override
   Future<StopResult> stop(Duration timeout) async {
     if (!await groupAlive) return const StopResult(forced: false);
-    if (!_assigned || !_job.terminate()) {
-      _process.kill(); // 아직 거두지 않은 내 자식이라 PID 가 재사용되지 않았다
-    }
+    // 이미 끝난 리더는 PID 로 다시 열려 남의 프로세스를 멈출 수 있으니, 살아 있을 때만 PID 로 멈춘다.
+    if ((!_assigned || !_job.terminate()) && !_exited) _process.kill();
     await _process.exitCode.timeout(const Duration(seconds: 5), onTimeout: () => -1);
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (await groupAlive && DateTime.now().isBefore(deadline)) {
