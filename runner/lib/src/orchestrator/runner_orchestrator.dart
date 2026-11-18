@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
 
+import '../log/log_store.dart';
 import '../process/process_launcher.dart';
 import '../ready/readiness.dart';
 import 'env_file.dart';
@@ -14,7 +15,7 @@ import 'start_order.dart';
 /// - 멈추는 건 이 객체가 띄운 프로세스와 `ppoling-<프로젝트ID>` Compose 항목뿐이다. 포트·PID 만으로 멈추지 않는다.
 /// - 다른 기능의 구현은 함수로 받아 처음 쓸 때 꺼낸다(`AppRegistry` 약속: 등록이 다 끝난 뒤 꺼낸다).
 /// - 항목마다 시작은 한 번에 하나만 돈다. 시작하는 중에 멈추면 그 시작은 상태를 바꾸지 않고 끝난다.
-// shortcut: 실행 기록·로그를 메모리에만 둔다. 앱을 다시 켜면 잊는다. 로그 저장·실행 기록(④)에서 파일로 옮긴다.
+// shortcut: 실행 기록을 메모리에만 둔다. 앱을 다시 켜면 잊는다. 실행 기록(④)에서 파일로 옮긴다.
 class RunnerOrchestrator implements Orchestrator {
   RunnerOrchestrator({
     required this.projects,
@@ -22,6 +23,7 @@ class RunnerOrchestrator implements Orchestrator {
     required this.ports,
     required this.http,
     required this.processes,
+    required this.logs,
   });
 
   final ProjectRepository Function() projects;
@@ -29,6 +31,7 @@ class RunnerOrchestrator implements Orchestrator {
   final PortProbe Function() ports;
   final HttpProbe Function() http;
   final ProcessLauncher processes;
+  final LogStore logs;
 
   final _events = StreamController<RunEvent>.broadcast();
   final _states = <ItemRef, ItemState>{};
@@ -249,11 +252,14 @@ class RunnerOrchestrator implements Orchestrator {
     if (cwd == null) return _fail(item, '작업 폴더를 찾을 수 없거나 프로젝트 폴더 밖이에요: ${service.cwd}');
 
     final env = <String, String>{};
+    final secrets = <String>[]; // 로그에서 가릴 값은 .env 에서 읽은 것만(env 는 설정 파일 값이라 비밀이 아니다)
     if (service.envFile case final envFile?) {
       final path = _inside(project.folderPath, envFile);
       try {
         if (path == null) throw const FileSystemException();
-        env.addAll(readEnvFile(path));
+        final fromFile = readEnvFile(path);
+        env.addAll(fromFile);
+        secrets.addAll(fromFile.values);
       } on FileSystemException {
         return _fail(item, '.env 파일을 읽을 수 없거나 프로젝트 폴더 밖이에요: $envFile');
       }
@@ -274,7 +280,16 @@ class RunnerOrchestrator implements Orchestrator {
 
     // 준비 확인이 첫 줄부터 보도록, 출력을 받기 시작하는 지금 바로 구독한다(사이에 await 를 두지 않는다).
     final lines = StreamController<String>.broadcast();
-    process.output.listen((l) => lines.add(l.text), onDone: lines.close);
+    final logLines = StreamController<OutputLine>();
+    process.output.listen((l) {
+      lines.add(l.text);
+      logLines.add(l);
+    }, onDone: () {
+      lines.close();
+      logLines.close();
+    });
+    // shortcut: 이전 프로세스의 자식이 그룹·Job 을 빠져나가 stdout 을 잡고 있으면 새 실행의 로그 줄이 닫힐 때까지 메모리에 쌓인다, 실제로 관찰되면 항목별 큐 대신 실행마다 따로 쓰게 바꾼다.
+    unawaited(logs.record(item, logLines.stream, secrets: secrets));
     final Future<ReadyResult> ready;
     try {
       ready = readiness.wait(service.ready, lines: lines.stream, exited: exited, cancelled: cancel.future);

@@ -32,6 +32,8 @@ void main() {
     expect(app.read<ConfigValidator>(), isNot(isA<FakeConfigValidator>()));
     expect(app.read<ItemLauncher>(), isNot(isA<FakeItemLauncher>()));
     expect(app.read<LlmClient>(), isNot(isA<FakeLlmClient>()));
+    expect(app.read<HttpProbe>(), isNot(isA<FakeHttpProbe>()));
+    expect(app.read<Orchestrator>(), isNot(isA<FakeOrchestrator>()));
   });
 
   test('가짜 Orchestrator 는 바꿔 끼운 ProjectRepository 의 프로젝트를 본다', () async {

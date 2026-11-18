@@ -2,8 +2,12 @@
 /// `import 'package:ppoling_runner/runner.dart' as runner;`
 library;
 
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
 import 'package:ppoling_core/contracts.dart';
 
+import 'src/log/log_store.dart';
 import 'src/orchestrator/runner_orchestrator.dart';
 import 'src/process/process_launcher.dart';
 
@@ -18,5 +22,6 @@ void register(AppRegistry app) {
     ports: () => app.read<PortProbe>(),
     http: () => app.read<HttpProbe>(),
     processes: ProcessLauncher.forPlatform(),
+    logs: LogStore(() async => Directory('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}logs')),
   ));
 }

@@ -12,6 +12,7 @@ dependencies:
   ppoling_core:
     path: ../core
   ffi: ^2.2.0
+  path_provider: ^2.1.5
 
 dev_dependencies:
   flutter_test:
