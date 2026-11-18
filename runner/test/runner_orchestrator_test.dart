@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/testing.dart';
+import 'package:ppoling_runner/src/log/log_store.dart';
 import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
 
@@ -92,7 +93,15 @@ Project demo(String folder, {String api = 'echo "Started api"; exec sleep 30', L
       ]),
     );
 
-RunnerOrchestrator orchestrator(Project project, {PortProbe? ports, ItemLauncher Function(ProjectRepository)? launcher}) {
+/// 테스트마다 새 로그 폴더. 테스트가 끝나면 지운다.
+LogStore tempLogs() {
+  final dir = Directory.systemTemp.createTempSync('ppoling_logs_');
+  addTearDown(() => dir.deleteSync(recursive: true));
+  return LogStore(() async => dir);
+}
+
+RunnerOrchestrator orchestrator(Project project,
+    {PortProbe? ports, ItemLauncher Function(ProjectRepository)? launcher, LogStore? logs}) {
   final repo = FakeProjectRepository(projects: [project]);
   final launcher0 = launcher?.call(repo) ?? FakeItemLauncher(repo, reachable: {'storage'});
   final ports0 = ports ?? FakePortProbe();
@@ -103,6 +112,7 @@ RunnerOrchestrator orchestrator(Project project, {PortProbe? ports, ItemLauncher
     ports: () => ports0,
     http: () => http,
     processes: PosixProcessLauncher(searchPath: () async => '/usr/bin:/bin'),
+    logs: logs ?? tempLogs(),
   );
 }
 
@@ -292,6 +302,45 @@ void main() {
           ready: LogReady(pattern: 'from-file yaml', timeout: _s5),
         ),
       ]));
+      const item = ItemRef(projectId: 'demo', serviceId: 'x');
+      addTearDown(() => o.stop(item));
+      expect((await o.start(item)).outcome, ItemOutcome.ok);
+    });
+
+    test('실행한 항목의 출력을 .env 값을 가려 로그 파일에 남긴다', () async {
+      final folder = tempProject();
+      File('$folder/.env').writeAsStringSync('SECRET=hunter2\n');
+      final logs = tempLogs();
+      final o = orchestrator(
+          demo(folder, extra: [
+            const ProcessService(
+              id: 'x',
+              command: ['sh', '-c', r'echo "pw=$SECRET"; echo oops >&2; echo Started; exec sleep 30'],
+              envFile: '.env',
+              ready: LogReady(pattern: 'Started', timeout: _s5),
+            ),
+          ]),
+          logs: logs);
+      const item = ItemRef(projectId: 'demo', serviceId: 'x');
+      expect((await o.start(item)).outcome, ItemOutcome.ok);
+      await o.stop(item);
+      final file = await logs.fileOf(item);
+      var text = '';
+      for (var i = 0; i < 50 && !text.contains('out | Started'); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        text = file.existsSync() ? file.readAsStringSync() : '';
+      }
+      expect(text, contains('out | pw=****'));
+      expect(text, contains('err | oops'));
+      expect(text, contains('out | Started'));
+      expect(text, isNot(contains('hunter2')));
+    });
+
+    test('로그 폴더를 쓸 수 없어도 항목은 시작된다', () async {
+      final blocker = File('${tempProject()}/not_a_dir')..writeAsStringSync('x');
+      final o = orchestrator(
+          demo(tempProject(), extra: [const ProcessService(id: 'x', command: ['sleep', '36'])]),
+          logs: LogStore(() async => Directory(blocker.path)));
       const item = ItemRef(projectId: 'demo', serviceId: 'x');
       addTearDown(() => o.stop(item));
       expect((await o.start(item)).outcome, ItemOutcome.ok);
