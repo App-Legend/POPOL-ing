@@ -93,6 +93,10 @@ class _WindowsProcess implements RunningProcess {
     return alive;
   }
 
+  // Job 핸들로 묻으니 PID 가 재사용돼도 남의 프로세스를 내 것으로 보지 않는다.
+  @override
+  Future<bool> contains(int pid) async => _assigned ? _job.contains(pid) : !_exited && pid == _process.pid;
+
   // shortcut: 정상 종료 신호 없이 바로 Job 째 강제 종료하므로 [timeout] 을 쓰지 않고 항상 forced 다.
   // 콘솔 프로그램에 CTRL_BREAK 를 따로 보내려면 새 콘솔 그룹으로 띄워야 해서 CreateProcessW 로 바꿀 때 함께 한다.
   @override
@@ -132,6 +136,9 @@ class _RefusedProcess implements RunningProcess {
 
   @override
   Future<bool> get groupAlive async => false;
+
+  @override
+  Future<bool> contains(int pid) async => false;
 
   @override
   Future<StopResult> stop(Duration timeout) async => const StopResult(forced: false);

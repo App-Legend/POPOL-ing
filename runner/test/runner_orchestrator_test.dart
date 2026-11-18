@@ -11,6 +11,7 @@ import 'package:ppoling_core/testing.dart';
 import 'package:ppoling_runner/src/log/log_store.dart';
 import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
+import 'package:ppoling_runner/src/runtime/runtime_store.dart';
 
 const _s5 = Duration(seconds: 5);
 const _ms300 = Duration(milliseconds: 300);
@@ -100,8 +101,15 @@ LogStore tempLogs() {
   return LogStore(() async => dir);
 }
 
+/// 테스트마다 새 실행 기록 파일. 테스트가 끝나면 지운다.
+RuntimeStore tempStore() {
+  final dir = Directory.systemTemp.createTempSync('ppoling_runtime_');
+  addTearDown(() => dir.deleteSync(recursive: true));
+  return RuntimeStore(() async => File('${dir.path}/runtime.json'));
+}
+
 RunnerOrchestrator orchestrator(Project project,
-    {PortProbe? ports, ItemLauncher Function(ProjectRepository)? launcher, LogStore? logs}) {
+    {PortProbe? ports, ItemLauncher Function(ProjectRepository)? launcher, LogStore? logs, RuntimeStore? store}) {
   final repo = FakeProjectRepository(projects: [project]);
   final launcher0 = launcher?.call(repo) ?? FakeItemLauncher(repo, reachable: {'storage'});
   final ports0 = ports ?? FakePortProbe();
@@ -113,6 +121,7 @@ RunnerOrchestrator orchestrator(Project project,
     http: () => http,
     processes: PosixProcessLauncher(searchPath: () async => '/usr/bin:/bin'),
     logs: logs ?? tempLogs(),
+    store: store ?? tempStore(),
   );
 }
 
@@ -454,5 +463,38 @@ void main() {
     expect(r.outcome, ItemOutcome.failed);
     expect(r.reason, contains('멈추지 못했어요'));
     expect(o.stateOf(db), ItemState.failed);
+  });
+
+  group('실행 기록', () {
+    test('마지막 전체 실행 결과는 앱을 다시 켜도 남는다', () async {
+      final dir = Directory.systemTemp.createTempSync('ppoling_runtime_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      RuntimeStore store() => RuntimeStore(() async => File('${dir.path}/runtime.json'));
+      final project = demo(tempProject());
+      final o = orchestrator(project, store: store());
+      addTearDown(() => o.stopAll('demo'));
+      final summary = await o.runAll('demo');
+
+      final again = await orchestrator(project, store: store()).lastRun('demo');
+      expect(again!.startedAt, summary.startedAt);
+      expect(again.items.map((r) => (r.item, r.outcome)), summary.items.map((r) => (r.item, r.outcome)));
+    });
+
+    test('띄운 프로세스를 기록하고, 멈추면 기록에서 뺀다', () async {
+      final store = tempStore();
+      final o = orchestrator(demo(tempProject(), extra: [const ProcessService(id: 'x', command: ['sleep', '37'])]),
+          store: store);
+      const item = ItemRef(projectId: 'demo', serviceId: 'x');
+      addTearDown(() => o.stop(item));
+      await o.start(item);
+      final record = (await store.processes()).single;
+      expect(record.item, item);
+      expect(record.pid, o.liveProcesses.single.process.pid);
+      expect(record.command, ['sleep', '37']);
+      expect(record.appRunId, store.appRunId);
+
+      await o.stop(item);
+      expect(await store.processes(), isEmpty);
+    });
   });
 }

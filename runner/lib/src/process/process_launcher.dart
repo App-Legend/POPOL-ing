@@ -42,6 +42,10 @@ abstract interface class RunningProcess {
   /// 그룹에 프로세스가 하나라도 남아 있다.
   Future<bool> get groupAlive;
 
+  /// [pid] 가 지금 이 그룹(Windows 는 Job)에 든 프로세스다. 포트 주인이 내 항목인지 판단할 때 쓴다.
+  /// 확인할 수 없으면 false 다(내 것이라고 하지 않는다).
+  Future<bool> contains(int pid);
+
   /// 그룹 전체에 종료 신호를 보내고 [timeout] 동안 기다린다. 그래도 남아 있으면 강제 종료한다.
   /// 이미 끝났으면 아무것도 하지 않는다.
   Future<StopResult> stop(Duration timeout);

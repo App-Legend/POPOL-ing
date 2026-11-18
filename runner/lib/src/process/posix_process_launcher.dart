@@ -96,5 +96,13 @@ class _PosixProcess implements RunningProcess {
     return alive;
   }
 
+  // 그룹이 살아 있는 동안은 번호가 재사용되지 않으니, 그 번호의 그룹에 들었으면 내가 띄운 것이다.
+  @override
+  Future<bool> contains(int pid) async {
+    if (!await groupAlive) return false;
+    final r = await Process.run('ps', ['-o', 'pgid=', '-p', '$pid']);
+    return r.exitCode == 0 && int.tryParse((r.stdout as String).trim()) == pgid;
+  }
+
   Future<void> _signalGroup(String signal) => Process.run('kill', ['-$signal', '--', '-$pgid']);
 }
