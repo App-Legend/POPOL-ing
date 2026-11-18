@@ -104,6 +104,15 @@ void main() {
     expect(text, contains('after'));
   });
 
+  test('회전에 실패해도 줄을 잃지 않고 계속 쓴다', () async {
+    Directory('${tmp.path}/p1/s1.log.1').createSync(recursive: true); // .log -> .log.1 이름 바꾸기가 막힌다
+    await store(maxBytes: 100).record(item, Stream.fromIterable([for (var i = 0; i < 10; i++) out('line-$i')]));
+    final text = logOf('').readAsStringSync();
+    for (var i = 0; i < 10; i++) {
+      expect(text, contains('line-$i'));
+    }
+  });
+
   test('폴더를 만들 수 없어도 예외 없이 끝난다', () async {
     final blocker = File('${tmp.path}/file')..writeAsStringSync('x');
     final s = LogStore(() async => Directory('${blocker.path}/logs'));

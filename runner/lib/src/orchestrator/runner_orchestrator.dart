@@ -288,6 +288,7 @@ class RunnerOrchestrator implements Orchestrator {
       lines.close();
       logLines.close();
     });
+    // shortcut: 이전 프로세스의 자식이 그룹·Job 을 빠져나가 stdout 을 잡고 있으면 새 실행의 로그 줄이 닫힐 때까지 메모리에 쌓인다, 실제로 관찰되면 항목별 큐 대신 실행마다 따로 쓰게 바꾼다.
     unawaited(logs.record(item, logLines.stream, secrets: secrets));
     final Future<ReadyResult> ready;
     try {

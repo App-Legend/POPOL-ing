@@ -34,7 +34,7 @@ class LogStore {
   /// [item] 의 지금 로그 파일(없을 수도 있다).
   Future<File> fileOf(ItemRef item) async {
     final root = await _root();
-    return File('${root.path}/${item.projectId}/${item.serviceId}.log');
+    return File([root.path, item.projectId, '${item.serviceId}.log'].join(Platform.pathSeparator));
   }
 
   Future<void> _write(ItemRef item, Stream<OutputLine> lines, Iterable<String> secrets) async {
@@ -51,7 +51,9 @@ class LogStore {
       if (size > 0 && size + bytes.length > maxBytes) {
         await sink!.close();
         sink = null;
-        await _rotate(file!);
+        try {
+          await _rotate(file!);
+        } catch (_) {} // 다른 프로그램이 파일을 잡고 있으면 밀지 못한다. 그대로 이어 쓰고 maxBytes 뒤에 다시 시도한다.
         size = 0;
         sink = file!.openWrite(mode: FileMode.append);
       }
