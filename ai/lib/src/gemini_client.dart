@@ -17,6 +17,9 @@ class GeminiHttpResponse {
 /// POST 한 번을 보내는 함수. 테스트에서는 실제 서버 대신 가짜를 넣는다.
 typedef GeminiTransport = Future<GeminiHttpResponse> Function(Uri url, Map<String, String> headers, String body);
 
+/// 내용 없이 GET 한 번을 보내는 함수(키 연결 확인용). 테스트에서는 가짜를 넣는다.
+typedef GeminiFetch = Future<GeminiHttpResponse> Function(Uri url, Map<String, String> headers);
+
 /// Gemini API 로 보내는 [LlmClient]. 포폴링에서 Gemini 를 부르는 곳은 여기 하나뿐이다.
 ///
 /// - 키는 [ApiKeyStore] 에서 꺼내 `x-goog-api-key` 헤더로만 보낸다. 주소·로그·예외에는 넣지 않는다.
@@ -28,11 +31,13 @@ class GeminiLlmClient implements LlmClient {
   GeminiLlmClient({
     required this.keys,
     GeminiTransport? transport,
+    GeminiFetch? fetch,
     this.model = defaultModel,
     this.fallbackModel = defaultFallbackModel,
     this.timeout = const Duration(seconds: 30),
     this.retryDelay = const Duration(seconds: 2),
-  }) : _transport = transport ?? _httpPost;
+  })  : _transport = transport ?? _httpPost,
+        _fetch = fetch ?? _httpGet;
 
   /// 항상 최신 Flash 를 가리키는 이름. 옛 모델이 막혀도 앱을 고치지 않아도 된다.
   static const defaultModel = 'gemini-flash-latest';
@@ -57,6 +62,7 @@ class GeminiLlmClient implements LlmClient {
   final Duration retryDelay;
 
   final GeminiTransport _transport;
+  final GeminiFetch _fetch;
 
   String? _answeredBy;
 
@@ -104,6 +110,28 @@ class GeminiLlmClient implements LlmClient {
     return _answer(await _send(_url(fallbackModel ?? model), headers, body));
   }
 
+  /// [key] 로 Gemini 에 연결되는지 본다. 키 입력 창의 [연결 확인]이 부른다.
+  ///
+  /// [model] 의 정보만 물어보고 내용은 보내지 않는다. 키는 헤더로만 보내고 저장하지 않는다.
+  /// 되면 그냥 끝나고, 안 되면 [LlmException](빈 키는 [LlmFailure.missingKey]). 다시 보내지 않는다.
+  Future<void> checkKey(String key) async {
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) {
+      throw LlmException(LlmFailure.missingKey);
+    }
+    final GeminiHttpResponse response;
+    try {
+      response = await _fetch(_api.resolve('models/$model'), {'x-goog-api-key': trimmed}).timeout(timeout);
+    } on TimeoutException {
+      throw LlmException(LlmFailure.network);
+    } on IOException {
+      throw LlmException(LlmFailure.network);
+    }
+    if (response.status != 200) {
+      throw LlmException(_failure(response.status, _decode(response.body)));
+    }
+  }
+
   static Uri _url(String model) => _api.resolve('models/$model:generateContent');
 
   Future<GeminiHttpResponse> _send(Uri url, Map<String, String> headers, String body) async {
@@ -120,28 +148,28 @@ class GeminiLlmClient implements LlmClient {
 
   String _answer(GeminiHttpResponse response) {
     final json = _decode(response.body);
-    switch (response.status) {
-      case 200:
-        final text = _text(json);
-        if (text.trim().isEmpty) {
-          // 안전 필터 등으로 답이 비었다. 서버 응답 문제로 묶어 다시 해 보게 한다.
-          throw LlmException(LlmFailure.network);
-        }
-        if (json?['modelVersion'] case final String version when version.isNotEmpty) {
-          _answeredBy = version;
-        }
-        return text;
-      case 401 || 403:
-        throw LlmException(LlmFailure.invalidKey);
-      case 400 when _mentionsKey(json):
-        throw LlmException(LlmFailure.invalidKey);
-      case 429:
-        throw LlmException(LlmFailure.quotaExceeded);
-      default:
-        // 붐빔이 이어지거나 알 수 없는 응답. 키와 사용량 문제는 아니니 잠시 뒤 다시 해 보게 한다.
-        throw LlmException(LlmFailure.network);
+    if (response.status != 200) {
+      throw LlmException(_failure(response.status, json));
     }
+    final text = _text(json);
+    if (text.trim().isEmpty) {
+      // 안전 필터 등으로 답이 비었다. 서버 응답 문제로 묶어 다시 해 보게 한다.
+      throw LlmException(LlmFailure.network);
+    }
+    if (json?['modelVersion'] case final String version when version.isNotEmpty) {
+      _answeredBy = version;
+    }
+    return text;
   }
+
+  /// 200 이 아닌 응답의 실패 이유.
+  static LlmFailure _failure(int status, Map<String, Object?>? json) => switch (status) {
+        401 || 403 => LlmFailure.invalidKey,
+        400 when _mentionsKey(json) => LlmFailure.invalidKey,
+        429 => LlmFailure.quotaExceeded,
+        // 붐빔이 이어지거나 알 수 없는 응답. 키와 사용량 문제는 아니니 잠시 뒤 다시 해 보게 한다.
+        _ => LlmFailure.network,
+      };
 
   static Map<String, Object?>? _decode(String body) {
     try {
@@ -190,6 +218,19 @@ Future<GeminiHttpResponse> _httpPost(Uri url, Map<String, String> headers, Strin
     final request = await client.postUrl(url);
     headers.forEach(request.headers.set);
     request.add(utf8.encode(body));
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    return GeminiHttpResponse(response.statusCode, text);
+  } finally {
+    client.close(force: true);
+  }
+}
+
+Future<GeminiHttpResponse> _httpGet(Uri url, Map<String, String> headers) async {
+  final client = HttpClient();
+  try {
+    final request = await client.getUrl(url);
+    headers.forEach(request.headers.set);
     final response = await request.close();
     final text = await response.transform(utf8.decoder).join();
     return GeminiHttpResponse(response.statusCode, text);

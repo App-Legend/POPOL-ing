@@ -3,15 +3,35 @@ import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
 
-/// [PortProbe] 진짜 구현. 지금은 [connect] 만 있다.
+import 'failure_reason.dart';
+import 'port_owner/port_owner_lookup.dart';
+
+/// [PortProbe] 진짜 구현.
 ///
-/// [whoUses] 는 포트를 쓰는 PID·프로그램 이름을 OS 명령(`lsof`·`netstat`)으로 찾아야 해서,
-/// OS별 코드를 어디에 둘지 팀과 정한 뒤 채운다. 그 전에는 앱에 등록하지 않는다.
+/// [whoUses] 는 OS 명령으로 주인 PID·이름을 찾고(`port_owner/`), 그걸로 확실히 모르면
+/// 직접 포트를 열어 보며 쓰는지만 확인한다(이때 PID·이름은 null). 어떤 경우에도 프로세스를 종료하지 않는다.
 class SystemPortProbe implements PortProbe {
+  SystemPortProbe({PortOwnerLookup? owners}) : _owners = owners ?? PortOwnerLookup.forPlatform();
+
+  final PortOwnerLookup _owners;
+
   @override
   Future<PortUsage> whoUses(int port) async {
     _checkPort(port);
-    throw UnimplementedError('whoUses 는 OS별 코드 위치를 정한 뒤 구현한다.');
+    return await _owners.find(port) ?? await _tryBind(port);
+  }
+
+  /// 루프백과 모든 주소에 잠깐 열어 본다. 둘 중 하나라도 이미 쓰고 있으면 실패한다.
+  Future<PortUsage> _tryBind(int port) async {
+    for (final address in [InternetAddress.loopbackIPv4, InternetAddress.anyIPv4]) {
+      try {
+        final server = await ServerSocket.bind(address, port);
+        await server.close();
+      } on SocketException {
+        return PortInUse(port);
+      }
+    }
+    return PortFree(port);
   }
 
   @override
@@ -26,9 +46,9 @@ class SystemPortProbe implements PortProbe {
       socket.destroy(); // 연결만 확인한다. 아무것도 보내지 않는다.
       return ProbeResult(target: target, ok: true, elapsed: elapsed);
     } on SocketException catch (e) {
-      return ProbeResult(target: target, ok: false, failureReason: _reason(e, watch.elapsed, timeout));
+      return ProbeResult(target: target, ok: false, failureReason: connectFailureReason(e, watch.elapsed, timeout));
     } on TimeoutException {
-      return ProbeResult(target: target, ok: false, failureReason: _timedOut(timeout));
+      return ProbeResult(target: target, ok: false, failureReason: timedOutReason(timeout));
     }
   }
 }
@@ -37,22 +57,4 @@ void _checkPort(int port) {
   if (port < 1 || port > 65535) {
     throw ArgumentError.value(port, 'port', '포트 번호는 1~65535 사이여야 해요');
   }
-}
-
-/// 연결 거부를 뜻하는 OS 오류 코드 (Linux 111, macOS 61, Windows 10061·1225).
-/// Windows 는 거부돼도 약 2초 다시 시도한 뒤 1225 로 알려서, 기본 대기 시간(2초)이면 `응답 없음`이 될 수 있다.
-const _refusedCodes = {111, 61, 10061, 1225};
-
-String _reason(SocketException e, Duration elapsed, Duration timeout) {
-  final message = e.message.toLowerCase();
-  if (message.contains('timed out') || elapsed >= timeout) return _timedOut(timeout);
-  if (message.contains('host lookup')) return '주소를 찾을 수 없음';
-  if (_refusedCodes.contains(e.osError?.errorCode)) return '연결 거부';
-  return '연결 실패';
-}
-
-String _timedOut(Duration timeout) {
-  final seconds = timeout.inMilliseconds / 1000;
-  final text = seconds == seconds.roundToDouble() ? '${seconds.round()}' : '$seconds';
-  return '응답 없음 ($text초 안에 연결되지 않음)';
 }

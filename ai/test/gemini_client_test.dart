@@ -200,6 +200,58 @@ void main() {
     });
   });
 
+  group('키 연결 확인(checkKey)', () {
+    ({GeminiLlmClient client, List<({Uri url, Map<String, String> headers})> got, FakeHttp posts}) checker(Object response) {
+      final got = <({Uri url, Map<String, String> headers})>[];
+      final posts = FakeHttp([answer('보내면 안 돼요')]);
+      final client = GeminiLlmClient(
+        keys: MemoryApiKeyStore(),
+        transport: posts.call,
+        fetch: (url, headers) async {
+          got.add((url: url, headers: headers));
+          return switch (response) {
+            final GeminiHttpResponse r => r,
+            final Future<GeminiHttpResponse> Function() f => f(),
+            _ => throw StateError('$response'),
+          };
+        },
+        timeout: const Duration(milliseconds: 200),
+      );
+      return (client: client, got: got, posts: posts);
+    }
+
+    test('모델 정보만 묻고 내용은 보내지 않는다. 키는 헤더로만 보내고 저장하지 않는다', () async {
+      final c = checker(const GeminiHttpResponse(200, '{"name":"models/gemini-flash-latest"}'));
+      await c.client.checkKey('  AQ.typed-key-1234  ');
+      final req = c.got.single;
+      expect(req.url.toString(), 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest');
+      expect(req.url.query, isEmpty);
+      expect(req.headers['x-goog-api-key'], 'AQ.typed-key-1234');
+      expect(c.posts.sent, isEmpty, reason: 'generateContent 로는 보내지 않는다');
+      expect(await c.client.keys.read(), isNull);
+    });
+
+    test('빈 키면 아무것도 보내지 않는다', () async {
+      final c = checker(const GeminiHttpResponse(200, '{}'));
+      await expectLater(c.client.checkKey('  '), failsWith(LlmFailure.missingKey));
+      expect(c.got, isEmpty);
+    });
+
+    final cases = <String, (Object, LlmFailure)>{
+      '400 + API_KEY_INVALID → 키 오류': (error(400, 'INVALID_ARGUMENT', message: 'API key not valid.', reason: 'API_KEY_INVALID'), LlmFailure.invalidKey),
+      '403 → 키 오류': (error(403, 'PERMISSION_DENIED'), LlmFailure.invalidKey),
+      '429 → 사용량 초과': (error(429, 'RESOURCE_EXHAUSTED'), LlmFailure.quotaExceeded),
+      '503 → 네트워크': (error(503, 'UNAVAILABLE'), LlmFailure.network),
+      '인터넷 끊김 → 네트워크': (() async => throw const SocketException('Failed host lookup'), LlmFailure.network),
+      '시간 초과 → 네트워크': (() => Completer<GeminiHttpResponse>().future, LlmFailure.network),
+    };
+    for (final MapEntry(key: name, value: (response, failure)) in cases.entries) {
+      test(name, () async {
+        await expectLater(checker(response).client.checkKey('AQ.k-1234'), failsWith(failure));
+      });
+    }
+  });
+
   test('예외 문장에 API 키가 들어가지 않는다', () async {
     final http = FakeHttp([error(400, 'INVALID_ARGUMENT', message: 'API key not valid.', reason: 'API_KEY_INVALID')]);
     try {
