@@ -26,7 +26,8 @@ class LogStore {
   /// [lines] 를 끝날 때까지 [item] 의 로그 파일에 쓴다. [secrets] 는 쓰기 전에 `****` 로 가린다.
   /// 같은 항목의 이전 기록이 남아 있으면 그게 끝난 뒤 쓴다. 쓰기에 실패해도 예외를 내지 않는다.
   Future<void> record(ItemRef item, Stream<OutputLine> lines, {Iterable<String> secrets = const []}) {
-    final next = (_tails[item] ?? Future.value()).then((_) => _write(item, lines, secrets));
+    Future<void> run(Object? _) => _write(item, lines, secrets);
+    final next = (_tails[item] ?? Future.value()).then(run, onError: run);
     return _tails[item] = next;
   }
 
@@ -69,14 +70,16 @@ class LogStore {
       sink = null;
     }
     // 쓰기가 실패해도 끝까지 읽는다. 안 그러면 보내는 쪽이 막힌다.
-    await for (final l in lines) {
-      if (sink == null) continue;
-      try {
-        await put('${l.at.toIso8601String()} ${l.isError ? 'err' : 'out'} | ${mask(l.text)}');
-      } catch (_) {
-        sink = null;
+    try {
+      await for (final l in lines) {
+        if (sink == null) continue;
+        try {
+          await put('${l.at.toIso8601String()} ${l.isError ? 'err' : 'out'} | ${mask(l.text)}');
+        } catch (_) {
+          sink = null;
+        }
       }
-    }
+    } catch (_) {} // 입력 스트림 오류: 거기까지 쓰고 끝낸다
     try {
       await sink?.close();
     } catch (_) {}

@@ -66,7 +66,8 @@ void main() {
   });
 
   test('크기는 문자 수가 아니라 UTF-8 바이트로 센다', () async {
-    // 구분 줄 39바이트(35자) + 한 줄 43바이트(35자). 두 줄째에서 바이트로는 125 > 110, 글자로는 105 <= 110.
+    // 구분 줄(시각 정밀도에 따라 35~38자, 39~42바이트) + 한 줄 43바이트(35자) 두 개.
+    // 바이트로는 125 이상이라 110 을 넘고, 글자로는 105~108 이라 넘지 않는다.
     await store(maxBytes: 110).record(item, Stream.fromIterable([out('가나다라'), out('가나다라')]));
     expect(logOf('.1').existsSync(), isTrue);
     expect(utf8.encode(logOf('.1').readAsStringSync()).length, lessThanOrEqualTo(110));
@@ -87,6 +88,20 @@ void main() {
     await Future.wait([fa, fb]);
     final lines = logOf('').readAsLinesSync().where((l) => l.contains(' | ')).map((l) => l.split(' | ').last).toList();
     expect(lines, ['a1', 'a2', 'b1', 'b2']);
+  });
+
+  test('입력 스트림이 오류를 내도 예외 없이 끝나고 다음 기록이 이어진다', () async {
+    final s = store();
+    final bad = Stream<OutputLine>.multi((c) {
+      c.add(out('before'));
+      c.addError('boom');
+      c.close();
+    });
+    await s.record(item, bad);
+    await s.record(item, Stream.fromIterable([out('after')]));
+    final text = logOf('').readAsStringSync();
+    expect(text, contains('before'));
+    expect(text, contains('after'));
   });
 
   test('폴더를 만들 수 없어도 예외 없이 끝난다', () async {
