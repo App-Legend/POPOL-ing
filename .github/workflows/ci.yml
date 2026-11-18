@@ -31,6 +31,22 @@ jobs:
             echo "::endgroup::"
           done
 
+  # Windows 실행기는 이 Mac 에서 돌려 볼 수 없어 Windows 러너에서 시험한다.
+  runner-windows:
+    name: runner Windows 실행·종료 테스트
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: runner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get
+      - run: flutter test test/windows_process_launcher_test.dart test/windows_command_test.dart
+
   build:
     name: ${{ matrix.target }} 빌드
     strategy:

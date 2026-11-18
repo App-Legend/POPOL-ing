@@ -7,7 +7,8 @@ import 'package:ppoling_catalog/catalog.dart' as catalog;
 import 'package:ppoling_checks/checks.dart' as checks;
 import 'package:ppoling_compose/compose.dart' as compose;
 import 'package:ppoling_project/project.dart' as project;
-import 'package:ppoling_runner/runner.dart' as runner;
+// 진짜 실행 제어는 3주차 목요일 첫 조립 때 켠다. 지금은 HttpProbe 가 가짜(모든 주소 "연결 거부")라 ready: http 항목이 모두 실패로 보인다.
+// import 'package:ppoling_runner/runner.dart' as runner;
 
 import 'registry.dart';
 import 'screens/ai_screen.dart';
@@ -31,7 +32,7 @@ Registry buildRegistry({bool features = true}) {
   _registerMockups(app);
   if (features) {
     project.register(app);
-    runner.register(app);
+    // runner.register(app);
     checks.register(app);
     compose.register(app);
     catalog.register(app);
