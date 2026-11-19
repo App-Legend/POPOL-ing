@@ -37,6 +37,25 @@ class LogStore {
     return File([root.path, item.projectId, '${item.serviceId}.log'].join(Platform.pathSeparator));
   }
 
+  /// [item] 의 로그 파일 마지막 [lines] 줄. 파일이 없으면 빈 목록. 파일 끝 [maxRead] 바이트만 읽는다.
+  Future<List<String>> tail(ItemRef item, {int lines = 5000, int maxRead = 1024 * 1024}) async {
+    try {
+      final raf = await (await fileOf(item)).open();
+      try {
+        final length = await raf.length();
+        final start = length > maxRead ? length - maxRead : 0;
+        await raf.setPosition(start);
+        final all = const LineSplitter().convert(utf8.decode(await raf.read(length - start), allowMalformed: true));
+        final whole = start == 0 ? all : all.skip(1).toList(); // 중간부터 읽었으면 첫 줄은 잘린 줄이다
+        return whole.length > lines ? whole.sublist(whole.length - lines) : whole;
+      } finally {
+        await raf.close();
+      }
+    } on FileSystemException {
+      return const [];
+    }
+  }
+
   Future<void> _write(ItemRef item, Stream<OutputLine> lines, Iterable<String> secrets) async {
     // 긴 값부터 가려야 짧은 값이 긴 값의 일부를 먼저 갉아먹지 않는다.
     final masks = secrets.where((s) => s.isNotEmpty).toList()..sort((a, b) => b.length.compareTo(a.length));

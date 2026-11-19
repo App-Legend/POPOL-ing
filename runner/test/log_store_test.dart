@@ -36,6 +36,17 @@ void main() {
     expect(lines[1], startsWith(at.toIso8601String()));
   });
 
+  test('tail 은 마지막 줄들만 돌려주고, 중간부터 읽으면 잘린 첫 줄은 버린다', () async {
+    final s = store();
+    expect(await s.tail(item), isEmpty, reason: '파일이 없으면 빈 목록');
+    await s.record(item, Stream.fromIterable([for (var i = 0; i < 100; i++) out('line $i')]));
+    final last = await s.tail(item, lines: 3);
+    expect(last.map((l) => l.split(' | ').last), ['line 97', 'line 98', 'line 99']);
+    final cut = await s.tail(item, maxRead: 50);
+    expect(cut, isNotEmpty);
+    expect(cut.every((l) => RegExp(r'^\S+ out \| line \d+$').hasMatch(l)), isTrue);
+  });
+
   test('.env 값은 가리고, 빈 값은 무시하고, 긴 값부터 가린다', () async {
     final s = store();
     await s.record(item, Stream.fromIterable([out('x=abcdef y=abc')]), secrets: ['', 'abc', 'abcdef']);
