@@ -6,8 +6,12 @@ import 'package:ppoling_core/contracts.dart';
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
 import '../ready/readiness.dart';
+import '../runtime/runtime_store.dart';
 import 'env_file.dart';
 import 'start_order.dart';
+
+/// 떠 있는 프로세스 항목 하나.
+typedef LiveProcess = ({ItemRef item, ProcessService service, RunningProcess process});
 
 /// [Orchestrator] 의 진짜 구현. 정책은 기획서 §6.
 ///
@@ -15,23 +19,27 @@ import 'start_order.dart';
 /// - 멈추는 건 이 객체가 띄운 프로세스와 `ppoling-<프로젝트ID>` Compose 항목뿐이다. 포트·PID 만으로 멈추지 않는다.
 /// - 다른 기능의 구현은 함수로 받아 처음 쓸 때 꺼낸다(`AppRegistry` 약속: 등록이 다 끝난 뒤 꺼낸다).
 /// - 항목마다 시작은 한 번에 하나만 돈다. 시작하는 중에 멈추면 그 시작은 상태를 바꾸지 않고 끝난다.
-// shortcut: 실행 기록을 메모리에만 둔다. 앱을 다시 켜면 잊는다. 실행 기록(④)에서 파일로 옮긴다.
+/// - 마지막 전체 실행 결과와 띄운 프로세스는 [store] 에 남긴다. 앱을 다시 켰을 때 되살리는 건 복구(FR-11)가 한다.
 class RunnerOrchestrator implements Orchestrator {
   RunnerOrchestrator({
     required this.projects,
     required this.launcher,
     required this.ports,
     required this.http,
+    required this.runtime,
     required this.processes,
     required this.logs,
+    required this.store,
   });
 
   final ProjectRepository Function() projects;
   final ItemLauncher Function() launcher;
   final PortProbe Function() ports;
   final HttpProbe Function() http;
+  final RuntimeQuery Function() runtime;
   final ProcessLauncher processes;
   final LogStore logs;
+  final RuntimeStore store;
 
   final _events = StreamController<RunEvent>.broadcast();
   final _states = <ItemRef, ItemState>{};
@@ -44,7 +52,6 @@ class RunnerOrchestrator implements Orchestrator {
   /// 진행 중인 시작의 결과. 같은 항목을 또 시작하면(전체 실행과 단일 시작이 겹칠 때 등) 이걸 같이 기다린다.
   final _ups = <ItemRef, Future<ItemResult>>{};
   final _stopping = <ItemRef>{};
-  final _lastRuns = <String, RunSummary>{};
 
   /// 띄울 때 쓴 설정. 설정 파일이 깨지거나 항목이 빠져도 띄운 것은 멈출 수 있어야 한다.
   final _launched = <ItemRef, ServiceConfig>{};
@@ -60,6 +67,12 @@ class RunnerOrchestrator implements Orchestrator {
 
   @override
   ItemState stateOf(ItemRef item) => _states[item] ?? ItemState.stopped;
+
+  /// 지금 떠 있는, 이 객체가 띄운 프로세스 항목. `RuntimeQuery` 가 포트 주인을 판단할 때 쓴다.
+  Iterable<LiveProcess> get liveProcesses => [
+        for (final MapEntry(key: item, value: process) in _running.entries)
+          if (_launched[item] case final ProcessService service) (item: item, service: service, process: process),
+      ];
 
   /// 같은 프로젝트를 실행하는 중에 또 누르면 진행 중인 실행의 결과를 같이 기다린다.
   @override
@@ -90,7 +103,7 @@ class RunnerOrchestrator implements Orchestrator {
     }
     final summary =
         RunSummary(projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values]);
-    _lastRuns[projectId] = summary;
+    await store.saveRun(summary);
     if (summary.succeeded) _events.add(RunSucceeded(summary));
     return summary;
   }
@@ -136,7 +149,7 @@ class RunnerOrchestrator implements Orchestrator {
   @override
   Future<RunSummary?> lastRun(String projectId) async {
     await projects().getProject(projectId); // 없으면 ProjectNotFoundException
-    return _lastRuns[projectId];
+    return store.lastRun(projectId);
   }
 
   // ---- 띄우기 ----
@@ -274,6 +287,13 @@ class RunnerOrchestrator implements Orchestrator {
       return _cancelled(item);
     }
     _running[item] = process;
+    unawaited(store.putProcess(ProcessRecord(
+        item: item,
+        pid: process.pid,
+        pgid: process.pgid,
+        command: service.command,
+        startedAt: process.startedAt,
+        appRunId: store.appRunId)));
     _exitCodes.remove(item);
     final exited = _allExited(process);
     unawaited(exited.then((code) => _onExit(item, process, code))); // 준비 확인보다 먼저 걸어야 실패에 종료 코드가 붙는다
@@ -297,6 +317,7 @@ class RunnerOrchestrator implements Orchestrator {
       // 준비 조건이 잘못됐으면(정규식 오류 등) 띄운 프로세스를 남기지 않는다.
       _running.remove(item);
       await process.stop(service.stopTimeout);
+      unawaited(store.removeProcess(item));
       rethrow;
     }
     _set(item, ItemState.running);
@@ -324,16 +345,20 @@ class RunnerOrchestrator implements Orchestrator {
     if (!identical(_running[item], process)) return;
     _exitCodes[item] = code;
     _running.remove(item);
+    unawaited(store.removeProcess(item));
     if (_stopping.contains(item) || stateOf(item) != ItemState.ready) return;
     _set(item, code == 0 ? ItemState.stopped : ItemState.failed,
         reason: code == 0 ? null : '실행 중에 종료됐어요 (종료 코드 $code).', exitCode: code);
   }
 
   /// 항목이 쓸 포트를 다른 프로그램이 쓰고 있으면 그 이유. 확인할 수 없으면 null(시작은 막지 않는다).
+  /// 내가 띄운 다른 항목이 쓰고 있으면 그 항목을 알려 준다(AT-17).
   Future<String?> _busyPort(ProcessService service) async {
     for (final port in service.ports) {
       try {
-        if (await ports().whoUses(port) case PortInUse(:final processName, :final pid)) {
+        if (await ports().whoUses(port) case final PortInUse usage) {
+          if (await runtime().ownerOf(usage) case final owner?) return '포트 $port 를 $owner 항목이 쓰고 있어요.';
+          final PortInUse(:processName, :pid) = usage;
           final who = processName == null ? '' : '($processName${pid == null ? '' : ', PID $pid'})';
           return '포트 $port 를 다른 프로그램$who이 쓰고 있어요.';
         }
@@ -373,6 +398,7 @@ class RunnerOrchestrator implements Orchestrator {
         await launcher().stop(projectId, service);
       } else if (process != null) {
         forced = (await process.stop((service as ProcessService).stopTimeout)).forced;
+        unawaited(store.removeProcess(item));
       }
       _set(item, ItemState.stopped);
       return ItemResult(item: item, outcome: ItemOutcome.ok, forced: forced);

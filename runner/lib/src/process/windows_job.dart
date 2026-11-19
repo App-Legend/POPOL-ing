@@ -28,6 +28,20 @@ class WindowsJob {
     }
   }
 
+  /// [processId] 프로세스가 지금 이 Job 에 들어 있다. 열 수 없거나 물어보지 못했으면 false.
+  bool contains(int processId) {
+    if (_closed) return false;
+    final process = _openProcess(_processQueryLimitedInformation, 0, processId);
+    if (process == nullptr) return false;
+    final result = calloc<Int32>();
+    try {
+      return _isProcessInJob(process, _job, result) != 0 && result.value != 0;
+    } finally {
+      calloc.free(result);
+      _closeHandle(process);
+    }
+  }
+
   /// Job 안의 프로세스를 모두 강제 종료한다. 실패하면 false.
   bool terminate() => !_closed && _terminateJobObject(_job, 1) != 0;
 
@@ -80,6 +94,8 @@ final _openProcess = _kernel32
     .lookupFunction<Pointer<Void> Function(Uint32, Int32, Uint32), Pointer<Void> Function(int, int, int)>('OpenProcess');
 final _assignProcessToJobObject = _kernel32.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Void>),
     int Function(Pointer<Void>, Pointer<Void>)>('AssignProcessToJobObject');
+final _isProcessInJob = _kernel32.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Void>, Pointer<Int32>),
+    int Function(Pointer<Void>, Pointer<Void>, Pointer<Int32>)>('IsProcessInJob');
 final _terminateJobObject = _kernel32
     .lookupFunction<Int32 Function(Pointer<Void>, Uint32), int Function(Pointer<Void>, int)>('TerminateJobObject');
 final _queryInformationJobObject = _kernel32.lookupFunction<

@@ -72,6 +72,16 @@ void main() {
     expect(out.lengthSync(), after, reason: '멈춘 뒤에는 손자 ping 도 더 쓰지 않아야 한다');
   });
 
+  test('Job 에 든 프로세스만 내 것이다', () async {
+    final p = await start(['ping', '-n', '30', '127.0.0.1']);
+    final foreign = await Process.start('ping', ['-n', '30', '127.0.0.1']);
+    addTearDown(foreign.kill);
+    expect(await p.contains(p.pid), isTrue);
+    expect(await p.contains(foreign.pid), isFalse);
+    await p.stop(Duration.zero);
+    expect(await p.contains(p.pid), isFalse);
+  });
+
   test('이미 끝난 프로세스를 멈추면 아무것도 하지 않는다', () async {
     final p = await start(['cmd', '/d', '/c', 'exit /b 0']);
     await p.exitCode;
