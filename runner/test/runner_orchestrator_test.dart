@@ -109,16 +109,22 @@ RuntimeStore tempStore() {
 }
 
 RunnerOrchestrator orchestrator(Project project,
-    {PortProbe? ports, ItemLauncher Function(ProjectRepository)? launcher, LogStore? logs, RuntimeStore? store}) {
+    {PortProbe? ports,
+    ItemLauncher Function(ProjectRepository)? launcher,
+    LogStore? logs,
+    RuntimeStore? store,
+    RuntimeQuery? runtime}) {
   final repo = FakeProjectRepository(projects: [project]);
   final launcher0 = launcher?.call(repo) ?? FakeItemLauncher(repo, reachable: {'storage'});
   final ports0 = ports ?? FakePortProbe();
   final http = FakeHttpProbe();
+  final runtime0 = runtime ?? FakeRuntimeQuery();
   return RunnerOrchestrator(
     projects: () => repo,
     launcher: () => launcher0,
     ports: () => ports0,
     http: () => http,
+    runtime: () => runtime0,
     processes: PosixProcessLauncher(searchPath: () async => '/usr/bin:/bin'),
     logs: logs ?? tempLogs(),
     store: store ?? tempStore(),
@@ -253,8 +259,8 @@ void main() {
   });
 
   group('프로세스 항목', () {
-    Future<(RunnerOrchestrator, ItemRef)> setUpItem(ProcessService service, {PortProbe? ports}) async {
-      final o = orchestrator(demo(tempProject(), extra: [service]), ports: ports);
+    Future<(RunnerOrchestrator, ItemRef)> setUpItem(ProcessService service, {PortProbe? ports, RuntimeQuery? runtime}) async {
+      final o = orchestrator(demo(tempProject(), extra: [service]), ports: ports, runtime: runtime);
       final item = ItemRef(projectId: 'demo', serviceId: service.id);
       addTearDown(() => o.stop(item));
       return (o, item);
@@ -268,6 +274,19 @@ void main() {
       final r = await o.start(item);
       expect(r.outcome, ItemOutcome.failed);
       expect(r.reason, allOf(contains('8080'), contains('java')));
+      expect(o.stateOf(item), ItemState.portBusy);
+    });
+
+    test('쓸 포트를 내가 띄운 다른 프로젝트 항목이 쓰고 있으면 그 항목을 알린다 (AT-17)', () async {
+      const owner = ItemRef(projectId: 'shop-clone', serviceId: 'web');
+      final (o, item) = await setUpItem(
+        const ProcessService(id: 'x', command: ['sleep', '30'], ports: [5173]),
+        ports: FakePortProbe(inUse: [const PortInUse(5173, pid: 4321, processName: 'node')]),
+        runtime: FakeRuntimeQuery(owned: [(port: 5173, pid: 4321, item: owner)]),
+      );
+      final r = await o.start(item);
+      expect(r.outcome, ItemOutcome.failed);
+      expect(r.reason, '포트 5173 를 shop-clone / web 항목이 쓰고 있어요.');
       expect(o.stateOf(item), ItemState.portBusy);
     });
 

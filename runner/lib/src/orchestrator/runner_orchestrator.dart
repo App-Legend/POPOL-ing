@@ -26,6 +26,7 @@ class RunnerOrchestrator implements Orchestrator {
     required this.launcher,
     required this.ports,
     required this.http,
+    required this.runtime,
     required this.processes,
     required this.logs,
     required this.store,
@@ -35,6 +36,7 @@ class RunnerOrchestrator implements Orchestrator {
   final ItemLauncher Function() launcher;
   final PortProbe Function() ports;
   final HttpProbe Function() http;
+  final RuntimeQuery Function() runtime;
   final ProcessLauncher processes;
   final LogStore logs;
   final RuntimeStore store;
@@ -350,10 +352,13 @@ class RunnerOrchestrator implements Orchestrator {
   }
 
   /// 항목이 쓸 포트를 다른 프로그램이 쓰고 있으면 그 이유. 확인할 수 없으면 null(시작은 막지 않는다).
+  /// 내가 띄운 다른 항목이 쓰고 있으면 그 항목을 알려 준다(AT-17).
   Future<String?> _busyPort(ProcessService service) async {
     for (final port in service.ports) {
       try {
-        if (await ports().whoUses(port) case PortInUse(:final processName, :final pid)) {
+        if (await ports().whoUses(port) case final PortInUse usage) {
+          if (await runtime().ownerOf(usage) case final owner?) return '포트 $port 를 $owner 항목이 쓰고 있어요.';
+          final PortInUse(:processName, :pid) = usage;
           final who = processName == null ? '' : '($processName${pid == null ? '' : ', PID $pid'})';
           return '포트 $port 를 다른 프로그램$who이 쓰고 있어요.';
         }
