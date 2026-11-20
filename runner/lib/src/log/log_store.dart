@@ -37,22 +37,35 @@ class LogStore {
     return File([root.path, item.projectId, '${item.serviceId}.log'].join(Platform.pathSeparator));
   }
 
-  /// [item] 의 로그 파일 마지막 [lines] 줄. 파일이 없으면 빈 목록. 파일 끝 [maxRead] 바이트만 읽는다.
+  /// [item] 의 지금 기록이 다 써지면 끝난다. 기록 중인 게 없으면 바로 끝난다.
+  Future<void> idle(ItemRef item) => _tails[item] ?? Future.value();
+
+  /// [item] 의 로그 마지막 [lines] 줄. 지금 파일 줄이 모자라면 막 밀려난 `.log.1` 끝에서 채운다.
+  /// 파일이 없으면 빈 목록. 파일마다 끝 [maxRead] 바이트만 읽는다.
   Future<List<String>> tail(ItemRef item, {int lines = 5000, int maxRead = 1024 * 1024}) async {
+    final file = await fileOf(item);
+    final (now, whole) = await _tailOf(file, lines, maxRead);
+    if (now.length >= lines || !whole) return now; // 중간부터 읽었으면 .log.1 과 이어지지 않는다
+    final (older, _) = await _tailOf(File('${file.path}.1'), lines - now.length, maxRead);
+    return [...older, ...now];
+  }
+
+  /// [file] 마지막 [lines] 줄과, 파일을 처음부터 다 읽었는지.
+  Future<(List<String>, bool)> _tailOf(File file, int lines, int maxRead) async {
     try {
-      final raf = await (await fileOf(item)).open();
+      final raf = await file.open();
       try {
         final length = await raf.length();
         final start = length > maxRead ? length - maxRead : 0;
         await raf.setPosition(start);
         final all = const LineSplitter().convert(utf8.decode(await raf.read(length - start), allowMalformed: true));
         final whole = start == 0 ? all : all.skip(1).toList(); // 중간부터 읽었으면 첫 줄은 잘린 줄이다
-        return whole.length > lines ? whole.sublist(whole.length - lines) : whole;
+        return (whole.length > lines ? whole.sublist(whole.length - lines) : whole, start == 0);
       } finally {
         await raf.close();
       }
     } on FileSystemException {
-      return const [];
+      return (const <String>[], true);
     }
   }
 

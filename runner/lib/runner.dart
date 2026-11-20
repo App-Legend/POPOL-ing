@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:ppoling_core/contracts.dart';
 
 import 'src/log/log_store.dart';
+import 'src/log/runner_log_excerpt.dart';
 import 'src/orchestrator/runner_orchestrator.dart';
 import 'src/process/process_launcher.dart';
 import 'src/runtime/runner_runtime_query.dart';
@@ -16,10 +17,9 @@ import 'src/runtime/runtime_store.dart';
 import 'src/screens/dashboard_screen.dart';
 import 'src/screens/detail_screen.dart';
 
-/// 실행 제어의 화면(대시보드 `/dashboard`, 항목 상세 `/detail`)과 구현을 앱에 등록한다.
+/// 실행 제어의 화면(대시보드 `/dashboard`, 항목 상세 `/detail`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt])을 앱에 등록한다.
 ///
 /// 다른 기능의 구현([ProjectRepository]·[ItemLauncher]·[PortProbe]·[HttpProbe]·[RuntimeQuery])은 처음 쓸 때 꺼낸다.
-// 3주차 금에 LogExcerpt 구현을 여기서 등록한다.
 void register(AppRegistry app) {
   Future<String> data() async => (await getApplicationSupportDirectory()).path;
   final logs = LogStore(() async => Directory('${await data()}${Platform.pathSeparator}logs'));
@@ -38,6 +38,7 @@ void register(AppRegistry app) {
     processes: () => orchestrator.liveProcesses,
     launcher: () => app.read<ItemLauncher>(),
   ));
+  app.provide<LogExcerpt>(RunnerLogExcerpt(projects: () => app.read<ProjectRepository>(), logs: logs));
 
   Object? args(BuildContext context) => ModalRoute.of(context)?.settings.arguments;
   app.route(
