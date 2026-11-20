@@ -47,6 +47,32 @@ void main() {
     expect(cut.every((l) => RegExp(r'^\S+ out \| line \d+$').hasMatch(l)), isTrue);
   });
 
+  test('tail 은 지금 파일 줄이 모자라면 막 밀려난 .log.1 끝에서 채운다', () async {
+    logOf('.1').createSync(recursive: true);
+    logOf('.1').writeAsStringSync('old 1\nold 2\nold 3\n');
+    logOf('').writeAsStringSync('new 1\nnew 2\n');
+    final s = store();
+    expect(await s.tail(item, lines: 4), ['old 2', 'old 3', 'new 1', 'new 2']);
+    expect(await s.tail(item, lines: 2), ['new 1', 'new 2']);
+    logOf('').deleteSync();
+    expect(await s.tail(item, lines: 2), ['old 2', 'old 3'], reason: '.log 가 없어도 .log.1 은 읽는다');
+  });
+
+  test('idle 은 그 항목의 기록이 다 써진 뒤에 끝난다', () async {
+    final s = store();
+    await s.idle(item); // 기록이 없으면 바로 끝난다
+    final c = StreamController<OutputLine>();
+    unawaited(s.record(item, c.stream));
+    var done = false;
+    final idle = s.idle(item).then((_) => done = true);
+    c.add(out('last'));
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(done, isFalse);
+    await c.close();
+    await idle;
+    expect(logOf('').readAsStringSync(), contains('last'));
+  });
+
   test('.env 값은 가리고, 빈 값은 무시하고, 긴 값부터 가린다', () async {
     final s = store();
     await s.record(item, Stream.fromIterable([out('x=abcdef y=abc')]), secrets: ['', 'abc', 'abcdef']);
