@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
+import 'package:ppoling_relay/log_file.dart';
 
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
@@ -309,7 +310,7 @@ class RunnerOrchestrator implements Orchestrator {
       logLines.close();
     });
     // shortcut: 이전 프로세스의 자식이 그룹·Job 을 빠져나가 stdout 을 잡고 있으면 새 실행의 로그 줄이 닫힐 때까지 메모리에 쌓인다, 실제로 관찰되면 항목별 큐 대신 실행마다 따로 쓰게 바꾼다.
-    unawaited(logs.record(item, logLines.stream, secrets: secrets));
+    unawaited(_record(item, logLines.stream, secrets));
     final Future<ReadyResult> ready;
     try {
       ready = readiness.wait(service.ready, lines: lines.stream, exited: exited, cancelled: cancel.future);
@@ -327,6 +328,19 @@ class RunnerOrchestrator implements Orchestrator {
     if (!r.ok) return _fail(item, r.reason!, exitCode: _exitCodes[item]); // 준비 시간 초과여도 자동 종료하지 않는다(§6)
     _set(item, ItemState.ready);
     return ItemResult(item: item, outcome: ItemOutcome.ok);
+  }
+
+  // 임시: 중계(ppoling-relay)가 들어오면 지운다(Task 3).
+  Future<void> _record(ItemRef item, Stream<OutputLine> lines, List<String> secrets) async {
+    final file = RotatingLogFile(await logs.fileOf(item), maxBytes: logs.maxBytes, keep: logs.keep);
+    await file.open();
+    await file.write(startLine(DateTime.now()));
+    try {
+      await for (final l in lines) {
+        await file.write(outputLine(l.at, maskSecrets(l.text, secrets), isError: l.isError));
+      }
+    } catch (_) {}
+    await file.close();
   }
 
   /// 띄운 명령과 그 자식이 모두 끝났다. 값은 띄운 명령의 종료 코드.
