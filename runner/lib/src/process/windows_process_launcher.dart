@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:ppoling_relay/relay_request.dart';
+
 import 'process_launcher.dart';
 import 'windows_command.dart';
 import 'windows_job.dart';
 
-/// Windows 구현. 띄운 프로세스를 Job Object 에 넣고, 멈출 때 Job 째 끝낸다.
+/// Windows 구현. 중계를 이름 붙은 Job Object 에 넣어 띄우고, 멈출 때 Job 째 끝낸다.
 ///
 /// 일반 `Process.kill()` 은 띄운 프로세스 하나만 멈춰 `npm` 이 띄운 `node` 같은 손자가 남는다.
 /// Job 에 넣은 뒤 생긴 자식·손자는 부모가 먼저 끝나도 같은 Job 에 남는다.
+/// 중계도 같은 Job 핸들을 쥐고 있어서, 앱을 다시 켠 뒤 Job 이름으로 다시 붙는다.
 ///
 /// 명령은 PATH·PATHEXT 로 찾는다([resolveWindowsCommand]). 항목 설정의 `env` 에 PATH 가 있으면 그걸 쓴다.
 class WindowsProcessLauncher implements ProcessLauncher {
@@ -17,7 +20,21 @@ class WindowsProcessLauncher implements ProcessLauncher {
   final String relay;
 
   @override
-  Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async => const Gone();
+  Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async {
+    try {
+      if (jobName != null) {
+        if (WindowsJob.open(jobName) case final job?) {
+          if (job.contains(pid)) return Attached(_AttachedProcess(job, pid, startedAt, jobName));
+          job.close();
+          return const Unverified();
+        }
+      }
+      // Job 이 없으면(예전 기록, 중계가 죽음) 증명할 수 없다. 살아 있으면 확인 불가로만 알린다.
+      return windowsProcessAlive(pid) ? const Unverified() : const Gone();
+    } catch (_) {
+      return const Unverified(); // 확인하지 못했으면 내 것이라고 하지 않는다
+    }
+  }
 
   @override
   Future<RunningProcess> start(
@@ -48,25 +65,36 @@ class WindowsProcessLauncher implements ProcessLauncher {
       case RefuseCommand(:final message, :final exitCode):
         return RefusedProcess(message, exitCode);
       case RunCommand(:final executable, :final arguments):
+        if (!File(relay).existsSync()) return RefusedProcess('중계 프로그램을 찾을 수 없어요.', 127);
         // Job 을 먼저 만든다. 띄운 뒤에 만들다 실패하면 띄운 프로세스를 아무도 모르게 된다.
-        final job = WindowsJob();
+        final jobName = 'ppoling-$pid-${DateTime.now().microsecondsSinceEpoch}';
+        final job = WindowsJob(name: jobName);
         final Process process;
         try {
-          process = await Process.start(executable, arguments, workingDirectory: workingDirectory, environment: environment);
+          process = await Process.start(relay, const [], workingDirectory: workingDirectory, environment: environment);
         } catch (_) {
           job.close();
           rethrow;
         }
-        process.stdin.close().ignore(); // 입력을 기다리는 명령이 영영 멈춰 있지 않게 바로 EOF 를 준다
-        // shortcut: 띄운 뒤 Job 에 넣기까지의 아주 짧은 틈에 생긴 자식은 Job 밖에 남을 수 있다.
-        // 문제가 되면 CreateProcessW(CREATE_SUSPENDED)로 띄워 Job 에 넣은 뒤 재개하도록 바꾼다.
-        return _WindowsProcess(process, job, DateTime.now(), job.assign(process.pid));
+        final startedAt = DateTime.now();
+        // 요청을 넘기기 전에 Job 에 넣어야, 중계가 띄우는 명령이 처음부터 Job 안에서 생긴다.
+        final assigned = job.assign(process.pid);
+        process.stdin.writeln(RelayRequest(
+          command: [executable, ...arguments],
+          logFile: log.file.path,
+          secrets: log.secrets,
+          jobName: jobName,
+          maxBytes: log.maxBytes,
+          keep: log.keep,
+        ).encode());
+        process.stdin.close().ignore();
+        return _WindowsProcess(process, job, startedAt, assigned, jobName);
     }
   }
 }
 
 class _WindowsProcess implements RunningProcess {
-  _WindowsProcess(this._process, this._job, this.startedAt, this._assigned) : output = outputLines(_process) {
+  _WindowsProcess(this._process, this._job, this.startedAt, this._assigned, this.jobName) : output = outputLines(_process) {
     _process.exitCode.then((_) => _exited = true);
   }
 
@@ -81,7 +109,7 @@ class _WindowsProcess implements RunningProcess {
   final DateTime startedAt;
 
   @override
-  String? get jobName => null;
+  final String jobName;
 
   @override
   int get pid => _process.pid;
@@ -116,6 +144,58 @@ class _WindowsProcess implements RunningProcess {
     // 이미 끝난 리더는 PID 로 다시 열려 남의 프로세스를 멈출 수 있으니, 살아 있을 때만 PID 로 멈춘다.
     if ((!_assigned || !_job.terminate()) && !_exited) _process.kill();
     await _process.exitCode.timeout(const Duration(seconds: 5), onTimeout: () => -1);
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (await groupAlive && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    return const StopResult(forced: true);
+  }
+}
+
+/// 앱을 다시 켜기 전에 띄운 중계. Job 이름으로 다시 연 핸들로만 다룬다.
+class _AttachedProcess implements RunningProcess {
+  _AttachedProcess(this._job, this.pid, this.startedAt, this.jobName) {
+    exitCode = () async {
+      while (await groupAlive) {
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      _job.close();
+      return -1;
+    }();
+  }
+
+  final WindowsJob _job;
+
+  @override
+  final int pid;
+
+  @override
+  final DateTime startedAt;
+
+  @override
+  final String jobName;
+
+  @override
+  late final Future<int> exitCode;
+
+  @override
+  int get pgid => pid;
+
+  @override
+  Stream<OutputLine> get output => const Stream.empty();
+
+  // 물어보지 못하면 살아 있다고 본다. 끝났다고 잘못 보면 [중지] 할 방법을 잃는다.
+  @override
+  Future<bool> get groupAlive async => (_job.activeProcesses ?? 1) > 0;
+
+  @override
+  Future<bool> contains(int pid) async => _job.contains(pid);
+
+  // shortcut: 새로 띄운 것과 같이 정상 종료 신호 없이 Job 째 강제 종료한다.
+  @override
+  Future<StopResult> stop(Duration timeout) async {
+    if (!await groupAlive) return const StopResult(forced: false);
+    _job.terminate();
     final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (await groupAlive && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 50));

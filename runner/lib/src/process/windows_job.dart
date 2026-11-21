@@ -8,8 +8,18 @@ import 'package:ffi/ffi.dart';
 ///
 /// 핸들로만 다루므로 PID 가 재사용돼도 남의 프로세스를 멈추지 않는다. 다 쓰면 [close] 한다.
 class WindowsJob {
-  WindowsJob() : _job = _createJobObject(nullptr, nullptr) {
+  /// 새 Job. [name] 을 주면 이름 붙은 Job 이라, 핸들을 쥔 프로세스가 있는 동안 [open] 으로 다시 열 수 있다.
+  WindowsJob({String? name})
+      : _job = using((arena) => _createJobObject(nullptr, name == null ? nullptr : name.toNativeUtf16(allocator: arena))) {
     if (_job == nullptr) throw StateError('Windows Job Object 를 만들 수 없어요.');
+  }
+
+  WindowsJob._(this._job);
+
+  /// 이름 붙은 Job 을 다시 연다. 없으면(핸들을 쥔 프로세스가 모두 끝났으면) null.
+  static WindowsJob? open(String name) {
+    final job = using((arena) => _openJobObject(_jobObjectQuery | _jobObjectTerminate, 0, name.toNativeUtf16(allocator: arena)));
+    return job == nullptr ? null : WindowsJob._(job);
   }
 
   final Pointer<Void> _job;
@@ -68,6 +78,19 @@ class WindowsJob {
   }
 }
 
+/// [processId] 프로세스가 아직 끝나지 않았다. 열 수 없으면 false.
+bool windowsProcessAlive(int processId) {
+  final process = _openProcess(_processQueryLimitedInformation, 0, processId);
+  if (process == nullptr) return false;
+  final code = calloc<Uint32>();
+  try {
+    return _getExitCodeProcess(process, code) != 0 && code.value == _stillActive;
+  } finally {
+    calloc.free(code);
+    _closeHandle(process);
+  }
+}
+
 /// [process] 의 부모 PID. 물어보지 못했으면 null.
 int? _parentPid(Pointer<Void> process) {
   // PROCESS_BASIC_INFORMATION(64비트): ... UniqueProcessId(오프셋 32), InheritedFromUniqueProcessId(40). 48바이트.
@@ -83,6 +106,9 @@ int? _parentPid(Pointer<Void> process) {
 const _processTerminate = 0x0001;
 const _processSetQuota = 0x0100;
 const _processQueryLimitedInformation = 0x1000;
+const _jobObjectQuery = 0x0004;
+const _jobObjectTerminate = 0x0008;
+const _stillActive = 259;
 const _jobObjectBasicAccountingInformation = 1;
 const _accountingInfoSize = 48;
 
@@ -90,6 +116,10 @@ final _kernel32 = DynamicLibrary.open('kernel32.dll');
 
 final _createJobObject = _kernel32.lookupFunction<Pointer<Void> Function(Pointer<Void>, Pointer<Utf16>),
     Pointer<Void> Function(Pointer<Void>, Pointer<Utf16>)>('CreateJobObjectW');
+final _openJobObject = _kernel32.lookupFunction<Pointer<Void> Function(Uint32, Int32, Pointer<Utf16>),
+    Pointer<Void> Function(int, int, Pointer<Utf16>)>('OpenJobObjectW');
+final _getExitCodeProcess = _kernel32.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Uint32>),
+    int Function(Pointer<Void>, Pointer<Uint32>)>('GetExitCodeProcess');
 final _openProcess = _kernel32
     .lookupFunction<Pointer<Void> Function(Uint32, Int32, Uint32), Pointer<Void> Function(int, int, int)>('OpenProcess');
 final _assignProcessToJobObject = _kernel32.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Void>),
