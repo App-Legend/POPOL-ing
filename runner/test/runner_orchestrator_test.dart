@@ -614,6 +614,20 @@ void main() {
       expect(await store.processes(), isEmpty);
     });
 
+    test('프로젝트 목록을 못 읽어도 복구는 예외 없이 끝난다', () async {
+      final o = RunnerOrchestrator(
+        projects: () => throw StateError('아직 준비 안 됨'),
+        launcher: () => throw StateError('아직 준비 안 됨'),
+        ports: () => FakePortProbe(),
+        http: () => FakeHttpProbe(),
+        runtime: () => FakeRuntimeQuery(),
+        processes: _AttachOnly(const Gone()),
+        logs: tempLogs(),
+        store: tempStore(),
+      );
+      await o.recover();
+    });
+
     test('앱을 다시 켜면 떠 있는 Compose 항목을 실행 중으로 보여 준다', () async {
       final project = demo(tempProject());
       FakeItemLauncher? shared;

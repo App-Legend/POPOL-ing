@@ -394,6 +394,13 @@ packages:
       relative: true
     source: path
     version: "0.1.0"
+  ppoling_relay:
+    dependency: transitive
+    description:
+      path: "../runner/relay"
+      relative: true
+    source: path
+    version: "0.1.0"
   ppoling_runner:
     dependency: "direct main"
     description:

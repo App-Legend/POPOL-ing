@@ -80,6 +80,7 @@ class RunnerOrchestrator implements Orchestrator {
   /// 앱을 다시 켜기 전에 띄운 프로세스·Compose 항목의 상태를 되살린다(FR-11). 앱 시작 때 한 번 부른다.
   ///
   /// 내가 띄운 중계라고 증명된 프로세스만 되살린다. 살아 있지만 증명할 수 없으면 확인 불가로 두고 멈추지 않는다.
+  /// 예외를 던지지 않는다.
   Future<void> recover() async {
     for (final r in await store.processes()) {
       if (r.appRunId == store.appRunId) continue;
@@ -142,8 +143,8 @@ class RunnerOrchestrator implements Orchestrator {
           }
         }
       }
-    } on Exception {
-      // 프로젝트 목록을 못 읽으면 되살리지 않는다
+    } on Object {
+      // 앱 시작 때 뒤에서 도니 어떤 이유로든 앱을 멈추면 안 된다. 목록을 못 읽으면 되살리지 않는다
     }
   }
 

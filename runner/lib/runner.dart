@@ -2,6 +2,7 @@
 /// `import 'package:ppoling_runner/runner.dart' as runner;`
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -34,6 +35,7 @@ void register(AppRegistry app) {
     store: RuntimeStore(() async => File('${await data()}${Platform.pathSeparator}runtime.json')),
   );
   app.provide<Orchestrator>(orchestrator);
+  unawaited(orchestrator.recover()); // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다
   app.provide<RuntimeQuery>(RunnerRuntimeQuery(
     processes: () => orchestrator.liveProcesses,
     launcher: () => app.read<ItemLauncher>(),
