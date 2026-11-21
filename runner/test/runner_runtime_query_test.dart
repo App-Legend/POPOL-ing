@@ -13,6 +13,8 @@ import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
 import 'package:ppoling_runner/src/runtime/runner_runtime_query.dart';
 import 'package:ppoling_runner/src/runtime/runtime_store.dart';
 
+import 'support/relay_binary.dart';
+
 const _web = ItemRef(projectId: 'demo', serviceId: 'web');
 const _db = ItemRef(projectId: 'demo', serviceId: 'db');
 
@@ -56,7 +58,7 @@ Future<(RunnerOrchestrator, RunnerRuntimeQuery, FakePortProbe)> setUpRunning() a
     ports: () => ports,
     http: () => FakeHttpProbe(),
     runtime: () => query,
-    processes: PosixProcessLauncher(searchPath: () async => '/usr/bin:/bin'),
+    processes: PosixProcessLauncher(relay: relay, searchPath: () async => '/usr/bin:/bin'),
     logs: LogStore(() async => Directory('${tmp.path}/logs')),
     store: RuntimeStore(() async => File('${tmp.path}/runtime.json')),
   );
@@ -77,7 +79,11 @@ Future<int> childOf(int pgid) async {
       .first;
 }
 
+/// 테스트용 중계 실행 파일. [main] 의 setUpAll 에서 채운다.
+late String relay;
+
 void main() {
+  setUpAll(() async => relay = await relayBinary());
   group('약속 테스트', () {
     runtimeQueryContract(() async {
       final (o, query, _) = await setUpRunning();

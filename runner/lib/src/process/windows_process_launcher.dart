@@ -12,11 +12,19 @@ import 'windows_job.dart';
 ///
 /// 명령은 PATH·PATHEXT 로 찾는다([resolveWindowsCommand]). 항목 설정의 `env` 에 PATH 가 있으면 그걸 쓴다.
 class WindowsProcessLauncher implements ProcessLauncher {
+  WindowsProcessLauncher({required this.relay});
+
+  final String relay;
+
+  @override
+  Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async => const Gone();
+
   @override
   Future<RunningProcess> start(
     List<String> command, {
     required String workingDirectory,
     Map<String, String> environment = const {},
+    required LogTarget log,
   }) async {
     if (command.isEmpty) throw ArgumentError.value(command, 'command', '실행할 명령이 비어 있어요');
     if (!Directory(workingDirectory).existsSync()) {
@@ -38,7 +46,7 @@ class WindowsProcessLauncher implements ProcessLauncher {
     );
     switch (resolved) {
       case RefuseCommand(:final message, :final exitCode):
-        return _RefusedProcess(message, exitCode);
+        return RefusedProcess(message, exitCode);
       case RunCommand(:final executable, :final arguments):
         // Job 을 먼저 만든다. 띄운 뒤에 만들다 실패하면 띄운 프로세스를 아무도 모르게 된다.
         final job = WindowsJob();
@@ -71,6 +79,9 @@ class _WindowsProcess implements RunningProcess {
 
   @override
   final DateTime startedAt;
+
+  @override
+  String? get jobName => null;
 
   @override
   int get pid => _process.pid;
@@ -111,35 +122,4 @@ class _WindowsProcess implements RunningProcess {
     }
     return const StopResult(forced: true);
   }
-}
-
-/// 띄우지 않은 명령. 띄운 것처럼 안내 한 줄과 종료 코드를 알린다.
-class _RefusedProcess implements RunningProcess {
-  _RefusedProcess(String message, int code)
-      : output = Stream.value(OutputLine(message, isError: true, at: DateTime.now())),
-        exitCode = Future.value(code);
-
-  @override
-  int get pid => 0;
-
-  @override
-  int get pgid => 0;
-
-  @override
-  final DateTime startedAt = DateTime.now();
-
-  @override
-  final Stream<OutputLine> output;
-
-  @override
-  final Future<int> exitCode;
-
-  @override
-  Future<bool> get groupAlive async => false;
-
-  @override
-  Future<bool> contains(int pid) async => false;
-
-  @override
-  Future<StopResult> stop(Duration timeout) async => const StopResult(forced: false);
 }

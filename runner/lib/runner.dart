@@ -29,7 +29,7 @@ void register(AppRegistry app) {
     ports: () => app.read<PortProbe>(),
     http: () => app.read<HttpProbe>(),
     runtime: () => app.read<RuntimeQuery>(),
-    processes: ProcessLauncher.forPlatform(),
+    processes: ProcessLauncher.forPlatform(relay: relayPath()),
     logs: logs,
     store: RuntimeStore(() async => File('${await data()}${Platform.pathSeparator}runtime.json')),
   );
@@ -61,3 +61,7 @@ void register(AppRegistry app) {
             launcher: app.read<ItemLauncher>(),
           ));
 }
+
+/// 앱에 함께 넣은 중계 실행 파일. 앱 실행 파일과 같은 폴더에 있다(macOS 는 `앱.app/Contents/MacOS/`).
+String relayPath() =>
+    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}ppoling-relay${Platform.isWindows ? '.exe' : ''}';

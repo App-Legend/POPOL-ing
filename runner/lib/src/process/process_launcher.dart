@@ -7,20 +7,59 @@ import 'windows_process_launcher.dart';
 
 /// 실행 항목 프로세스를 띄우는 부품. OS별 구현이 프로세스 트리를 통째로 멈출 수 있게 띄운다.
 ///
+/// 명령은 중계(`ppoling-relay`)가 띄운다. 중계가 출력을 받아 로그 파일에 쓰므로 앱이 꺼져도 명령은 계속 돈다.
 /// `runner/` 안에서만 쓴다. 다른 기능은 `Orchestrator` 계약으로 실행을 맡긴다.
 abstract interface class ProcessLauncher {
-  /// 이 OS 의 구현. OS 를 고르는 곳은 여기 한 곳이다.
-  static ProcessLauncher forPlatform() => Platform.isWindows ? WindowsProcessLauncher() : PosixProcessLauncher();
+  /// 이 OS 의 구현. OS 를 고르는 곳은 여기 한 곳이다. [relay] 는 중계 실행 파일 경로.
+  static ProcessLauncher forPlatform({required String relay}) =>
+      Platform.isWindows ? WindowsProcessLauncher(relay: relay) : PosixProcessLauncher(relay: relay);
 
-  /// [command] 를 셸 해석 없이 실행한다. [command] 의 첫 칸은 PATH 에서 찾는다.
+  /// [command] 를 셸 해석 없이 실행한다. [command] 의 첫 칸은 PATH 에서 찾는다. 출력은 [log] 에도 남는다.
   ///
-  /// 명령이 없거나 바로 실패해도 예외가 아니라, 종료 코드와 stderr 로 알린다(없는 명령은 127).
+  /// 명령이 없거나 바로 실패해도 예외가 아니라, 종료 코드와 stderr 로 알린다(없는 명령·중계 없음은 127).
   /// [command] 가 비어 있으면 [ArgumentError], [workingDirectory] 가 없으면 [ProcessException].
   Future<RunningProcess> start(
     List<String> command, {
     required String workingDirectory,
     Map<String, String> environment = const {},
+    required LogTarget log,
   });
+
+  /// 앱을 다시 켜기 전에 띄운 기록([pid]·[startedAt]·[jobName])에 다시 붙는다.
+  /// 그 프로세스가 내가 띄운 중계라고 증명될 때만 [Attached] 다. 예외를 던지지 않는다.
+  Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName});
+}
+
+/// 출력을 남길 로그 파일과 거기서 가릴 `.env` 값.
+class LogTarget {
+  const LogTarget(this.file, {this.secrets = const [], this.maxBytes = 10 * 1024 * 1024, this.keep = 3});
+
+  final File file;
+  final List<String> secrets;
+  final int maxBytes;
+  final int keep;
+}
+
+/// [ProcessLauncher.attach] 결과.
+sealed class AttachResult {
+  const AttachResult();
+}
+
+/// 내가 띄운 것이 증명됐다. [process] 로 멈추고 포트 주인을 판단한다.
+final class Attached extends AttachResult {
+  const Attached(this.process);
+
+  final RunningProcess process;
+}
+
+/// 살아 있지만 내가 띄운 것이라고 증명할 수 없다. 멈추지 않는다.
+final class Unverified extends AttachResult {
+  const Unverified();
+}
+
+/// 이미 끝났다.
+final class Gone extends AttachResult {
+  const Gone();
 }
 
 /// 띄운 프로세스 하나(와 그 자식들).
@@ -33,10 +72,14 @@ abstract interface class RunningProcess {
 
   DateTime get startedAt;
 
+  /// Windows: 이 프로세스를 묶은 이름 붙은 Job. 앱을 다시 켠 뒤 이 이름으로 다시 붙는다. macOS 는 null.
+  String? get jobName;
+
   /// stdout·stderr 를 줄 단위로, 나온 순서대로. 프로세스가 출력을 닫으면 끝난다. 한 번만 구독할 수 있다.
   Stream<OutputLine> get output;
 
   /// 띄운 프로세스의 종료 코드. 자식·손자는 그 뒤에도 남아 있을 수 있다([groupAlive]).
+  /// 다시 붙은 프로세스는 종료 코드를 모르니 끝나면 -1 이다(로그 끝 줄에 있다).
   Future<int> get exitCode;
 
   /// 그룹에 프로세스가 하나라도 남아 있다.
@@ -88,4 +131,38 @@ Stream<OutputLine> outputLines(Process process) {
   pipe(process.stdout, isError: false);
   pipe(process.stderr, isError: true);
   return out.stream;
+}
+
+/// 띄우지 않은 명령. 띄운 것처럼 안내 한 줄과 종료 코드를 알린다.
+class RefusedProcess implements RunningProcess {
+  RefusedProcess(String message, int code)
+      : output = Stream.value(OutputLine(message, isError: true, at: DateTime.now())),
+        exitCode = Future.value(code);
+
+  @override
+  int get pid => 0;
+
+  @override
+  int get pgid => 0;
+
+  @override
+  final DateTime startedAt = DateTime.now();
+
+  @override
+  String? get jobName => null;
+
+  @override
+  final Stream<OutputLine> output;
+
+  @override
+  final Future<int> exitCode;
+
+  @override
+  Future<bool> get groupAlive async => false;
+
+  @override
+  Future<bool> contains(int pid) async => false;
+
+  @override
+  Future<StopResult> stop(Duration timeout) async => const StopResult(forced: false);
 }

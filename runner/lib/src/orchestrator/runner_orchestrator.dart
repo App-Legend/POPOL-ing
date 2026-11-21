@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_relay/log_file.dart';
 
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
@@ -282,7 +281,8 @@ class RunnerOrchestrator implements Orchestrator {
 
     final readiness = _readiness; // 띄우기 전에 꺼내야 구현이 없을 때 프로세스를 남기지 않는다
     _set(item, ItemState.starting);
-    final process = await processes.start(service.command, workingDirectory: cwd, environment: env);
+    final log = LogTarget(await logs.fileOf(item), secrets: secrets, maxBytes: logs.maxBytes, keep: logs.keep);
+    final process = await processes.start(service.command, workingDirectory: cwd, environment: env, log: log);
     if (cancel.isCompleted) {
       await process.stop(service.stopTimeout); // 띄우는 사이에 멈추라고 했다
       return _cancelled(item);
@@ -301,16 +301,7 @@ class RunnerOrchestrator implements Orchestrator {
 
     // 준비 확인이 첫 줄부터 보도록, 출력을 받기 시작하는 지금 바로 구독한다(사이에 await 를 두지 않는다).
     final lines = StreamController<String>.broadcast();
-    final logLines = StreamController<OutputLine>();
-    process.output.listen((l) {
-      lines.add(l.text);
-      logLines.add(l);
-    }, onDone: () {
-      lines.close();
-      logLines.close();
-    });
-    // shortcut: 이전 프로세스의 자식이 그룹·Job 을 빠져나가 stdout 을 잡고 있으면 새 실행의 로그 줄이 닫힐 때까지 메모리에 쌓인다, 실제로 관찰되면 항목별 큐 대신 실행마다 따로 쓰게 바꾼다.
-    unawaited(_record(item, logLines.stream, secrets));
+    process.output.listen((l) => lines.add(l.text), onDone: lines.close);
     final Future<ReadyResult> ready;
     try {
       ready = readiness.wait(service.ready, lines: lines.stream, exited: exited, cancelled: cancel.future);
@@ -328,19 +319,6 @@ class RunnerOrchestrator implements Orchestrator {
     if (!r.ok) return _fail(item, r.reason!, exitCode: _exitCodes[item]); // 준비 시간 초과여도 자동 종료하지 않는다(§6)
     _set(item, ItemState.ready);
     return ItemResult(item: item, outcome: ItemOutcome.ok);
-  }
-
-  // 임시: 중계(ppoling-relay)가 들어오면 지운다(Task 3).
-  Future<void> _record(ItemRef item, Stream<OutputLine> lines, List<String> secrets) async {
-    final file = RotatingLogFile(await logs.fileOf(item), maxBytes: logs.maxBytes, keep: logs.keep);
-    await file.open();
-    await file.write(startLine(DateTime.now()));
-    try {
-      await for (final l in lines) {
-        await file.write(outputLine(l.at, maskSecrets(l.text, secrets), isError: l.isError));
-      }
-    } catch (_) {}
-    await file.close();
   }
 
   /// 띄운 명령과 그 자식이 모두 끝났다. 값은 띄운 명령의 종료 코드.

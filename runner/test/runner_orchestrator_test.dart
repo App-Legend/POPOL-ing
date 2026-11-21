@@ -13,6 +13,8 @@ import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
 import 'package:ppoling_runner/src/runtime/runtime_store.dart';
 
+import 'support/relay_binary.dart';
+
 const _s5 = Duration(seconds: 5);
 const _ms300 = Duration(milliseconds: 300);
 
@@ -125,13 +127,17 @@ RunnerOrchestrator orchestrator(Project project,
     ports: () => ports0,
     http: () => http,
     runtime: () => runtime0,
-    processes: PosixProcessLauncher(searchPath: () async => '/usr/bin:/bin'),
+    processes: PosixProcessLauncher(relay: relay, searchPath: () async => '/usr/bin:/bin'),
     logs: logs ?? tempLogs(),
     store: store ?? tempStore(),
   );
 }
 
+/// 테스트용 중계 실행 파일. [main] 의 setUpAll 에서 채운다.
+late String relay;
+
 void main() {
+  setUpAll(() async => relay = await relayBinary());
   group('약속 테스트', () {
     orchestratorContract(() async {
       final folder = tempProject();
@@ -327,7 +333,8 @@ void main() {
           command: ['sh', '-c', r'echo "$SECRET $MODE"; exec sleep 30'],
           envFile: '.env',
           env: {'MODE': 'yaml'},
-          ready: LogReady(pattern: 'from-file yaml', timeout: _s5),
+          // 앱은 중계가 가린 줄을 받는다. SECRET 이 .env 값(from-file)이라 가려지고, MODE 는 env 가 덮어썼다.
+          ready: LogReady(pattern: r'^\*\*\*\* yaml$', timeout: _s5),
         ),
       ]));
       const item = ItemRef(projectId: 'demo', serviceId: 'x');
