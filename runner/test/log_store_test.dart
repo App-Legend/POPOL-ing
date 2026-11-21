@@ -40,4 +40,14 @@ void main() {
     logOf('').deleteSync();
     expect(await s.tail(item, lines: 2), ['old 2', 'old 3'], reason: '.log 가 없어도 .log.1 은 읽는다');
   });
+
+  test('lastExitCode 는 마지막 줄이 끝 줄이면 그 종료 코드, 아니면 null', () async {
+    final s = store();
+    expect(await s.lastExitCode(item), isNull, reason: '파일이 없음');
+    logOf('').createSync(recursive: true);
+    logOf('').writeAsStringSync('a\n--- 끝 (종료 코드 2) ---\n');
+    expect(await s.lastExitCode(item), 2);
+    logOf('').writeAsStringSync('--- 끝 (종료 코드 2) ---\n--- 시작 x ---\n');
+    expect(await s.lastExitCode(item), isNull, reason: '다시 시작한 뒤 아직 안 끝남');
+  });
 }

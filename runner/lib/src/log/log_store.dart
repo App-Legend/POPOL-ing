@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
+import 'package:ppoling_relay/log_file.dart';
 
 /// 실행 항목 로그 `<root>/<projectId>/<serviceId>.log` 의 위치와 읽기. 쓰기는 중계(`ppoling-relay`)가 한다.
 class LogStore {
@@ -30,6 +31,12 @@ class LogStore {
     final (older, _) = await _tailOf(File('${file.path}.1'), lines - now.length, maxRead);
     return [...older, ...now];
   }
+
+  /// [item] 의 마지막 실행이 끝났으면 그 종료 코드(로그 끝 줄). 아직 안 끝났거나 모르면 null.
+  Future<int?> lastExitCode(ItemRef item) async => switch (await tail(item, lines: 1)) {
+        [final last] => exitCodeOf(last),
+        _ => null,
+      };
 
   /// [file] 마지막 [lines] 줄과, 파일을 처음부터 다 읽었는지.
   Future<(List<String>, bool)> _tailOf(File file, int lines, int maxRead) async {

@@ -8,9 +8,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/testing.dart';
+import 'package:ppoling_relay/log_file.dart';
 import 'package:ppoling_runner/src/log/log_store.dart';
 import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
+import 'package:ppoling_runner/src/process/process_launcher.dart';
 import 'package:ppoling_runner/src/runtime/runtime_store.dart';
 
 import 'support/relay_binary.dart';
@@ -115,7 +117,8 @@ RunnerOrchestrator orchestrator(Project project,
     ItemLauncher Function(ProjectRepository)? launcher,
     LogStore? logs,
     RuntimeStore? store,
-    RuntimeQuery? runtime}) {
+    RuntimeQuery? runtime,
+    ProcessLauncher? processes}) {
   final repo = FakeProjectRepository(projects: [project]);
   final launcher0 = launcher?.call(repo) ?? FakeItemLauncher(repo, reachable: {'storage'});
   final ports0 = ports ?? FakePortProbe();
@@ -127,7 +130,7 @@ RunnerOrchestrator orchestrator(Project project,
     ports: () => ports0,
     http: () => http,
     runtime: () => runtime0,
-    processes: PosixProcessLauncher(relay: relay, searchPath: () async => '/usr/bin:/bin'),
+    processes: processes ?? PosixProcessLauncher(relay: relay, searchPath: () async => '/usr/bin:/bin'),
     logs: logs ?? tempLogs(),
     store: store ?? tempStore(),
   );
@@ -523,4 +526,159 @@ void main() {
       expect(await store.processes(), isEmpty);
     });
   });
+
+  group('앱 재시작 후 복구', () {
+    const x = ItemRef(projectId: 'demo', serviceId: 'x');
+    Project withX() => demo(tempProject(), extra: [const ProcessService(id: 'x', command: ['sh', '-c', 'sleep 30 & wait'])]);
+
+    /// 앱을 다시 켜기 전 실행이 남긴 [x] 의 기록.
+    Future<RuntimeStore> storeWithOldRecord() async {
+      final store = tempStore();
+      await store.putProcess(ProcessRecord(
+          item: x, pid: 4242, pgid: 4242, command: const ['sh'], startedAt: DateTime(2026, 11, 22), appRunId: 'old'));
+      return store;
+    }
+
+    test('앱을 다시 켜면 증명된 프로세스를 실행 중으로 되살리고 멈출 수 있다 (AT-06)', () async {
+      final dir = Directory.systemTemp.createTempSync('ppoling_recover_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      RuntimeStore store() => RuntimeStore(() async => File('${dir.path}/runtime.json'));
+      final project = withX();
+      final logs = tempLogs();
+      final before = orchestrator(project, store: store(), logs: logs);
+      expect((await before.start(x)).outcome, ItemOutcome.ok);
+      final pid = before.liveProcesses.single.process.pid;
+      addTearDown(() => Process.run('kill', ['-KILL', '--', '-$pid']));
+
+      // 기록은 비동기로 써진다. 파일에 남을 때까지 기다린다(실제 재시작은 몇 초 뒤라 상관없다).
+      for (var i = 0; i < 50 && (await store().processes()).isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      final after = orchestrator(project, store: store(), logs: logs); // 다시 켠 앱
+      final states = <ItemState>[];
+      after.events.where((e) => e is ItemStateChanged).cast<ItemStateChanged>().listen((e) => states.add(e.state));
+      await after.recover();
+      expect(after.stateOf(x), ItemState.ready);
+      expect(states, [ItemState.running, ItemState.ready]);
+      expect(after.liveProcesses.single.process.pid, pid);
+      expect((await store().processes()).single.appRunId, isNot('old'));
+
+      expect((await after.stop(x)).outcome, ItemOutcome.ok);
+      expect((await Process.run('kill', ['-0', '--', '-$pid'])).exitCode, isNot(0), reason: '그룹째 멈췄다');
+    });
+
+    test('증명되지 않은 기록은 확인 불가이고 멈추지 않는다 (AT-07)', () async {
+      final store = await storeWithOldRecord();
+      final o = orchestrator(withX(), store: store, processes: _AttachOnly(const Unverified()));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.unknown);
+      final r = await o.stop(x);
+      expect(r.outcome, ItemOutcome.failed);
+      expect(o.stateOf(x), ItemState.unknown, reason: '멈춘 척하지 않는다');
+      expect(await o.stopAll('demo'), isA<RunSummary>());
+      expect(o.stateOf(x), ItemState.unknown);
+      expect((await store.processes()).single.pid, 4242, reason: '기록은 남긴다');
+    });
+
+    test('끝난 기록은 지우고 중지로 둔다', () async {
+      final store = await storeWithOldRecord();
+      final o = orchestrator(withX(), store: store, processes: _AttachOnly(const Gone()));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.stopped);
+      expect(await store.processes(), isEmpty);
+    });
+
+    test('설정에서 항목이 빠졌으면 확인 불가로 둔다', () async {
+      final store = await storeWithOldRecord();
+      final fake = _FakeRunning();
+      final o = orchestrator(demo(tempProject()), store: store, processes: _AttachOnly(Attached(fake)));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.unknown);
+      expect(fake.stopped, isFalse);
+    });
+
+    test('되살린 항목이 끝나면 로그의 종료 코드로 상태를 바꾼다', () async {
+      final store = await storeWithOldRecord();
+      final logs = tempLogs();
+      final fake = _FakeRunning();
+      final o = orchestrator(withX(), store: store, logs: logs, processes: _AttachOnly(Attached(fake)));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.ready);
+
+      final log = await logs.fileOf(x);
+      log.parent.createSync(recursive: true);
+      log.writeAsStringSync('${endLine(2)}\n');
+      final failed = o.events.where((e) => e is ItemStateChanged).cast<ItemStateChanged>().firstWhere((e) => e.state == ItemState.failed);
+      fake.finish();
+      expect((await failed).exitCode, 2);
+      expect(await store.processes(), isEmpty);
+    });
+
+    test('앱을 다시 켜면 떠 있는 Compose 항목을 실행 중으로 보여 준다', () async {
+      final project = demo(tempProject());
+      FakeItemLauncher? shared;
+      ItemLauncher launcher(ProjectRepository repo) => shared ??= FakeItemLauncher(repo, reachable: {'storage'});
+      const db = ItemRef(projectId: 'demo', serviceId: 'db');
+      expect((await orchestrator(project, launcher: launcher).start(db)).outcome, ItemOutcome.ok);
+
+      final after = orchestrator(project, launcher: launcher);
+      await after.recover();
+      expect(after.stateOf(db), ItemState.running);
+      expect(after.stateOf(const ItemRef(projectId: 'demo', serviceId: 'api')), ItemState.stopped);
+    });
+  });
+}
+
+/// [attach] 결과만 정해 주는 실행기. 띄우지는 않는다.
+class _AttachOnly implements ProcessLauncher {
+  _AttachOnly(this.result);
+
+  final AttachResult result;
+
+  @override
+  Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async => result;
+
+  @override
+  Future<RunningProcess> start(List<String> command,
+          {required String workingDirectory, Map<String, String> environment = const {}, required LogTarget log}) =>
+      throw UnimplementedError();
+}
+
+/// 다시 붙은 것처럼 보이는 프로세스. [finish] 를 부르면 끝난다.
+class _FakeRunning implements RunningProcess {
+  final _done = Completer<int>();
+  var stopped = false;
+
+  void finish() => _done.complete(-1);
+
+  @override
+  int get pid => 4242;
+
+  @override
+  int get pgid => 4242;
+
+  @override
+  DateTime get startedAt => DateTime(2026, 11, 22);
+
+  @override
+  String? get jobName => null;
+
+  @override
+  Stream<OutputLine> get output => const Stream.empty();
+
+  @override
+  Future<int> get exitCode => _done.future;
+
+  @override
+  Future<bool> get groupAlive async => !_done.isCompleted;
+
+  @override
+  Future<bool> contains(int pid) async => false;
+
+  @override
+  Future<StopResult> stop(Duration timeout) async {
+    stopped = true;
+    finish();
+    return const StopResult(forced: false);
+  }
 }

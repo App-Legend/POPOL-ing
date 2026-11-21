@@ -53,6 +53,9 @@ class RunnerOrchestrator implements Orchestrator {
   final _ups = <ItemRef, Future<ItemResult>>{};
   final _stopping = <ItemRef>{};
 
+  /// 앱을 다시 켠 뒤 되살린 항목. 준비 완료가 아니어도 끝나면 상태를 바꾼다.
+  final _recovered = <ItemRef>{};
+
   /// 띄울 때 쓴 설정. 설정 파일이 깨지거나 항목이 빠져도 띄운 것은 멈출 수 있어야 한다.
   final _launched = <ItemRef, ServiceConfig>{};
   final _runAlls = <String, Future<RunSummary>>{};
@@ -73,6 +76,76 @@ class RunnerOrchestrator implements Orchestrator {
         for (final MapEntry(key: item, value: process) in _running.entries)
           if (_launched[item] case final ProcessService service) (item: item, service: service, process: process),
       ];
+
+  /// 앱을 다시 켜기 전에 띄운 프로세스·Compose 항목의 상태를 되살린다(FR-11). 앱 시작 때 한 번 부른다.
+  ///
+  /// 내가 띄운 중계라고 증명된 프로세스만 되살린다. 살아 있지만 증명할 수 없으면 확인 불가로 두고 멈추지 않는다.
+  Future<void> recover() async {
+    for (final r in await store.processes()) {
+      if (r.appRunId == store.appRunId) continue;
+      switch (await processes.attach(pid: r.pid, startedAt: r.startedAt, jobName: r.jobName)) {
+        case Gone():
+          unawaited(store.removeProcess(r.item));
+        case Unverified():
+          _set(r.item, ItemState.unknown, reason: '앱을 다시 켜기 전에 띄운 프로세스인지 확인할 수 없어요.');
+        case Attached(:final process):
+          await _adopt(r, process);
+      }
+    }
+    await _recoverCompose();
+  }
+
+  Future<void> _adopt(ProcessRecord r, RunningProcess process) async {
+    final item = r.item;
+    final ProcessService service;
+    try {
+      service = _service(await _project(item.projectId, checkConfig: false), item.serviceId) as ProcessService;
+    } on Object {
+      // 설정 없이 멈추는 길은 만들지 않는다. 기록은 남겨 두고 확인 불가로만 알린다.
+      _set(item, ItemState.unknown, reason: '설정에서 이 항목을 찾을 수 없어 확인할 수 없어요.');
+      return;
+    }
+    _running[item] = process;
+    _launched[item] = service;
+    _recovered.add(item);
+    unawaited(store.putProcess(ProcessRecord(
+        item: item,
+        pid: r.pid,
+        pgid: r.pgid,
+        command: r.command,
+        startedAt: r.startedAt,
+        appRunId: store.appRunId,
+        jobName: r.jobName)));
+    // 내 자식이 아니라 종료 코드를 받을 수 없으니, 중계가 로그 끝에 남긴 코드를 읽는다.
+    unawaited(_allExited(process).then((code) async => _onExit(item, process, code < 0 ? await logs.lastExitCode(item) ?? -1 : code)));
+    _set(item, ItemState.running);
+    try {
+      final ready = switch (service.ready) {
+        LogReady() || NoneReady() => const ReadyResult.ready(), // 지난 출력은 다시 볼 수 없다. 떠 있으면 준비됐다고 본다
+        final condition => await _readiness.wait(condition, exited: process.exitCode),
+      };
+      if (ready.ok && identical(_running[item], process) && stateOf(item) == ItemState.running) _set(item, ItemState.ready);
+    } on Object {
+      // 준비 확인 부품이 아직 없으면 실행 중으로 둔다
+    }
+  }
+
+  /// `ppoling-<프로젝트ID>` 컨테이너가 떠 있는 Compose 항목을 실행 중으로 둔다. Docker 가 꺼져 있으면 건너뛴다.
+  Future<void> _recoverCompose() async {
+    try {
+      for (final project in await projects().listProjects()) {
+        for (final s in _services(project).whereType<ComposeService>()) {
+          final item = _ref(project, s);
+          if (stateOf(item) == ItemState.stopped && await _composeLeftUp(project.id, s)) {
+            _launched[item] = s;
+            _set(item, ItemState.running);
+          }
+        }
+      }
+    } on Exception {
+      // 프로젝트 목록을 못 읽으면 되살리지 않는다
+    }
+  }
 
   /// 같은 프로젝트를 실행하는 중에 또 누르면 진행 중인 실행의 결과를 같이 기다린다.
   @override
@@ -294,7 +367,8 @@ class RunnerOrchestrator implements Orchestrator {
         pgid: process.pgid,
         command: service.command,
         startedAt: process.startedAt,
-        appRunId: store.appRunId)));
+        appRunId: store.appRunId,
+        jobName: process.jobName)));
     _exitCodes.remove(item);
     final exited = _allExited(process);
     unawaited(exited.then((code) => _onExit(item, process, code))); // 준비 확인보다 먼저 걸어야 실패에 종료 코드가 붙는다
@@ -338,9 +412,15 @@ class RunnerOrchestrator implements Orchestrator {
     _exitCodes[item] = code;
     _running.remove(item);
     unawaited(store.removeProcess(item));
-    if (_stopping.contains(item) || stateOf(item) != ItemState.ready) return;
+    final recovered = _recovered.remove(item);
+    if (_stopping.contains(item) || (stateOf(item) != ItemState.ready && !recovered)) return;
     _set(item, code == 0 ? ItemState.stopped : ItemState.failed,
-        reason: code == 0 ? null : '실행 중에 종료됐어요 (종료 코드 $code).', exitCode: code);
+        reason: switch (code) {
+          0 => null,
+          -1 => '앱을 다시 켠 뒤 종료됐어요.',
+          _ => '실행 중에 종료됐어요 (종료 코드 $code).',
+        },
+        exitCode: code == -1 ? null : code);
   }
 
   /// 항목이 쓸 포트를 다른 프로그램이 쓰고 있으면 그 이유. 확인할 수 없으면 null(시작은 막지 않는다).
@@ -378,12 +458,16 @@ class RunnerOrchestrator implements Orchestrator {
   }
 
   Future<ItemResult> _halt(String projectId, ServiceConfig service, ItemRef item) async {
+    if (stateOf(item) == ItemState.unknown) {
+      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: '포폴링이 띄운 것인지 확인할 수 없어 멈추지 않았어요.');
+    }
     if (stateOf(item) == ItemState.stopped && !_running.containsKey(item) && !await _composeLeftUp(projectId, service)) {
       return ItemResult(item: item, outcome: ItemOutcome.ok);
     }
     _stopping.add(item);
     _set(item, ItemState.stopping);
     final process = _running.remove(item);
+    _recovered.remove(item);
     try {
       var forced = false;
       if (service is ComposeService) {
