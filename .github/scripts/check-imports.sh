@@ -16,8 +16,8 @@ for pub in */pubspec.yaml; do
     fail=1
   fi
 
-  # core 는 아무 기능도, 기능은 core 와 자기 자신만 쓸 수 있다.
-  allowed="ppoling_core|$self"
+  # core 는 아무 기능도, 기능은 core 와 자기 자신(자기 폴더 안의 하위 패키지 ppoling_<폴더>_* 포함)만 쓸 수 있다.
+  allowed="ppoling_core|$self|${self}_[a-z_]+"
   deps=$(grep -nE '^[[:space:]]+ppoling_[a-z_]+:' "$pub" | grep -vE "[[:space:]]($allowed):" || true)
   imports=$(grep -rnoE --include='*.dart' --exclude-dir=.dart_tool --exclude-dir=build \
     'package:ppoling_[a-z_]+' "$dir" | grep -vE ":package:($allowed)$" || true)

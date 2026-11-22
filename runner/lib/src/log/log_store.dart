@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_relay/log_file.dart';
+import 'package:ppoling_runner_relay/log_file.dart';
 
 /// 실행 항목 로그 `<root>/<projectId>/<serviceId>.log` 의 위치와 읽기. 쓰기는 중계(`ppoling-relay`)가 한다.
 class LogStore {

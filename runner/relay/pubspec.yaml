@@ -1,4 +1,4 @@
-name: ppoling_relay
+name: ppoling_runner_relay
 description: "실행 항목 출력을 받아 가린 뒤 로그 파일에 쓰는 중계 프로그램(ppoling-relay)과 그 로그 형식."
 publish_to: 'none'
 version: 0.1.0

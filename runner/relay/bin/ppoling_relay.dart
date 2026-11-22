@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ppoling_relay/log_file.dart';
-import 'package:ppoling_relay/relay_request.dart';
-import 'package:ppoling_relay/src/os.dart';
+import 'package:ppoling_runner_relay/log_file.dart';
+import 'package:ppoling_runner_relay/relay_request.dart';
+import 'package:ppoling_runner_relay/src/os.dart';
 
 /// 서비스 하나를 띄워 출력을 받아 적는 중계. 앱이 꺼져도 서비스가 출력할 곳을 잃고 죽지 않게 한다.
 ///

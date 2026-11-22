@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_relay/log_file.dart';
-import 'package:ppoling_relay/relay_request.dart';
+import 'package:ppoling_runner_relay/log_file.dart';
+import 'package:ppoling_runner_relay/relay_request.dart';
 
 import 'support/relay_binary.dart';
 

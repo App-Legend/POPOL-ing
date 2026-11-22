@@ -6,7 +6,7 @@ import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/testing.dart';
 import 'package:ppoling_runner/src/log/log_store.dart';
 import 'package:ppoling_runner/src/log/runner_log_excerpt.dart';
-import 'package:ppoling_relay/log_file.dart';
+import 'package:ppoling_runner_relay/log_file.dart';
 
 void main() {
   late Directory tmp;

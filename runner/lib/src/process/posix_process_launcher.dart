@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ppoling_relay/relay_request.dart';
+import 'package:ppoling_runner_relay/relay_request.dart';
 
 import 'process_launcher.dart';
 import 'shell_path.dart';

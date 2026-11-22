@@ -4,7 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_relay/relay_request.dart';
+import 'package:ppoling_runner_relay/relay_request.dart';
 import 'package:ppoling_runner/src/process/process_launcher.dart';
 import 'package:ppoling_runner/src/process/windows_job.dart';
 import 'package:ppoling_runner/src/process/windows_process_launcher.dart';

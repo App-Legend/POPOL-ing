@@ -19,6 +19,12 @@ Future<String> relayBinary() async {
   // 테스트 파일 여러 개가 동시에 컴파일해도 반쯤 쓴 파일을 쓰지 않게 다른 이름으로 만든 뒤 바꿔 끼운다.
   final tmp = '${out.path}.$pid';
   await run(['compile', 'exe', 'relay/bin/ppoling_relay.dart', '-o', tmp]);
-  File(tmp).renameSync(out.path);
+  try {
+    File(tmp).renameSync(out.path);
+  } on FileSystemException {
+    // Windows 는 다른 테스트 파일이 실행 중인 중계를 덮어쓸 수 없다. 그쪽이 먼저 만든 것을 쓴다.
+    if (!out.existsSync()) rethrow;
+    File(tmp).deleteSync();
+  }
   return out.absolute.path;
 }

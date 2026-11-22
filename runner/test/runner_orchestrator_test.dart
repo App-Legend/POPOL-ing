@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/testing.dart';
-import 'package:ppoling_relay/log_file.dart';
+import 'package:ppoling_runner_relay/log_file.dart';
 import 'package:ppoling_runner/src/log/log_store.dart';
 import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
