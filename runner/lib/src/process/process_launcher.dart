@@ -7,7 +7,7 @@ import 'windows_process_launcher.dart';
 
 /// 실행 항목 프로세스를 띄우는 부품. OS별 구현이 프로세스 트리를 통째로 멈출 수 있게 띄운다.
 ///
-/// 명령은 중계(`ppoling-relay`)가 띄운다. 중계가 출력을 받아 로그 파일에 쓰므로 앱이 꺼져도 명령은 계속 돈다.
+/// 명령은 중계(`popoling-relay`)가 띄운다. 중계가 출력을 받아 로그 파일에 쓰므로 앱이 꺼져도 명령은 계속 돈다.
 /// `runner/` 안에서만 쓴다. 다른 기능은 `Orchestrator` 계약으로 실행을 맡긴다.
 abstract interface class ProcessLauncher {
   /// 이 OS 의 구현. OS 를 고르는 곳은 여기 한 곳이다. [relay] 는 중계 실행 파일 경로.

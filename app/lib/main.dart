@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
-import 'package:ppoling_ai/ai.dart' as ai;
-import 'package:ppoling_catalog/catalog.dart' as catalog;
-import 'package:ppoling_checks/checks.dart' as checks;
-import 'package:ppoling_compose/compose.dart' as compose;
-import 'package:ppoling_project/project.dart' as project;
-import 'package:ppoling_runner/runner.dart' as runner;
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
+import 'package:popoling_ai/ai.dart' as ai;
+import 'package:popoling_catalog/catalog.dart' as catalog;
+import 'package:popoling_checks/checks.dart' as checks;
+import 'package:popoling_compose/compose.dart' as compose;
+import 'package:popoling_project/project.dart' as project;
+import 'package:popoling_runner/runner.dart' as runner;
 
 import 'registry.dart';
 import 'screens/ai_screen.dart';
@@ -20,7 +20,11 @@ import 'screens/home_screen.dart';
 import 'screens/qa_screen.dart';
 import 'screens/settings_screen.dart';
 
-void main() => runApp(PpolingApp(registry: buildRegistry()));
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await runner.moveLegacyData(); // 등록한 프로젝트를 읽기 전에 옛 이름(ppoling)의 앱 데이터를 옮긴다
+  runApp(PopolingApp(registry: buildRegistry()));
+}
 
 /// 가짜 구현과 목업 화면을 먼저 깔고, 기능의 `register()` 로 덮어쓴다.
 /// 진짜 기능이 생기면 아래 목록에 `<기능>.register(app);` 한 줄을 더한다.
@@ -64,8 +68,8 @@ void _registerMockups(AppRegistry app) {
   app.route('/ai', (_) => const AiScreen());
 }
 
-class PpolingApp extends StatelessWidget {
-  const PpolingApp({super.key, required this.registry});
+class PopolingApp extends StatelessWidget {
+  const PopolingApp({super.key, required this.registry});
 
   final Registry registry;
 

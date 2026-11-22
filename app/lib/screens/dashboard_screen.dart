@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다(목업이라 이름에만 쓴다).
 class DashboardScreen extends StatelessWidget {

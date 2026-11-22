@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling/main.dart';
+import 'package:popoling/main.dart';
 
 const _routes = ['/', '/home', '/dashboard', '/detail', '/env', '/qa', '/settings', '/dialogs', '/ai'];
 
@@ -12,7 +12,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
 
-      await tester.pumpWidget(PpolingApp(registry: buildRegistry(features: false)));
+      await tester.pumpWidget(PopolingApp(registry: buildRegistry(features: false)));
       if (route != '/') {
         tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
         await tester.pumpAndSettle();
@@ -26,7 +26,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(PpolingApp(registry: buildRegistry(features: false)));
+    await tester.pumpWidget(PopolingApp(registry: buildRegistry(features: false)));
     tester.state<NavigatorState>(find.byType(Navigator)).pushNamed('/dashboard', arguments: 'weather-bot');
     await tester.pumpAndSettle();
     expect(find.text('weather-bot'), findsWidgets);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 Widget _host(Widget child, {Map<String, WidgetBuilder> routes = const {}}) => MaterialApp(
       theme: buildTheme(),

@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 /// [AppRegistry] 의 구현. 같은 경로·같은 타입은 나중에 등록한 것으로 덮어쓴다.
 class Registry implements AppRegistry {

@@ -16,7 +16,7 @@ class ProjectRepositoryFixture {
   /// 아무 프로젝트도 등록되지 않은 저장소.
   final ProjectRepository repository;
 
-  /// 있는 폴더 두 개. ppoling.yaml 은 없어야 한다.
+  /// 있는 폴더 두 개. popoling.yaml 은 없어야 한다.
   final String existingFolder;
   final String anotherFolder;
 
@@ -36,7 +36,7 @@ class ProjectRepositoryFixture {
 ///   });
 /// });
 /// ```
-/// 폴더와 ppoling.yaml 을 지우지 않는지는 파일을 다루는 진짜 구현의 테스트에서 따로 확인한다.
+/// 폴더와 popoling.yaml 을 지우지 않는지는 파일을 다루는 진짜 구현의 테스트에서 따로 확인한다.
 void projectRepositoryContract(Future<ProjectRepositoryFixture> Function() setUp) {
   String folderName(String path) => path.split(RegExp(r'[\\/]')).where((part) => part.isNotEmpty).last;
 

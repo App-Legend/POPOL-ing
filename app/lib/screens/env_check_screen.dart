@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 4. 환경 점검
 class EnvCheckScreen extends StatelessWidget {
@@ -27,7 +27,7 @@ class EnvCheckScreen extends StatelessWidget {
       children: [
         const PageHead(
           title: '환경 점검',
-          sub: 'ppoling.yaml 의 requires 항목을 검사하고, 마지막으로 성공한 실행(2026-10-02 18:40)의 환경과 비교해요.',
+          sub: 'popoling.yaml 의 requires 항목을 검사하고, 마지막으로 성공한 실행(2026-10-02 18:40)의 환경과 비교해요.',
           actions: [Btn('다시 점검'), Btn('점검 + 전체 실행 + 헬스체크', primary: true)],
         ),
         AutoGrid(minItemWidth: 220, gap: 12, children: [

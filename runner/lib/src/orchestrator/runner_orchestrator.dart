@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
@@ -16,7 +16,7 @@ typedef LiveProcess = ({ItemRef item, ProcessService service, RunningProcess pro
 /// [Orchestrator] 의 진짜 구현. 정책은 기획서 §6.
 ///
 /// - 프로세스 항목은 [processes] 로 직접 띄우고, Compose·원격 항목은 C 의 [ItemLauncher] 에 맡긴다.
-/// - 멈추는 건 이 객체가 띄운 프로세스와 `ppoling-<프로젝트ID>` Compose 항목뿐이다. 포트·PID 만으로 멈추지 않는다.
+/// - 멈추는 건 이 객체가 띄운 프로세스와 `popoling-<프로젝트ID>` Compose 항목뿐이다. 포트·PID 만으로 멈추지 않는다.
 /// - 다른 기능의 구현은 함수로 받아 처음 쓸 때 꺼낸다(`AppRegistry` 약속: 등록이 다 끝난 뒤 꺼낸다).
 /// - 항목마다 시작은 한 번에 하나만 돈다. 시작하는 중에 멈추면 그 시작은 상태를 바꾸지 않고 끝난다.
 /// - 마지막 전체 실행 결과와 띄운 프로세스는 [store] 에 남긴다. 앱을 다시 켰을 때 되살리는 건 복구(FR-11)가 한다.
@@ -131,7 +131,7 @@ class RunnerOrchestrator implements Orchestrator {
     }
   }
 
-  /// `ppoling-<프로젝트ID>` 컨테이너가 떠 있는 Compose 항목을 실행 중으로 둔다. Docker 가 꺼져 있으면 건너뛴다.
+  /// `popoling-<프로젝트ID>` 컨테이너가 떠 있는 Compose 항목을 실행 중으로 둔다. Docker 가 꺼져 있으면 건너뛴다.
   Future<void> _recoverCompose() async {
     try {
       for (final project in await projects().listProjects()) {
@@ -266,7 +266,7 @@ class RunnerOrchestrator implements Orchestrator {
     } catch (e) {
       if (cancel.isCompleted) return _cancelled(item);
       return _fail(item, switch (e) {
-        PpolingException(:final message) => message,
+        PopolingException(:final message) => message,
         ProcessException(:final message) => '시작하지 못했어요: $message',
         _ => '시작하지 못했어요: $e',
       });
@@ -284,7 +284,7 @@ class RunnerOrchestrator implements Orchestrator {
         return ItemResult(item: item, outcome: ItemOutcome.ok);
       }
       reason = status is RemoteStatus ? status.probe.failureReason : null;
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       reason = e.message;
     }
     reason = '연결할 수 없어요${reason == null ? '' : ': $reason'}.';
@@ -481,13 +481,13 @@ class RunnerOrchestrator implements Orchestrator {
       return ItemResult(item: item, outcome: ItemOutcome.ok, forced: forced);
     } catch (e) {
       if (process != null) _running[item] ??= process; // 다시 멈출 수 있게 핸들을 되돌린다
-      return _fail(item, e is PpolingException ? e.message : '멈추지 못했어요: $e');
+      return _fail(item, e is PopolingException ? e.message : '멈추지 못했어요: $e');
     } finally {
       _stopping.remove(item);
     }
   }
 
-  /// 상태는 멈춤인데 `ppoling-<프로젝트ID>` 컨테이너가 남아 있다(앱을 다시 켜기 전에 띄운 것).
+  /// 상태는 멈춤인데 `popoling-<프로젝트ID>` 컨테이너가 남아 있다(앱을 다시 켜기 전에 띄운 것).
   /// 확인할 수 없으면(Docker 꺼짐 등) 남은 게 없다고 본다.
   Future<bool> _composeLeftUp(String projectId, ServiceConfig service) async {
     if (service is! ComposeService) return false;

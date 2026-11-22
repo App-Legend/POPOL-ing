@@ -1,5 +1,5 @@
 /// 기능 사이의 약속(인터페이스). 모델도 함께 내보낸다.
-/// `import 'package:ppoling_core/contracts.dart';`
+/// `import 'package:popoling_core/contracts.dart';`
 library;
 
 export 'contracts/app_registry.dart';

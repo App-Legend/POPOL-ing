@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/src/redact.dart';
+import 'package:popoling_ai/src/redact.dart';
 
 void main() {
   test('이름=값 꼴의 비밀값은 값만 가린다', () {

@@ -17,7 +17,7 @@ class QaRunnerFixture {
   /// 검사 이력이 비어 있는 QaRunner.
   final QaRunner runner;
 
-  /// 등록된 프로젝트. 그 ppoling.yaml 의 checks 가 [checks] 와 같아야 하고,
+  /// 등록된 프로젝트. 그 popoling.yaml 의 checks 가 [checks] 와 같아야 하고,
   /// 주소가 없는 check 가 하나 이상 있어야 한다.
   final String projectId;
   final List<CheckConfig> checks;

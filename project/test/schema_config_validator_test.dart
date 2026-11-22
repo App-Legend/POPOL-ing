@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
-import 'package:ppoling_project/src/schema_config_validator.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
+import 'package:popoling_project/src/schema_config_validator.dart';
 
 void main() {
   group('SchemaConfigValidator', () {

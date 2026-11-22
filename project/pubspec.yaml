@@ -1,4 +1,4 @@
-name: ppoling_project
+name: popoling_project
 description: "프로젝트·설정(B): 프로젝트 등록·설정 파일·메모."
 publish_to: 'none'
 version: 0.1.0
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  ppoling_core:
+  popoling_core:
     path: ../core
   path_provider: ^2.1.5
   yaml: ^3.1.3

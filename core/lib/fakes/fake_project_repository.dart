@@ -34,7 +34,7 @@ class FakeProjectRepository implements ProjectRepository {
   final DateTime Function() _clock;
   final List<StreamController<List<Project>>> _watchers = [];
 
-  /// "있는 폴더"를 더한다. [config] 를 주면 그 폴더에 ppoling.yaml 이 있는 것으로 친다.
+  /// "있는 폴더"를 더한다. [config] 를 주면 그 폴더에 popoling.yaml 이 있는 것으로 친다.
   void addFolder(String path, {ProjectConfig? config}) {
     _folders.add(path);
     if (config != null) {
@@ -91,7 +91,7 @@ class FakeProjectRepository implements ProjectRepository {
     _projects[i] = updated;
     final config = updated.config;
     if (config != null) {
-      _configFiles[updated.folderPath] = config; // ppoling.yaml 에 저장한 것으로 친다.
+      _configFiles[updated.folderPath] = config; // popoling.yaml 에 저장한 것으로 친다.
     }
     _notify();
     return updated;

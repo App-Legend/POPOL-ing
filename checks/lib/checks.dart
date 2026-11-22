@@ -1,8 +1,8 @@
 /// 환경·연결 점검(C). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_checks/checks.dart' as checks;`
+/// `import 'package:popoling_checks/checks.dart' as checks;`
 library;
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/system_http_probe.dart';
 import 'src/system_port_probe.dart';

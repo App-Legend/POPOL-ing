@@ -28,7 +28,7 @@ class OrchestratorFixture {
   /// 등록된 프로젝트. 의존 관계가 있는 항목과 원격 항목이 하나 이상 있어야 한다.
   final String projectId;
 
-  /// [projectId] 의 실행 항목 전부(ppoling.yaml 의 services 그대로).
+  /// [projectId] 의 실행 항목 전부(popoling.yaml 의 services 그대로).
   final List<ServiceConfig> services;
 
   /// 실패시킬 항목. 다른 항목이 이 항목에 의존해야 건너뜀을 확인할 수 있다.

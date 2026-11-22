@@ -62,7 +62,7 @@ class QaRun {
   final DateTime startedAt;
   final QaTrigger trigger;
 
-  /// ppoling.yaml 의 checks 와 같은 순서.
+  /// popoling.yaml 의 checks 와 같은 순서.
   final List<QaResult> results;
 
   int get passed => _count(QaStatus.passed);

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
 
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';

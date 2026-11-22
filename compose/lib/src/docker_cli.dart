@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 /// `docker` 명령을 셸 없이 인자 배열로 실행한다. 테스트에서는 [run]·[start] 를 바꿔 끼운다.
 class DockerCli {

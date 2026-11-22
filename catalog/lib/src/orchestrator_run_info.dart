@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'run_info.dart';
 
@@ -60,7 +60,7 @@ class OrchestratorRunInfoSource implements RunInfoSource {
       RunSummary? last;
       try {
         last = await _runner.lastRun(p.id);
-      } on PpolingException {
+      } on PopolingException {
         last = null; // 읽는 사이 목록에서 빠졌다. 다음 목록 갱신 때 사라진다.
       }
       final running = (p.config?.services ?? const <ServiceConfig>[])

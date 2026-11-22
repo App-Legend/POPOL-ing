@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 8. AI 검사 (Gemini API · MVP: AI-02·03)
 class AiScreen extends StatelessWidget {

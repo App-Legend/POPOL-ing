@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
 
 /// 가짜 구현이 약속 테스트를 통과하는지 확인한다.
 /// 진짜 구현도 각자 기능 폴더에서 같은 묶음을 돌린다.
@@ -53,7 +53,7 @@ void main() {
           }),
           changedProjectId: 'my-team-project',
           changedNames: {'node'},
-          noRecordProjectId: 'ppoling',
+          noRecordProjectId: 'popoling',
         ));
   });
 
@@ -211,7 +211,7 @@ void main() {
       expect((await repo.addProject('/x/포폴링')).id, 'project');
     });
 
-    test('FakeProjectRepository 는 addFolder 로 넣은 ppoling.yaml 을 등록 때 읽는다', () async {
+    test('FakeProjectRepository 는 addFolder 로 넣은 popoling.yaml 을 등록 때 읽는다', () async {
       final repo = FakeProjectRepository();
       repo.addFolder('/projects/new', config: const ProjectConfig(about: About(summary: '새 프로젝트')));
       final project = await repo.addProject('/projects/new');

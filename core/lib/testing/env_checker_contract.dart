@@ -10,7 +10,7 @@ class EnvCheckerFixture {
     required this.checker,
     required this.installedCli,
     required this.dockerRunning,
-    this.missingCli = 'ppoling-no-such-cli',
+    this.missingCli = 'popoling-no-such-cli',
   });
 
   final EnvChecker checker;

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner/src/process/windows_command.dart';
+import 'package:popoling_runner/src/process/windows_command.dart';
 
 void main() {
   const comSpec = r'C:\Windows\System32\cmd.exe';

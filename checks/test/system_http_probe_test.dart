@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_checks/src/system_http_probe.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_checks/src/system_http_probe.dart';
+import 'package:popoling_core/testing.dart';
 
 void main() {
   late HttpServer server;
