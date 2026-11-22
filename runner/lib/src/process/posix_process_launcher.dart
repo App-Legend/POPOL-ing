@@ -50,7 +50,9 @@ class PosixProcessLauncher implements ProcessLauncher {
   @override
   Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async {
     try {
-      final r = await Process.run('ps', ['-o', 'pgid=,lstart=,comm=', '-p', '$pid'], environment: {'LC_ALL': 'C'});
+      // comm 대신 명령줄(args)을 본다. Linux 에서 Dart 실행 파일은 comm 을 'dart:ppoling-re' 로 바꾼다.
+      // 중계는 인자 없이 띄우니 명령줄이 실행 파일 경로로 끝난다.
+      final r = await Process.run('ps', ['-o', 'pgid=,lstart=,args=', '-p', '$pid'], environment: {'LC_ALL': 'C'});
       // 예: "  812 Sun Nov 22 10:00:00 2026     /Applications/포폴링.app/Contents/MacOS/ppoling-relay"
       final f = (r.stdout as String).trim().split(RegExp(r'\s+'));
       if (r.exitCode == 0 && f.length >= 7) {

@@ -67,7 +67,8 @@ void main() {
       final req = File('${tmp.path}/req.json')
         ..writeAsStringSync(RelayRequest(command: command, logFile: logFile().path, secrets: []).encode());
       // pipeTo 가 있으면 중계 stdout 을 그 명령으로 넘긴다(앱 쪽 파이프 흉내).
-      final p = await Process.start('sh', ['-c', '"$relay" < "${req.path}"${pipeTo == null ? '' : ' | $pipeTo'}']);
+      // 끝의 '; true' 는 Linux 의 sh(dash)가 중계로 자신을 바꿔치기하지 않고 자식으로 띄우게 한다(relayPid 가 부모로 찾는다).
+      final p = await Process.start('sh', ['-c', '"$relay" < "${req.path}"${pipeTo == null ? '' : ' | $pipeTo'}; true']);
       p.stdout.drain<void>();
       p.stderr.drain<void>();
       return p;
@@ -76,7 +77,8 @@ void main() {
     /// [shell] 이 띄운 중계의 PID. 다른 테스트 파일이 띄운 중계와 섞이지 않게 부모로 찾는다.
     Future<int?> relayPid(Process shell) async {
       for (var i = 0; i < 50; i++) {
-        final r = await Process.run('pgrep', ['-P', '${shell.pid}', 'ppoling-relay']);
+        // 이름(comm)이 아니라 명령줄로 찾는다. Linux 에서 Dart 실행 파일은 comm 을 'dart:ppoling-re' 로 바꾼다.
+        final r = await Process.run('pgrep', ['-P', '${shell.pid}', '-f', 'ppoling-relay']);
         final pids = (r.stdout as String).trim().split('\n').where((l) => l.isNotEmpty).map(int.parse).toList();
         if (pids.isNotEmpty) return pids.last;
         await Future<void>.delayed(const Duration(milliseconds: 100));
