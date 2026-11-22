@@ -111,6 +111,63 @@ void main() {
     expect(find.text('Gemini API 키 입력'), findsNothing);
     expect(find.text('보안 저장소를 쓰지 못해 키 입력 창을 열지 못했어요.'), findsOneWidget);
   });
+
+  group('헬스체크 결과 요약 카드 (AI-03)', () {
+    final checkedAt = DateTime(2026, 11, 22, 14, 5, 2);
+    late FakeProjectRepository projects;
+    late FakeQaRunner qa;
+
+    setUp(() {
+      projects = FakeProjectRepository.withSamples();
+      qa = FakeQaRunner(projects, failing: {'API 헬스'}, clock: () => checkedAt);
+    });
+
+    Future<void> openWithProject(WidgetTester tester, {String? projectId, DateTime? now}) async {
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        home: AiScreen(
+          keys: MemoryApiKeyStore(fullKey),
+          client: FakeLlmClient(),
+          projectId: projectId,
+          qa: qa,
+          orchestrator: FakeOrchestrator(projects),
+          clock: () => now ?? checkedAt.add(const Duration(hours: 1)),
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('프로젝트 없이 열면 카드 없이 준비 중 안내만', (tester) async {
+      await openWithProject(tester);
+      expect(find.text('헬스체크 결과 요약'), findsNothing);
+      expect(find.text('실행 실패 원인 분석과 헬스체크 결과 요약은 준비 중이에요.'), findsOneWidget);
+    });
+
+    testWidgets('검사 이력이 없으면 빈 안내와 [헬스체크], 누르면 그 결과로 요약 패널', (tester) async {
+      await openWithProject(tester, projectId: 'my-team-project');
+      expect(find.text('헬스체크 결과 요약'), findsOneWidget);
+      expect(find.text('아직 헬스체크 결과가 없어요.'), findsOneWidget);
+      expect(btn('AI 요약'), findsNothing);
+      expect(find.text('실행 실패 원인 분석은 준비 중이에요.'), findsOneWidget);
+
+      await tester.tap(btn('헬스체크'));
+      await tester.pumpAndSettle();
+      expect(await qa.history('my-team-project'), hasLength(1), reason: '누를 때만 한 번 검사');
+      expect(find.text('아직 헬스체크 결과가 없어요.'), findsNothing);
+      expect(find.text('오늘 14:05 검사 기준'), findsOneWidget);
+      expect(btn('AI 요약'), findsOneWidget);
+    });
+
+    testWidgets('최근 검사가 오늘이 아니면 날짜로 기준을 보여 준다', (tester) async {
+      await qa.runChecks('my-team-project');
+      await openWithProject(tester, projectId: 'my-team-project', now: DateTime(2026, 11, 23, 9));
+      expect(find.text('11/22 14:05 검사 기준'), findsOneWidget);
+      expect(btn('AI 요약'), findsOneWidget);
+    });
+  });
 }
 
 /// OS 보안 저장소를 쓸 수 없는 컴퓨터.
