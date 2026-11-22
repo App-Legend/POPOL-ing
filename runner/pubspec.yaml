@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   ppoling_core:
     path: ../core
+  ppoling_runner_relay:
+    path: relay
   ffi: ^2.2.0
   path_provider: ^2.1.5
 

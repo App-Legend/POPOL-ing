@@ -4,24 +4,31 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ppoling_runner_relay/relay_request.dart';
 import 'package:ppoling_runner/src/process/process_launcher.dart';
+import 'package:ppoling_runner/src/process/windows_job.dart';
 import 'package:ppoling_runner/src/process/windows_process_launcher.dart';
 
+import 'support/relay_binary.dart';
+
 void main() {
-  final launcher = WindowsProcessLauncher();
+  late WindowsProcessLauncher launcher;
   late Directory dir;
 
+  setUpAll(() async => launcher = WindowsProcessLauncher(relay: await relayBinary()));
   setUp(() => dir = Directory.systemTemp.createTempSync('ppoling_win_'));
   tearDown(() => dir.deleteSync(recursive: true));
 
+  LogTarget log() => LogTarget(File('${dir.path}\\s.log'));
+
   Future<RunningProcess> start(List<String> command, {Map<String, String> env = const {}}) async {
-    final p = await launcher.start(command, workingDirectory: dir.path, environment: env);
+    final p = await launcher.start(command, workingDirectory: dir.path, environment: env, log: log());
     addTearDown(() => p.stop(Duration.zero));
     return p;
   }
 
   test('ProcessLauncher.forPlatform 은 Windows 실행기를 고른다', () {
-    expect(ProcessLauncher.forPlatform(), isA<WindowsProcessLauncher>());
+    expect(ProcessLauncher.forPlatform(relay: 'ppoling-relay.exe'), isA<WindowsProcessLauncher>());
   });
 
   test('stdout·stderr 를 줄 단위로 나눠 보내고 종료 코드를 알려준다', () async {
@@ -58,7 +65,8 @@ void main() {
     // 손자 ping 은 1초마다 ping.txt 에 한 줄씩 쓰니, 파일이 자라는지로 살아 있는지 Job 과 따로 확인한다.
     final out = File('${dir.path}\\ping.txt');
     final p = await start(['cmd', '/d', '/c', 'ping -n 2 127.0.0.1 > nul & start /b ping -n 60 127.0.0.1 > ping.txt']);
-    await p.exitCode;
+    // 손자가 stderr 를 물려받아 중계는 손자가 끝날 때까지 남는다. cmd 가 끝날 시간만 기다린다.
+    await Future<void>.delayed(const Duration(seconds: 3));
     expect(await p.groupAlive, isTrue);
     final before = out.lengthSync();
     await Future<void>.delayed(const Duration(milliseconds: 2500));
@@ -87,5 +95,67 @@ void main() {
     await p.exitCode;
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect((await p.stop(Duration.zero)).forced, isFalse);
+  });
+
+  test('중계가 로그 파일에도 쓴다', () async {
+    final p = await start(['cmd', '/d', '/c', 'echo hello']);
+    await p.exitCode;
+    expect(log().file.readAsStringSync(), contains(' out | hello'));
+  });
+
+  group('다시 붙기', () {
+    test('앱이 꺼져 Job 핸들이 닫혀도 중계가 쥐고 있으면 Job 이름이 남는다', () async {
+      // 앱이 꺼진 상황: Job 을 만든 쪽 핸들을 닫는다. 중계가 같은 이름으로 연 핸들만 남는다.
+      final name = 'ppoling-test-${DateTime.now().microsecondsSinceEpoch}';
+      final job = WindowsJob(name: name);
+      final relay = await Process.start(await relayBinary(), const [], workingDirectory: dir.path);
+      expect(job.assign(relay.pid), isTrue);
+      relay.stdin.writeln(RelayRequest(
+              command: ['ping', '-n', '60', '127.0.0.1'], logFile: log().file.path, secrets: const [], jobName: name)
+          .encode());
+      await relay.stdin.close();
+      relay.stdout.drain<void>();
+      relay.stderr.drain<void>();
+      await Future<void>.delayed(const Duration(seconds: 1));
+      job.close();
+
+      final reopened = WindowsJob.open(name);
+      expect(reopened, isNotNull, reason: '이게 실패하면 설계의 대안(중계 PID + 생성 시각)으로 가야 한다');
+      expect(reopened!.contains(relay.pid), isTrue);
+      expect(reopened.terminate(), isTrue);
+      reopened.close();
+      await relay.exitCode.timeout(const Duration(seconds: 5));
+    });
+
+    test('앱이 Job 핸들을 닫아도 중계가 살아 있으면 이름으로 다시 열린다', () async {
+      final p = await start(['ping', '-n', '60', '127.0.0.1']);
+      final name = p.jobName!;
+      await Future<void>.delayed(const Duration(seconds: 1)); // 중계가 Job 핸들을 열 때까지
+      expect(WindowsJob.open(name), isNotNull);
+      final r = await launcher.attach(pid: p.pid, startedAt: p.startedAt, jobName: name);
+      final again = (r as Attached).process;
+      expect(await again.contains(p.pid), isTrue);
+      expect(await again.output.toList(), isEmpty);
+      await again.stop(Duration.zero);
+      expect(await again.groupAlive, isFalse);
+      expect(await again.exitCode.timeout(const Duration(seconds: 5)), -1);
+    });
+
+    test('Job 이름이 없거나 다른 프로세스면 Unverified', () async {
+      final foreign = await Process.start('ping', ['-n', '30', '127.0.0.1']);
+      addTearDown(foreign.kill);
+      expect(await launcher.attach(pid: foreign.pid, startedAt: DateTime.now()), isA<Unverified>());
+      final p = await start(['ping', '-n', '30', '127.0.0.1']);
+      await Future<void>.delayed(const Duration(seconds: 1));
+      expect(await launcher.attach(pid: foreign.pid, startedAt: DateTime.now(), jobName: p.jobName), isA<Unverified>());
+      expect(foreign.kill(ProcessSignal.sigterm), isTrue, reason: '건드리지 않았으니 아직 살아 있다');
+    });
+
+    test('끝난 기록은 Gone', () async {
+      final p = await start(['cmd', '/d', '/c', 'exit /b 0']);
+      await p.exitCode;
+      await p.stop(Duration.zero);
+      expect(await launcher.attach(pid: p.pid, startedAt: p.startedAt, jobName: p.jobName), isA<Gone>());
+    });
   });
 }

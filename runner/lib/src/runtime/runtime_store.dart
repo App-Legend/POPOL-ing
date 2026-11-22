@@ -13,6 +13,7 @@ class ProcessRecord {
     required this.command,
     required this.startedAt,
     required this.appRunId,
+    this.jobName,
   });
 
   final ItemRef item;
@@ -23,6 +24,9 @@ class ProcessRecord {
 
   /// 띄운 앱 실행의 ID([RuntimeStore.appRunId]). 이번 실행에서 띄운 것인지 가린다.
   final String appRunId;
+
+  /// Windows: 프로세스를 묶은 이름 붙은 Job. 앱을 다시 켠 뒤 이 이름으로 다시 붙는다. macOS 는 null.
+  final String? jobName;
 }
 
 /// 실행 기록(마지막 전체 실행 결과, 떠 있는 프로세스)을 JSON 파일 하나에 저장한다.
@@ -97,6 +101,7 @@ class _Data {
               command: (p['command'] as List).cast<String>(),
               startedAt: DateTime.parse(p['startedAt'] as String),
               appRunId: p['appRunId'] as String,
+              jobName: p['jobName'] as String?,
             ),
         },
       );
@@ -112,6 +117,7 @@ class _Data {
               'command': p.command,
               'startedAt': p.startedAt.toIso8601String(),
               'appRunId': p.appRunId,
+              if (p.jobName != null) 'jobName': p.jobName,
             },
         ],
       };

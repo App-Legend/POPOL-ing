@@ -2,6 +2,7 @@
 /// `import 'package:ppoling_runner/runner.dart' as runner;`
 library;
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/widgets.dart';
@@ -29,11 +30,12 @@ void register(AppRegistry app) {
     ports: () => app.read<PortProbe>(),
     http: () => app.read<HttpProbe>(),
     runtime: () => app.read<RuntimeQuery>(),
-    processes: ProcessLauncher.forPlatform(),
+    processes: ProcessLauncher.forPlatform(relay: relayPath()),
     logs: logs,
     store: RuntimeStore(() async => File('${await data()}${Platform.pathSeparator}runtime.json')),
   );
   app.provide<Orchestrator>(orchestrator);
+  unawaited(orchestrator.recover()); // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다
   app.provide<RuntimeQuery>(RunnerRuntimeQuery(
     processes: () => orchestrator.liveProcesses,
     launcher: () => app.read<ItemLauncher>(),
@@ -61,3 +63,7 @@ void register(AppRegistry app) {
             launcher: app.read<ItemLauncher>(),
           ));
 }
+
+/// 앱에 함께 넣은 중계 실행 파일. 앱 실행 파일과 같은 폴더에 있다(macOS 는 `앱.app/Contents/MacOS/`).
+String relayPath() =>
+    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}ppoling-relay${Platform.isWindows ? '.exe' : ''}';

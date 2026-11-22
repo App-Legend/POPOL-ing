@@ -45,7 +45,7 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           cache: true
       - run: flutter pub get
-      - run: flutter test test/windows_process_launcher_test.dart test/windows_command_test.dart
+      - run: flutter test test/windows_process_launcher_test.dart test/windows_command_test.dart test/relay_test.dart
 
   build:
     name: ${{ matrix.target }} 빌드

@@ -55,6 +55,20 @@ void main() {
     expect(read.command, ['npm', 'run', 'dev']);
   });
 
+  test('jobName 을 저장하고 다시 읽는다', () async {
+    final s = store();
+    await s.putProcess(ProcessRecord(
+        item: api, pid: 1, pgid: 1, command: const ['a'], startedAt: DateTime(2026, 11, 22), appRunId: 'r', jobName: 'ppoling-1-2'));
+    expect((await store().processes()).single.jobName, 'ppoling-1-2');
+  });
+
+  test('jobName 이 없는 예전 기록도 읽는다', () async {
+    file.writeAsStringSync(
+        '{"lastRuns":[],"processes":[{"projectId":"p","serviceId":"api","pid":1,"pgid":1,"command":["a"],"startedAt":"2026-11-18T00:00:00.000","appRunId":"old"}]}');
+    final read = (await store().processes()).single;
+    expect((read.pid, read.jobName), (1, null));
+  });
+
   test('파일이 깨져 있으면 빈 기록으로 시작하고, 다음 저장에서 고친다', () async {
     file.writeAsStringSync('{깨진');
     final s = store();

@@ -5,7 +5,10 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
+import 'package:ppoling_runner/src/process/process_launcher.dart';
 import 'package:ppoling_runner/src/process/shell_path.dart';
+
+import 'support/relay_binary.dart';
 
 /// [body] 를 실행하는 가짜 셸 스크립트를 만든다.
 String fakeShell(String body) {
@@ -17,6 +20,8 @@ String fakeShell(String body) {
 }
 
 void main() {
+  late String relay;
+  setUpAll(() async => relay = await relayBinary());
   test('로그인 셸의 PATH 를 앞에 두고, 지금 PATH 와 Homebrew 경로를 뒤에 붙인다', () async {
     final shell = fakeShell(r'printf "noise from .zshrc\n__PPOLING_PATH__/nvm/bin:/usr/bin__PPOLING_PATH__\n"');
     final path = await loginShellPath(environment: {'SHELL': shell, 'PATH': '/usr/bin:/bin'});
@@ -46,11 +51,13 @@ void main() {
     final tool = File('${dir.path}/ppoling-hello')..writeAsStringSync('#!/bin/sh\necho hello from tool\n');
     Process.runSync('chmod', ['+x', tool.path]);
 
-    final launcher = PosixProcessLauncher(searchPath: () async => '${dir.path}:/usr/bin:/bin');
-    final found = await launcher.start(['ppoling-hello'], workingDirectory: dir.path);
+    final launcher = PosixProcessLauncher(relay: relay, searchPath: () async => '${dir.path}:/usr/bin:/bin');
+    final log = LogTarget(File('${dir.path}/s.log'));
+    final found = await launcher.start(['ppoling-hello'], workingDirectory: dir.path, log: log);
     expect((await found.output.toList()).map((l) => l.text), ['hello from tool']);
 
-    final overridden = await launcher.start(['ppoling-hello'], workingDirectory: dir.path, environment: {'PATH': '/usr/bin:/bin'});
+    final overridden =
+        await launcher.start(['ppoling-hello'], workingDirectory: dir.path, environment: {'PATH': '/usr/bin:/bin'}, log: log);
     await overridden.output.drain<void>();
     expect(await overridden.exitCode, 127);
   });
