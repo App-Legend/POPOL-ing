@@ -126,6 +126,7 @@ class _AiScreenState extends State<AiScreen> {
                   qa: widget.qa!,
                   orchestrator: widget.orchestrator!,
                   checkKey: widget.checkKey,
+                  onKeysChanged: _load, // 카드에서 키를 바꿔도 머리의 키 상태가 맞게
                 ),
     );
   }

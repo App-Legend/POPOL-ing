@@ -14,26 +14,33 @@ const recentLimit = 5;
 const slowFactor = 2;
 const slowMinDelta = Duration(milliseconds: 200);
 
+/// 모양을 알 수 없는 주소 대신 보내는 말.
+const hiddenAddress = '(주소 생략)';
+
 /// 검사한 곳에서 호스트를 빼고 경로만 남긴다. 쿼리·조각도 뺀다(비밀값이 섞일 수 있어서).
 ///
 /// `GET http://localhost:8080/health?token=x` → `GET /health`, `localhost:3306` → `포트 3306`.
+/// 모양을 알 수 없으면 원문을 보내지 않고 [hiddenAddress] 로 바꾼다(예: `http://` 를 빠뜨린 주소).
 String stripHost(String target) {
   final m = RegExp(r'^(?:([A-Z]+)\s+)?(\S+)$').firstMatch(target.trim());
   if (m == null) {
-    return target;
+    return hiddenAddress;
   }
   final method = m[1];
+  String withMethod(String s) => method == null ? s : '$method $s';
   final address = m[2]!;
   final uri = Uri.tryParse(address);
-  if (uri != null && uri.hasScheme && uri.hasAuthority) {
-    final path = uri.path.isEmpty ? '/' : uri.path;
-    return method == null ? path : '$method $path';
+  if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https') && uri.hasAuthority) {
+    return withMethod(uri.path.isEmpty ? '/' : uri.path);
   }
-  final port = RegExp(r'^[^/]+:(\d+)$').firstMatch(address);
+  if (uri != null && address.startsWith('/')) {
+    return withMethod(uri.path);
+  }
+  final port = RegExp(r'^[^/?#]+:(\d+)$').firstMatch(address);
   if (port != null) {
     return '포트 ${port[1]}';
   }
-  return target;
+  return withMethod(hiddenAddress);
 }
 
 /// 화면·보낼 글에 쓰는 판정 라벨.
@@ -220,10 +227,11 @@ List<QaSummarySentence>? parseQaSummary(String reply, QaRun run) {
   return out.isEmpty ? null : out;
 }
 
-/// 근거 칸. `{이름} · {값} · {HH:mm}`. 값은 응답 코드 → 실패 이유 → 응답 시간 → 판정 라벨 중 있는 것 하나.
+/// 근거 칸. `{이름} · {판정} · {값} · {HH:mm}`. 값은 응답 코드 → 실패 이유 → 응답 시간 중 있는 것 하나(없으면 뺀다).
+/// 판정을 넣는 이유: AI 문장이 판정과 다르게 말해도 바로 옆에 실제 판정이 보이게.
 String evidenceLabel(QaResult r) {
-  final value = r.statusCode?.toString() ?? r.failureReason ?? (r.elapsed != null ? '${r.elapsed!.inMilliseconds}ms' : qaStatusLabel(r.status));
-  return '${r.name} · $value · ${_hm(r.checkedAt)}';
+  final value = r.statusCode?.toString() ?? r.failureReason ?? (r.elapsed != null ? '${r.elapsed!.inMilliseconds}ms' : null);
+  return [r.name, qaStatusLabel(r.status), ?value, _hm(r.checkedAt)].join(' · ');
 }
 
 String _two(int n) => n.toString().padLeft(2, '0');

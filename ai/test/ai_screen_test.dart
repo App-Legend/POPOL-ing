@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ppoling_ai/ai.dart';
 import 'package:ppoling_ai/src/ai_screen.dart';
+import 'package:ppoling_core/contracts.dart';
 import 'package:ppoling_core/fakes.dart';
 import 'package:ppoling_core/ui.dart';
 
@@ -161,6 +162,39 @@ void main() {
       expect(btn('AI 요약'), findsOneWidget);
     });
 
+    testWidgets('카드에서 키를 넣으면 화면 위쪽 키 상태도 바뀐다', (tester) async {
+      await qa.runChecks('my-team-project');
+      final keys = MemoryApiKeyStore();
+      tester.view.physicalSize = const Size(1280, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: buildTheme(),
+        home: AiScreen(
+          keys: keys,
+          client: _StoreClient(keys),
+          projectId: 'my-team-project',
+          qa: qa,
+          orchestrator: FakeOrchestrator(projects),
+          clock: () => checkedAt,
+        ),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(StatusChip, 'API 키 필요'), findsOneWidget);
+
+      final panelKeyButton = find.descendant(of: find.byType(QaSummaryPanel), matching: btn('키 입력'));
+      expect(panelKeyButton, findsOneWidget);
+      await tester.tap(panelKeyButton);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.new-key-1234wxyz');
+      await tester.tap(btn('저장'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(StatusChip, 'API 키 입력됨'), findsOneWidget);
+      expect(find.text(noKeyNotice), findsNothing);
+      expect(btn('AI 요약'), findsOneWidget);
+    });
+
     testWidgets('최근 검사가 오늘이 아니면 날짜로 기준을 보여 준다', (tester) async {
       await qa.runChecks('my-team-project');
       await openWithProject(tester, projectId: 'my-team-project', now: DateTime(2026, 11, 23, 9));
@@ -168,6 +202,22 @@ void main() {
       expect(btn('AI 요약'), findsOneWidget);
     });
   });
+}
+
+/// 키가 있는지를 저장소에서 읽는 가짜 AI(진짜 Gemini 연결처럼).
+class _StoreClient implements LlmClient {
+  _StoreClient(this.keys);
+
+  final ApiKeyStore keys;
+
+  @override
+  String get modelName => 'store-model';
+
+  @override
+  Future<bool> isConfigured() async => await keys.read() != null;
+
+  @override
+  Future<String> complete(String prompt, {String? system}) async => '{}';
 }
 
 /// OS 보안 저장소를 쓸 수 없는 컴퓨터.

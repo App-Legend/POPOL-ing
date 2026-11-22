@@ -32,6 +32,38 @@ class HeldLlmClient implements LlmClient {
   }
 }
 
+/// 키가 있는지를 저장소에서 읽는 가짜 AI(진짜 Gemini 연결처럼). [completeError] 를 주면 보낼 때 그 예외를 던진다.
+class StoreLlmClient implements LlmClient {
+  StoreLlmClient(this.keys, {this.completeError});
+
+  final ApiKeyStore keys;
+  final Object? completeError;
+
+  @override
+  String get modelName => 'store-model';
+
+  @override
+  Future<bool> isConfigured() async => await keys.read() != null;
+
+  @override
+  Future<String> complete(String prompt, {String? system}) async {
+    if (completeError case final e?) throw e;
+    return failedReply;
+  }
+}
+
+/// OS 보안 저장소를 쓸 수 없는 컴퓨터.
+class BrokenStore implements ApiKeyStore {
+  @override
+  Future<String?> read() async => throw StateError('keychain locked');
+
+  @override
+  Future<void> write(String key) async => throw StateError('keychain locked');
+
+  @override
+  Future<void> delete() async => throw StateError('keychain locked');
+}
+
 class Setup {
   Setup({Set<String> failing = const {'API 헬스'}})
       : projects = FakeProjectRepository.withSamples(),
@@ -121,7 +153,7 @@ void main() {
     await summarize(tester);
 
     expect(find.text('API 헬스가 괜찮아요.'), findsOneWidget);
-    expect(find.text('근거  API 헬스 · 연결 거부 · 14:05'), findsOneWidget);
+    expect(find.text('근거  API 헬스 · 실패 · 연결 거부 · 14:05'), findsOneWidget, reason: 'AI 가 괜찮다고 써도 근거에 실제 판정');
     expect(find.widgetWithText(StatusChip, '실패 · API 헬스'), findsOneWidget);
     expect(find.widgetWithText(StatusChip, '설정 필요 · 관리자 페이지'), findsOneWidget);
     expect(find.text('요약 완료 · fake-model'), findsOneWidget);
@@ -222,6 +254,56 @@ void main() {
     await summarize(tester);
     expect(ai.sent.single, isNot(contains('[마지막 전체 실행]')));
     expect(find.text('API 헬스가 괜찮아요.'), findsOneWidget);
+  });
+
+  testWidgets('보안 저장소를 읽지 못하면 빈 카드 대신 그렇게 알리고 [다시 시도]', (tester) async {
+    final s = Setup();
+    final run = await s.qa.runChecks('my-team-project');
+    final keys = BrokenStore();
+    await show(tester, run, StoreLlmClient(keys), s, keys: keys);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('이 컴퓨터의 보안 저장소에서 API 키를 읽지 못했어요.'), findsOneWidget);
+    expect(btn('다시 시도'), findsOneWidget);
+    expect(btn('AI 요약'), findsNothing);
+  });
+
+  testWidgets('보낸 뒤 예상 못 한 오류가 나도 분석 중에 멈추지 않고 연결 오류로 안내', (tester) async {
+    final s = Setup();
+    final run = await s.qa.runChecks('my-team-project');
+    final keys = MemoryApiKeyStore(storedKey);
+    await show(tester, run, StoreLlmClient(keys, completeError: StateError('boom')), s, keys: keys);
+    await summarize(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text(working), findsNothing);
+    expect(find.text(llmErrorText(LlmFailure.network).title), findsOneWidget);
+    expect(btn('다시 시도'), findsOneWidget);
+  });
+
+  testWidgets('패널에서 키를 바꾸면 onKeysChanged 로 알린다', (tester) async {
+    final s = Setup();
+    final run = await s.qa.runChecks('my-team-project');
+    final keys = MemoryApiKeyStore();
+    var changed = 0;
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(
+        body: QaSummaryPanel(run: run, client: StoreLlmClient(keys), keys: keys, qa: s.qa, orchestrator: s.orchestrator, onKeysChanged: () => changed++),
+      ),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(btn('키 입력'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.new-key-1234wxyz');
+    await tester.tap(btn('저장'));
+    await tester.pumpAndSettle();
+    expect(changed, 1);
+    expect(btn('AI 요약'), findsOneWidget);
   });
 
   testWidgets('답을 기다리다 화면을 떠나도 오류가 없다', (tester) async {

@@ -62,6 +62,17 @@ void main() {
       expect(stripHost('localhost:3306'), '포트 3306');
       expect(stripHost('db.internal:5432'), '포트 5432');
     });
+
+    test('모르는 모양의 주소는 원문 대신 주소 생략으로 보낸다', () {
+      expect(stripHost('GET localhost:8080/health?sig=abc'), 'GET (주소 생략)', reason: 'http:// 를 빠뜨린 주소');
+      expect(stripHost('GET http:/host/x?sig=1'), 'GET (주소 생략)');
+      expect(stripHost('GET http://host/a b?sig=1'), '(주소 생략)', reason: '공백이 든 주소');
+      expect(stripHost('host/x?sig=1'), '(주소 생략)');
+    });
+
+    test('경로만 있는 주소는 쿼리를 빼고 그대로 쓴다', () {
+      expect(stripHost('GET /health?sig=abc'), 'GET /health');
+    });
   });
 
   group('prompt', () {
@@ -198,19 +209,19 @@ void main() {
   group('evidenceLabel', () {
     final at1402 = DateTime(2026, 11, 22, 14, 2);
 
-    test('응답 코드가 있으면 코드', () {
-      expect(evidenceLabel(r('API 헬스', QaStatus.failed, at1402, target: apiUrl, code: 503, ms: 120)), 'API 헬스 · 503 · 14:02');
+    test('판정 다음에 응답 코드', () {
+      expect(evidenceLabel(r('API 헬스', QaStatus.failed, at1402, target: apiUrl, code: 503, ms: 120)), 'API 헬스 · 실패 · 503 · 14:02');
     });
 
     test('코드가 없으면 실패 이유', () {
-      expect(evidenceLabel(r('프론트 메인', QaStatus.failed, nowAt, target: webUrl, reason: '연결 거부')), '프론트 메인 · 연결 거부 · 14:05');
+      expect(evidenceLabel(r('프론트 메인', QaStatus.failed, nowAt, target: webUrl, reason: '연결 거부')), '프론트 메인 · 실패 · 연결 거부 · 14:05');
     });
 
     test('코드·이유가 없으면 응답 시간', () {
-      expect(evidenceLabel(r('DB 포트', QaStatus.passed, nowAt, target: 'localhost:3306', ms: 84)), 'DB 포트 · 84ms · 14:05');
+      expect(evidenceLabel(r('DB 포트', QaStatus.passed, nowAt, target: 'localhost:3306', ms: 84)), 'DB 포트 · 통과 · 84ms · 14:05');
     });
 
-    test('아무것도 없으면 판정 라벨', () {
+    test('값이 없으면 판정과 시각만', () {
       expect(evidenceLabel(r('관리자 페이지', QaStatus.needsSetup, nowAt)), '관리자 페이지 · 설정 필요 · 14:05');
     });
   });

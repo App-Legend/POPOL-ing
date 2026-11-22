@@ -28,6 +28,7 @@ class QaSummaryPanel extends StatefulWidget {
     required this.qa,
     required this.orchestrator,
     this.checkKey,
+    this.onKeysChanged,
   });
 
   /// 요약할 검사.
@@ -46,11 +47,14 @@ class QaSummaryPanel extends StatefulWidget {
   /// 키 입력 창의 [연결 확인]. null 이면 버튼이 없다.
   final ApiKeyCheck? checkKey;
 
+  /// 패널의 [키 입력]·[키 바꾸기]로 키를 저장하거나 지웠을 때. 화면 머리의 키 상태를 다시 읽게 한다.
+  final VoidCallback? onKeysChanged;
+
   @override
   State<QaSummaryPanel> createState() => _QaSummaryPanelState();
 }
 
-enum _Phase { loading, empty, allPassed, missingKey, ready, working, done, failed, unreadable, cancelled }
+enum _Phase { loading, empty, allPassed, missingKey, keyUnreadable, ready, working, done, failed, unreadable, cancelled }
 
 class _QaSummaryPanelState extends State<QaSummaryPanel> {
   _Phase _phase = _Phase.loading;
@@ -116,7 +120,12 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
   }
 
   Future<void> _checkKey() async {
-    final configured = await widget.client.isConfigured();
+    final bool configured;
+    try {
+      configured = await widget.client.isConfigured();
+    } catch (_) {
+      return _set(_Phase.keyUnreadable); // OS 보안 저장소를 못 읽음(잠김 등). 빈 카드로 멈추지 않게 알린다.
+    }
     if (!configured) {
       _failure = LlmFailure.missingKey;
     }
@@ -127,6 +136,7 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
     final input = _input!;
     final attempt = ++_attempt;
     final before = _phase;
+    var confirmed = false;
     try {
       final reply = await AiSender(widget.client, keys: widget.keys).send(
         context,
@@ -135,6 +145,7 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
         system: qaSummarySystem,
         notes: const [_sendNote],
         onConfirmed: () {
+          confirmed = true;
           if (attempt == _attempt) _set(_Phase.working);
         },
       );
@@ -156,6 +167,17 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
       }
       _failure = e.failure;
       _set(e.failure == LlmFailure.missingKey ? _Phase.missingKey : _Phase.failed);
+    } catch (_) {
+      // LlmException 이 아닌 오류. 보내기 전이면 키 저장소 문제, 보낸 뒤면 연결 문제로 안내한다("분석 중"에 멈추지 않게).
+      if (attempt != _attempt) {
+        return;
+      }
+      if (confirmed) {
+        _failure = LlmFailure.network;
+        _set(_Phase.failed);
+      } else {
+        _set(_Phase.keyUnreadable);
+      }
     }
   }
 
@@ -166,11 +188,15 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
 
   Future<void> _openKeys() async {
     final messenger = ScaffoldMessenger.maybeOf(context);
+    final ApiKeyChange? change;
     try {
-      await showApiKeyDialog(context, widget.keys, check: widget.checkKey);
+      change = await showApiKeyDialog(context, widget.keys, check: widget.checkKey);
     } catch (_) {
       messenger?.showSnackBar(const SnackBar(content: Text('보안 저장소를 쓰지 못해 키 입력 창을 열지 못했어요.')));
       return;
+    }
+    if (change != null) {
+      widget.onKeysChanged?.call();
     }
     await _checkKey();
   }
@@ -199,6 +225,7 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
         ],
       _Phase.working => [const Text(_working, style: body), action('취소', _cancel)],
       _Phase.unreadable => [const Text('AI 답을 읽지 못했어요.', style: body), action('다시 요약', _send)],
+      _Phase.keyUnreadable => [const Text('이 컴퓨터의 보안 저장소에서 API 키를 읽지 못했어요.', style: body), action('다시 시도', _checkKey)],
       _Phase.missingKey || _Phase.failed => _error(llmErrorText(_failure!), body),
       _Phase.done => _done(body, muted, action),
     };
