@@ -641,6 +641,86 @@ void main() {
       expect(after.stateOf(const ItemRef(projectId: 'demo', serviceId: 'api')), ItemState.stopped);
     });
   });
+
+  group('앱 종료 (FR-12)', () {
+    const api = ItemRef(projectId: 'demo', serviceId: 'api');
+    const db = ItemRef(projectId: 'demo', serviceId: 'db');
+
+    test('떠 있는 것만 알려 주고 모두 멈춘다 (원격 제외)', () async {
+      final o = orchestrator(demo(tempProject()));
+      expect(await o.stillUp(), isEmpty);
+      await o.runAll('demo');
+      expect((await o.stillUp()).map((i) => i.serviceId), unorderedEquals(['db', 'api', 'web']));
+      expect(await o.stopEverything(), isEmpty);
+      expect(await o.stillUp(), isEmpty);
+      expect(o.liveProcesses, isEmpty);
+    });
+
+    test('준비 시간을 넘겨 실패했지만 살아 있는 프로세스도 포함한다', () async {
+      const slow = ProcessService(
+          id: 'slow', command: ['sleep', '30'], ready: LogReady(pattern: 'never', timeout: _ms300));
+      const x = ItemRef(projectId: 'demo', serviceId: 'slow');
+      final o = orchestrator(demo(tempProject(), extra: const [slow]));
+      expect((await o.start(x)).outcome, ItemOutcome.failed);
+      expect(await o.stillUp(), [x]);
+      expect(await o.stopEverything(), isEmpty);
+      expect(o.liveProcesses, isEmpty);
+    });
+
+    test('시작하는 중이면 뒤늦게 뜬 것까지 정리된 뒤에 끝난다', () async {
+      late _SlowStartLauncher launcher;
+      final o = orchestrator(demo(tempProject()), launcher: (repo) => launcher = _SlowStartLauncher(repo));
+      unawaited(o.start(db));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(await o.stillUp(), [db]);
+      expect(await o.stopEverything(), isEmpty);
+      expect(launcher.calls.last, 'stop');
+      expect(launcher.calls, contains('start'));
+    });
+
+    test('실행 기록을 파일에서 지운 뒤에 끝난다', () async {
+      final dir = Directory.systemTemp.createTempSync('popoling_exit_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/runtime.json');
+      final store = RuntimeStore(() async => file);
+      final o = orchestrator(demo(tempProject()), store: store);
+      await o.start(api);
+      for (var i = 0; i < 50 && !file.existsSync(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(file.readAsStringSync(), contains('"api"'));
+      expect(await o.stopEverything(), isEmpty);
+      expect(file.readAsStringSync(), isNot(contains('"api"'))); // 바로 앱이 꺼져도 남지 않는다
+    });
+
+    test('이미 멈추는 중인 항목은 끝나길 기다린다', () async {
+      final o = orchestrator(demo(tempProject()));
+      await o.start(api);
+      final stop = o.stop(api);
+      expect(await o.stopEverything(), isEmpty);
+      expect((await stop).outcome, ItemOutcome.ok);
+    });
+
+    test('멈추지 못한 항목을 이유와 함께 돌려준다', () async {
+      final o = orchestrator(demo(tempProject()), launcher: _BrokenStopLauncher.new);
+      await o.start(db);
+      final failed = await o.stopEverything();
+      expect(failed.single.item, db);
+      expect(failed.single.reason, contains('docker 응답 없음'));
+    });
+
+    test('확인 불가 항목은 묻지도 멈추지도 않는다', () async {
+      const x = ItemRef(projectId: 'demo', serviceId: 'x');
+      final store = tempStore();
+      await store.putProcess(ProcessRecord(
+          item: x, pid: 4242, pgid: 4242, command: const ['sleep'], startedAt: DateTime(2026, 11, 22), appRunId: 'old'));
+      final o = orchestrator(demo(tempProject()), store: store, processes: _AttachOnly(const Unverified()));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.unknown);
+      expect(await o.stillUp(), isEmpty);
+      expect(await o.stopEverything(), isEmpty);
+    });
+  });
 }
 
 /// [attach] 결과만 정해 주는 실행기. 띄우지는 않는다.

@@ -60,6 +60,11 @@ class RunnerOrchestrator implements Orchestrator {
   final _launched = <ItemRef, ServiceConfig>{};
   final _runAlls = <String, Future<RunSummary>>{};
 
+  Future<void>? _recovery;
+
+  /// 아직 정리가 끝나지 않은 시작. 멈춰서 [_ups] 에서 빠진 것도 들어 있다.
+  final _inFlight = <Future<void>>{};
+
   /// 프로젝트별 전체 종료 횟수. 전체 실행은 시작 때 값과 달라지면 남은 항목을 띄우지 않는다.
   final _stopAlls = <String, int>{};
 
@@ -81,7 +86,9 @@ class RunnerOrchestrator implements Orchestrator {
   ///
   /// 내가 띄운 중계라고 증명된 프로세스만 되살린다. 살아 있지만 증명할 수 없으면 확인 불가로 두고 멈추지 않는다.
   /// 예외를 던지지 않는다.
-  Future<void> recover() async {
+  Future<void> recover() => _recovery ??= _recover();
+
+  Future<void> _recover() async {
     for (final r in await store.processes()) {
       if (r.appRunId == store.appRunId) continue;
       switch (await processes.attach(pid: r.pid, startedAt: r.startedAt, jobName: r.jobName)) {
@@ -235,6 +242,10 @@ class RunnerOrchestrator implements Orchestrator {
     up = _upOnce(project, service, item).whenComplete(() {
       if (identical(_ups[item], up)) _ups.remove(item);
     });
+    if (service is! RemoteService) {
+      _inFlight.add(up);
+      unawaited(up.whenComplete(() => _inFlight.remove(up)));
+    }
     return _ups[item] = up;
   }
 
@@ -497,6 +508,49 @@ class RunnerOrchestrator implements Orchestrator {
     } on Exception {
       return false;
     }
+  }
+
+  // ---- 앱 종료 (FR-12) ----
+
+  /// 지금 떠 있거나 시작하는 중인, 내가 멈출 수 있는 항목. 실패했지만 살아 있는 것도 들어 있다.
+  Future<List<ItemRef>> stillUp() async {
+    await _recovery?.timeout(const Duration(seconds: 3), onTimeout: () {}); // 앱을 켜자마자 닫을 때
+    final up = <ItemRef>[];
+    for (final MapEntry(key: item, value: service) in [..._launched.entries]) {
+      final alive = switch (stateOf(item)) {
+        ItemState.starting || ItemState.running || ItemState.ready || ItemState.stopping => true,
+        ItemState.failed when service is ComposeService =>
+          await _composeLeftUp(item.projectId, service).timeout(const Duration(seconds: 3), onTimeout: () => true),
+        _ => false,
+      };
+      if (alive || _running.containsKey(item) || _starting.containsKey(item)) up.add(item);
+    }
+    return up;
+  }
+
+  /// 떠 있는 항목이 있는 프로젝트를 모두 전체 종료하고, 멈추지 못한 항목만 돌려준다.
+  /// 시작하다 끊긴 것이 뒤늦게 뜨면 그 정리까지 기다린다. 먼저 앱이 꺼지면 기록 없는 프로세스가 남는다.
+  Future<List<ItemResult>> stopEverything() async {
+    while (_stopping.isNotEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    final failed = <ItemResult>[];
+    final up = await stillUp();
+    await Future.wait([
+      for (final id in {for (final i in up) i.projectId})
+        stopAll(id).then(
+          (s) => failed.addAll(s.items.where((r) => r.outcome == ItemOutcome.failed && stateOf(r.item) != ItemState.unknown)),
+          onError: (Object e) => failed.addAll([
+            for (final i in up)
+              if (i.projectId == id)
+                ItemResult(
+                    item: i, outcome: ItemOutcome.failed, reason: e is PopolingException ? e.message : '멈추지 못했어요: $e'),
+          ]),
+        ),
+    ]);
+    await Future.wait([..._inFlight]);
+    await store.flush(); // 지운 기록이 남으면 다음에 '확인 불가'로 보일 수 있다
+    return failed;
   }
 
   // ---- 도우미 ----
