@@ -138,6 +138,7 @@ Map<String, dynamic> _summaryToJson(RunSummary s) => {
       'projectId': s.projectId,
       'startedAt': s.startedAt.toIso8601String(),
       'finishedAt': s.finishedAt.toIso8601String(),
+      if (s.pull case final pull?) 'pull': {'outcome': pull.outcome.name, 'message': pull.message},
       'items': [
         for (final r in s.items)
           {
@@ -154,6 +155,11 @@ RunSummary _summaryFromJson(Map<String, dynamic> j) => RunSummary(
       projectId: j['projectId'] as String,
       startedAt: DateTime.parse(j['startedAt'] as String),
       finishedAt: DateTime.parse(j['finishedAt'] as String),
+      pull: switch (j['pull']) {
+        final Map<String, dynamic> p =>
+          PullResult(outcome: ItemOutcome.values.byName(p['outcome'] as String), message: p['message'] as String),
+        _ => null,
+      },
       items: [
         for (final r in (j['items'] as List).cast<Map<String, dynamic>>())
           ItemResult(

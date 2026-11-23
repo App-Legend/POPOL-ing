@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
+import '../git/git_adapter.dart';
 import 'item_status.dart';
 
 /// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다.
 ///
 /// 전체 실행·종료(FR-04·05), 항목 시작·중지(FR-03), 포트 주인이 내 다른 항목이면 [그 항목 중지](AT-17).
-// Git 표시(FR-19)·환경 배너(EnvBanner)·최근 로그(LogPreview)는 4주차에 여기 더한다.
+// 환경 배너(EnvBanner)·최근 로그(LogPreview)는 4주차에 여기 더한다.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -18,6 +19,7 @@ class DashboardScreen extends StatefulWidget {
     required this.runner,
     required this.ports,
     required this.runtime,
+    this.git,
   });
 
   final String projectId;
@@ -25,6 +27,7 @@ class DashboardScreen extends StatefulWidget {
   final Orchestrator runner;
   final PortProbe ports;
   final RuntimeQuery runtime;
+  final GitAdapter? git;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -34,6 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Project? _project;
   String? _loadError;
   RunSummary? _summary;
+  GitStatus? _git;
   final _reasons = <ItemRef, String?>{};
 
   /// 포트 사용 중인 항목 → 그 포트를 쓰는 내 다른 항목.
@@ -44,7 +48,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final StreamSubscription<List<Project>> _projectSub;
   late final StreamSubscription<RunEvent> _eventSub;
 
+  var _gitLoaded = false;
+
   String get _id => widget.projectId;
+
+  /// 지금 아는 상태를 먼저 보여 주고, [fetch] 면 원격을 확인한 뒤 다시 보여 준다.
+  Future<void> _loadGit(String folder, {bool fetch = false}) async {
+    Future<void> show() async {
+      final status = await widget.git?.status(folder);
+      if (mounted) setState(() => _git = status);
+    }
+
+    await show();
+    if (fetch && _git != null && await widget.git!.fetch(folder)) await show();
+  }
 
   @override
   void initState() {
@@ -55,6 +72,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _project = p;
         _loadError = p == null ? '목록에 없는 프로젝트예요: $_id' : null;
       });
+      if (p != null && !_gitLoaded) {
+        _gitLoaded = true;
+        unawaited(_loadGit(p.folderPath, fetch: true));
+      }
     }, onError: (Object e) => setState(() => _loadError = errorText(e)));
     _eventSub = widget.runner.events.listen((e) {
       if (e case ItemStateChanged(:final item, :final state, :final reason) when item.projectId == _id) {
@@ -95,7 +116,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _runAll() => _run('all', () async {
         final s = await widget.runner.runAll(_id);
+        if (!mounted) return;
         setState(() => _summary = s);
+        if (_project case final p?) unawaited(_loadGit(p.folderPath));
       });
 
   Future<void> _stopAll() => _run('all', () async {
@@ -160,6 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
               Text(p.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
               Text(p.folderPath, style: mono.copyWith(fontSize: 13, color: C.muted)),
+              if (_git case final git?) _gitLine(git),
             ]),
           ),
           Wrap(spacing: 8, runSpacing: 8, children: [
@@ -200,16 +224,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: _summary == null
               ? const Text('아직 전체 실행 기록이 없어요.', style: TextStyle(color: C.muted))
               : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
+                  if (_summary!.pull case final pull?) _resultRow(pull.outcome, 'Git pull — ${pull.message}'),
                   for (final r in _summary!.items)
-                    Row(spacing: 8, children: [
-                      SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(r.outcome))),
-                      Expanded(child: Text('${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}', style: const TextStyle(fontSize: 14))),
-                    ]),
+                    _resultRow(r.outcome, '${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}'),
                 ]),
         ),
       ],
     );
   }
+
+  static Widget _resultRow(ItemOutcome outcome, String text) => Row(spacing: 8, children: [
+        SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(outcome))),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+      ]);
+
+  static Widget _gitLine(GitStatus git) => Wrap(
+        spacing: 16,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+            const Icon(Icons.call_split, size: 14, color: C.text2, semanticLabel: 'Git 브랜치'),
+            const Text('브랜치', style: TextStyle(fontSize: 13, color: C.text2)),
+            Flexible(child: Text(git.branch ?? '없음', overflow: TextOverflow.ellipsis, style: mono.copyWith(fontSize: 13, fontWeight: FontWeight.w500))),
+          ]),
+          if (git.changed > 0) Text('커밋하지 않은 변경 ${git.changed}개', style: const TextStyle(fontSize: 13, color: C.text2)),
+          if (git.behind > 0) Text('원격보다 ${git.behind}커밋 뒤처짐', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: C.warn.$2)),
+        ],
+      );
 
   Widget _itemRow(ServiceConfig s) {
     final item = _ref(s);

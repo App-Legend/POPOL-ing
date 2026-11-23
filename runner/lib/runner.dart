@@ -9,6 +9,7 @@ import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
+import 'src/git/git_adapter.dart';
 import 'src/log/log_store.dart';
 import 'src/log/runner_log_excerpt.dart';
 import 'src/orchestrator/runner_orchestrator.dart';
@@ -26,6 +27,7 @@ import 'src/screens/exit_guard.dart';
 void register(AppRegistry app) {
   Future<String> data() async => (await getApplicationSupportDirectory()).path;
   final logs = LogStore(() async => Directory('${await data()}${Platform.pathSeparator}logs'));
+  final git = GitAdapter(environment: toolEnvironment);
   final orchestrator = RunnerOrchestrator(
     projects: () => app.read<ProjectRepository>(),
     launcher: () => app.read<ItemLauncher>(),
@@ -35,6 +37,7 @@ void register(AppRegistry app) {
     processes: ProcessLauncher.forPlatform(relay: relayPath()),
     logs: logs,
     store: RuntimeStore(() async => File('${await data()}${Platform.pathSeparator}runtime.json')),
+    git: git,
   );
   app.provide<Orchestrator>(orchestrator);
   unawaited(orchestrator.recover()); // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다
@@ -53,6 +56,7 @@ void register(AppRegistry app) {
             runner: app.read<Orchestrator>(),
             ports: app.read<PortProbe>(),
             runtime: app.read<RuntimeQuery>(),
+            git: git,
           ));
   app.route(
       '/detail',

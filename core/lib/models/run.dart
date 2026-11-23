@@ -62,9 +62,21 @@ class ItemResult {
   final bool forced;
 }
 
+/// 전체 실행 전에 최신 코드를 받은(Git pull) 결과(FR-19). 받지 못해도 실행은 계속한다.
+class PullResult {
+  const PullResult({required this.outcome, required this.message});
+
+  /// [ItemOutcome.ok] 면 받았거나 받을 새 커밋이 없음, [ItemOutcome.skipped] 면 받지 않았다.
+  final ItemOutcome outcome;
+
+  /// 화면에 그대로 보여줄 수 있는 문장.
+  final String message;
+}
+
 /// 전체 실행 또는 전체 종료 한 번의 결과.
 class RunSummary {
-  RunSummary({required this.projectId, required this.startedAt, required this.finishedAt, required List<ItemResult> items})
+  RunSummary(
+      {required this.projectId, required this.startedAt, required this.finishedAt, required List<ItemResult> items, this.pull})
       : items = List.unmodifiable(items);
 
   final String projectId;
@@ -74,6 +86,9 @@ class RunSummary {
   /// 처리한 순서대로. 전체 종료에서 원격 항목은 건드리지 않으므로 들어가지 않는다.
   final List<ItemResult> items;
 
-  /// 모든 항목이 성공했다.
+  /// 실행 전에 최신 코드를 받은 결과. 받기를 껐거나 Git 저장소가 아니거나 전체 종료면 null.
+  final PullResult? pull;
+
+  /// 모든 항목이 성공했다. [pull] 은 따지지 않는다.
   bool get succeeded => items.every((r) => r.outcome == ItemOutcome.ok);
 }

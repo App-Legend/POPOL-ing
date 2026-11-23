@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/fakes.dart';
+import 'package:popoling_runner/src/git/git_adapter.dart';
 import 'package:popoling_runner/src/log/log_store.dart';
 import 'package:popoling_runner/src/screens/dashboard_screen.dart';
 import 'package:popoling_runner/src/screens/detail_screen.dart';
@@ -35,6 +36,24 @@ class _PortBusyOrchestrator extends FakeOrchestrator {
   }
 }
 
+/// fetch 하면 [remote] 로 바뀌는 Git 상태.
+class _FakeGit extends GitAdapter {
+  _FakeGit(this.current, {this.remote});
+
+  GitStatus? current;
+  final GitStatus? remote;
+
+  @override
+  Future<GitStatus?> status(String folder) async => current;
+
+  @override
+  Future<bool> fetch(String folder) async {
+    if (remote == null) return false;
+    current = remote;
+    return true;
+  }
+}
+
 Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
   tester.view.physicalSize = const Size(1280, 1600);
   tester.view.devicePixelRatio = 1;
@@ -48,12 +67,13 @@ void main() {
     late FakeProjectRepository projects;
     setUp(() => projects = FakeProjectRepository.withSamples());
 
-    DashboardScreen dashboard(Orchestrator runner, {PortProbe? ports, RuntimeQuery? runtime}) => DashboardScreen(
+    DashboardScreen dashboard(Orchestrator runner, {PortProbe? ports, RuntimeQuery? runtime, GitAdapter? git}) => DashboardScreen(
           projectId: 'my-team-project',
           projects: projects,
           runner: runner,
           ports: ports ?? FakePortProbe(),
           runtime: runtime ?? FakeRuntimeQuery(),
+          git: git,
         );
 
     testWidgets('항목을 상태 라벨과 함께 보여 주고, 전체 실행하면 상태와 결과가 바뀐다', (tester) async {
@@ -69,6 +89,25 @@ void main() {
       expect(find.text('준비 완료'), findsNWidgets(3));
       expect(find.text('연결됨'), findsOneWidget);
       expect(find.text('성공'), findsNWidgets(4));
+    });
+
+    testWidgets('Git 상태를 보여 주고 전체 실행 뒤 다시 읽는다 (AT-23)', (tester) async {
+      final git = _FakeGit(const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev'),
+          remote: const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev', behind: 3));
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), git: git));
+      expect(find.text('dev'), findsOneWidget);
+      expect(find.text('커밋하지 않은 변경 2개'), findsOneWidget);
+      expect(find.text('원격보다 3커밋 뒤처짐'), findsOneWidget);
+
+      git.current = const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev');
+      await tester.tap(find.text('전체 실행'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('뒤처짐'), findsNothing);
+    });
+
+    testWidgets('Git 저장소가 아니면 표시를 숨긴다', (tester) async {
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), git: _FakeGit(null)));
+      expect(find.text('브랜치'), findsNothing);
     });
 
     testWidgets('의존 항목이 실패하면 결과에 건너뜀을 보여 준다 (AT-04)', (tester) async {
