@@ -69,15 +69,18 @@ void _registerMockups(AppRegistry app) {
 }
 
 class PopolingApp extends StatelessWidget {
-  const PopolingApp({super.key, required this.registry});
+  PopolingApp({super.key, required this.registry});
 
   final Registry registry;
+  final _navigator = GlobalKey<NavigatorState>();
 
   @override
   Widget build(BuildContext context) => MaterialApp(
         title: '포폴링',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
+        navigatorKey: _navigator,
+        builder: (_, child) => runner.exitGuard(registry, _navigator, child!),
         routes: registry.routes,
       );
 }
