@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'docker_cli.dart';
 
@@ -25,7 +25,7 @@ class DockerItemLauncher implements ItemLauncher {
   final DockerCli _docker;
 
   /// Compose 프로젝트 이름의 앞부분. 사용자가 직접 띄운 compose 와 섞이지 않게 한다(CLAUDE.md).
-  static const projectPrefix = 'ppoling-';
+  static const projectPrefix = 'popoling-';
 
   /// 오류 안내에 붙일 명령 출력 줄 수.
   static const _outputLines = 20;
@@ -119,7 +119,7 @@ class DockerItemLauncher implements ItemLauncher {
     }
   }
 
-  /// 컨테이너의 compose 서비스 이름으로 ppoling.yaml 의 Compose 항목을 찾는다.
+  /// 컨테이너의 compose 서비스 이름으로 popoling.yaml 의 Compose 항목을 찾는다.
   Future<ItemRef?> _itemFor(String projectId, String composeService) async {
     final config = (await _projects().getProject(projectId)).config;
     final items = config?.services.whereType<ComposeService>() ?? const <ComposeService>[];
@@ -150,7 +150,7 @@ class DockerItemLauncher implements ItemLauncher {
     final folder = Directory(project.folderPath).absolute.uri;
     final file = folder.resolve(service.file.replaceAll(r'\', '/'));
     if (!file.path.startsWith(folder.path)) {
-      throw PpolingException('compose 파일이 프로젝트 폴더 밖에 있어요: ${service.file}');
+      throw PopolingException('compose 파일이 프로젝트 폴더 밖에 있어요: ${service.file}');
     }
     return file.toFilePath();
   }
@@ -162,7 +162,7 @@ class DockerItemLauncher implements ItemLauncher {
   }
 }
 
-/// 항목 하나에 대한 `docker compose -p ppoling-<id> -f <file>` 명령.
+/// 항목 하나에 대한 `docker compose -p popoling-<id> -f <file>` 명령.
 class _Compose {
   _Compose(this._docker, this.project, this.service, String file)
       : base = ['compose', '-p', '${DockerItemLauncher.projectPrefix}${project.id}', '-f', file];
@@ -189,7 +189,7 @@ class _Compose {
     return r;
   }
 
-  /// `ppoling-<id>` 프로젝트에 남은 컨테이너가 없는지. 다른 compose 파일로 띄운 항목까지 본다.
+  /// `popoling-<id>` 프로젝트에 남은 컨테이너가 없는지. 다른 compose 파일로 띄운 항목까지 본다.
   Future<bool> projectEmpty() async {
     final r = await _docker.run(['ps', '--all', '--quiet', '--filter', 'label=com.docker.compose.project=${base[2]}']);
     return r.exitCode == 0 && '${r.stdout}'.trim().isEmpty;

@@ -68,10 +68,10 @@ abstract final class SampleProjects {
     ),
   );
 
-  static final ppoling = Project(
-    id: 'ppoling',
-    name: 'ppoling',
-    folderPath: '/projects/ppoling',
+  static final popoling = Project(
+    id: 'popoling',
+    name: 'popoling',
+    folderPath: '/projects/popoling',
     registeredAt: _registeredAt,
     config: const ProjectConfig(
       about: About(summary: '포폴링 데스크톱 앱', stack: ['Flutter']),
@@ -128,5 +128,5 @@ abstract final class SampleProjects {
     config: const ProjectConfig(about: About(stack: ['Python'])),
   );
 
-  static final all = [myTeamProject, ppoling, weatherBot, shopClone, algoStudy];
+  static final all = [myTeamProject, popoling, weatherBot, shopClone, algoStudy];
 }

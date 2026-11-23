@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_catalog/src/catalog_screen.dart';
-import 'package:ppoling_catalog/src/orchestrator_run_info.dart';
-import 'package:ppoling_catalog/src/run_info.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_catalog/src/catalog_screen.dart';
+import 'package:popoling_catalog/src/orchestrator_run_info.dart';
+import 'package:popoling_catalog/src/run_info.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
 
 final now = DateTime(2026, 11, 16, 15);
 
@@ -65,7 +65,7 @@ void main() {
     expect(inCard('my-team-project', find.widgetWithText(Tag, 'Spring Boot')), findsOneWidget);
     expect(inCard('my-team-project', find.text('실행 중 3/3')), findsOneWidget);
     expect(inCard('my-team-project', find.text('마지막 실행 오늘 14:00 · 성공')), findsOneWidget);
-    expect(inCard('ppoling', find.text('마지막 실행 어제 · 성공')), findsOneWidget);
+    expect(inCard('popoling', find.text('마지막 실행 어제 · 성공')), findsOneWidget);
     expect(inCard('weather-bot', find.text('마지막 실행 2026-03-12 · 실패')), findsOneWidget);
     expect(inCard('weather-bot', find.text('오래됨 · 8개월')), findsOneWidget);
     expect(inCard('algo-study', find.text('실행 기록 없음')), findsOneWidget);
@@ -79,12 +79,12 @@ void main() {
 
   testWidgets('AT-13: 오래 방치된 순 정렬', (tester) async {
     await open(tester);
-    expect(shownCards(tester), ['my-team-project', 'ppoling', 'weather-bot', 'shop-clone', 'algo-study']);
+    expect(shownCards(tester), ['my-team-project', 'popoling', 'weather-bot', 'shop-clone', 'algo-study']);
     await tester.tap(find.byKey(const Key('catalog-sort')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('오래 방치된 순').last);
     await tester.pumpAndSettle();
-    expect(shownCards(tester), ['shop-clone', 'weather-bot', 'ppoling', 'my-team-project', 'algo-study']);
+    expect(shownCards(tester), ['shop-clone', 'weather-bot', 'popoling', 'my-team-project', 'algo-study']);
   });
 
   testWidgets('검색 결과가 없으면 안내 문구', (tester) async {
@@ -123,10 +123,10 @@ void main() {
 
   testWidgets('[열기]는 프로젝트 ID 를 넘겨 대시보드로', (tester) async {
     final opened = await open(tester);
-    await tester.tap(inCard('ppoling', find.text('열기')));
+    await tester.tap(inCard('popoling', find.text('열기')));
     await tester.pumpAndSettle();
     expect(opened.route, '/dashboard');
-    expect(opened.arguments, 'ppoling');
+    expect(opened.arguments, 'popoling');
   });
 
   testWidgets('고른 태그가 사라지면 전체로 돌아간다', (tester) async {
@@ -144,10 +144,10 @@ void main() {
   testWidgets('실행 정보가 바뀌면 카드가 바로 바뀐다', (tester) async {
     final runs = FakeRunInfoSource.samples(clock: () => now);
     await open(tester, runs: runs);
-    expect(inCard('ppoling', find.text('중지')), findsOneWidget);
-    runs.update({'ppoling': RunInfo(lastRunAt: now, lastSucceeded: true, running: 1)});
+    expect(inCard('popoling', find.text('중지')), findsOneWidget);
+    runs.update({'popoling': RunInfo(lastRunAt: now, lastSucceeded: true, running: 1)});
     await tester.pumpAndSettle();
-    expect(inCard('ppoling', find.text('실행 중 1/1')), findsOneWidget);
+    expect(inCard('popoling', find.text('실행 중 1/1')), findsOneWidget);
   });
 
   group('카드의 [전체 실행]·[전체 종료]', () {
@@ -170,19 +170,19 @@ void main() {
 
     testWidgets('[전체 실행]을 누르면 실행하고 카드가 실행 중으로 바뀐다', (tester) async {
       await openLive(tester);
-      await tapInCard(tester, 'ppoling', '전체 실행');
-      expect(inCard('ppoling', find.text('실행 중 1/1')), findsOneWidget);
-      expect(inCard('ppoling', find.text('전체 종료')), findsOneWidget);
-      expect(find.text('ppoling: 모두 실행됐어요.'), findsOneWidget);
+      await tapInCard(tester, 'popoling', '전체 실행');
+      expect(inCard('popoling', find.text('실행 중 1/1')), findsOneWidget);
+      expect(inCard('popoling', find.text('전체 종료')), findsOneWidget);
+      expect(find.text('popoling: 모두 실행됐어요.'), findsOneWidget);
     });
 
     testWidgets('[전체 종료]를 누르면 멈추고 다시 [전체 실행]이 나온다', (tester) async {
-      await runner.runAll('ppoling');
+      await runner.runAll('popoling');
       await openLive(tester);
-      await tapInCard(tester, 'ppoling', '전체 종료');
-      expect(inCard('ppoling', find.text('중지')), findsOneWidget);
-      expect(inCard('ppoling', find.text('전체 실행')), findsOneWidget);
-      expect(find.text('ppoling: 모두 멈췄어요.'), findsOneWidget);
+      await tapInCard(tester, 'popoling', '전체 종료');
+      expect(inCard('popoling', find.text('중지')), findsOneWidget);
+      expect(inCard('popoling', find.text('전체 실행')), findsOneWidget);
+      expect(find.text('popoling: 모두 멈췄어요.'), findsOneWidget);
     });
 
     testWidgets('실패하면 카드에 한 줄 요약과 [대시보드에서 보기]', (tester) async {
@@ -200,21 +200,21 @@ void main() {
     testWidgets('실행하는 동안에는 버튼을 다시 누를 수 없다', (tester) async {
       final slow = _SlowOrchestrator(repo);
       await openLive(tester, using: slow);
-      await tester.tap(inCard('ppoling', find.text('전체 실행')));
+      await tester.tap(inCard('popoling', find.text('전체 실행')));
       await tester.pump();
-      final busy = inCard('ppoling', find.widgetWithText(Btn, '시작하는 중…'));
+      final busy = inCard('popoling', find.widgetWithText(Btn, '시작하는 중…'));
       expect(busy, findsOneWidget);
       expect(tester.widget<Btn>(busy).onPressed, isNull);
       slow.gate.complete();
       await tester.pumpAndSettle();
-      expect(inCard('ppoling', find.text('실행 중 1/1')), findsOneWidget);
+      expect(inCard('popoling', find.text('실행 중 1/1')), findsOneWidget);
     });
 
     testWidgets('실행 요청이 예외로 끝나도 카드에 알린다', (tester) async {
       await openLive(tester, using: _ThrowingOrchestrator(repo));
-      await tapInCard(tester, 'ppoling', '전체 실행');
-      expect(inCard('ppoling', find.text('실행하지 못했어요.')), findsOneWidget);
-      expect(inCard('ppoling', find.text('전체 실행')), findsOneWidget, reason: '다시 시도할 수 있다');
+      await tapInCard(tester, 'popoling', '전체 실행');
+      expect(inCard('popoling', find.text('실행하지 못했어요.')), findsOneWidget);
+      expect(inCard('popoling', find.text('전체 실행')), findsOneWidget, reason: '다시 시도할 수 있다');
     });
   });
 }

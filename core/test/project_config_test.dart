@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 /// 기획서 §7 스키마 예시를 YAML 라이브러리가 읽었을 때와 같은 모양의 Map.
 Map<String, Object?> planExample() => {
@@ -254,7 +254,7 @@ void main() {
       expect(
         () => ProjectConfig.fromMap({'version': 1, 'services': 'db'}),
         throwsA(isA<ConfigFormatException>()
-            .having((e) => e.message, 'message', 'ppoling.yaml 에서 고칠 곳이 1군데 있어요.')
+            .having((e) => e.message, 'message', 'popoling.yaml 에서 고칠 곳이 1군데 있어요.')
             .having((e) => e.issues.single.path, 'path', 'services')),
       );
     });

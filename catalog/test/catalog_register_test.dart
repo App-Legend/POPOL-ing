@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_catalog/catalog.dart' as catalog;
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_catalog/catalog.dart' as catalog;
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
 
 /// `app/` 의 Registry 와 같은 규칙(나중에 등록한 것이 이긴다)의 테스트용 구현.
 class TestRegistry implements AppRegistry {
@@ -59,19 +59,19 @@ void main() {
 
   testWidgets('실행 중인 프로젝트 수를 보여 준다', (tester) async {
     final (:app, repo: _, :runner) = setUpApp();
-    await runner.runAll('ppoling');
+    await runner.runAll('popoling');
     await openApp(tester, app);
     expect(find.text('실행 중 1개'), findsOneWidget);
   });
 
   testWidgets('개발 홈 카드는 A 의 마지막 전체 실행을 보여 준다', (tester) async {
     final (:app, repo: _, :runner) = setUpApp();
-    await runner.runAll('ppoling');
-    await runner.stopAll('ppoling');
+    await runner.runAll('popoling');
+    await runner.stopAll('popoling');
     await openApp(tester, app);
     await tester.tap(find.byKey(const Key('category-dev')));
     await tester.pumpAndSettle();
-    final card = find.byKey(const ValueKey('catalog-card-ppoling'));
+    final card = find.byKey(const ValueKey('catalog-card-popoling'));
     expect(find.descendant(of: card, matching: find.text('중지')), findsOneWidget);
     expect(find.descendant(of: card, matching: find.textContaining('마지막 실행 오늘')), findsOneWidget);
   });
@@ -81,10 +81,10 @@ void main() {
     await openApp(tester, app);
     await tester.tap(find.byKey(const Key('category-dev')));
     await tester.pumpAndSettle();
-    final card = find.byKey(const ValueKey('catalog-card-ppoling'));
+    final card = find.byKey(const ValueKey('catalog-card-popoling'));
     await tester.tap(find.descendant(of: card, matching: find.text('전체 실행')));
     await tester.pumpAndSettle();
-    expect(runner.stateOf(const ItemRef(projectId: 'ppoling', serviceId: 'app')), ItemState.ready);
+    expect(runner.stateOf(const ItemRef(projectId: 'popoling', serviceId: 'app')), ItemState.ready);
     expect(find.descendant(of: card, matching: find.text('실행 중 1/1')), findsOneWidget);
   });
 

@@ -1,4 +1,4 @@
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'log_store.dart';
 

@@ -2,11 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_runner/src/log/log_store.dart';
-import 'package:ppoling_runner/src/screens/dashboard_screen.dart';
-import 'package:ppoling_runner/src/screens/detail_screen.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_runner/src/log/log_store.dart';
+import 'package:popoling_runner/src/screens/dashboard_screen.dart';
+import 'package:popoling_runner/src/screens/detail_screen.dart';
 
 const _web = ItemRef(projectId: 'my-team-project', serviceId: 'web');
 const _shopWeb = ItemRef(projectId: 'shop-clone', serviceId: 'web');
@@ -127,7 +127,7 @@ void main() {
 
   group('항목 상세', () {
     late Directory tmp;
-    setUp(() => tmp = Directory.systemTemp.createTempSync('ppoling_detail_'));
+    setUp(() => tmp = Directory.systemTemp.createTempSync('popoling_detail_'));
     tearDown(() => tmp.deleteSync(recursive: true));
 
     testWidgets('로그 파일을 보여 주고 stderr 만 골라 볼 수 있다', (tester) async {

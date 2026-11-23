@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_ai/ai.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
 
 /// 보낸 요청을 남기고, 정해 둔 응답을 차례로 돌려주는 가짜 HTTP.
 class FakeHttp {

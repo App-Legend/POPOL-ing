@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 보내기 전 확인 창(기획서 §2, AT-21). 실제로 보낼 내용을 그대로 보여주고, [보내기]를 눌러야 true.
 class SendConfirmDialog extends StatelessWidget {

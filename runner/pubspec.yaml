@@ -1,4 +1,4 @@
-name: ppoling_runner
+name: popoling_runner
 description: "실행 제어(A): 실행·종료·로그·실행 기록·복구."
 publish_to: 'none'
 version: 0.1.0
@@ -9,9 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  ppoling_core:
+  popoling_core:
     path: ../core
-  ppoling_runner_relay:
+  popoling_runner_relay:
     path: relay
   ffi: ^2.2.0
   path_provider: ^2.1.5

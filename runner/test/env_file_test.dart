@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner/src/orchestrator/env_file.dart';
+import 'package:popoling_runner/src/orchestrator/env_file.dart';
 
 void main() {
   test('따옴표·export·주석을 다루고, 값 뒤 주석은 뗀다', () {
-    final dir = Directory.systemTemp.createTempSync('ppoling_env_');
+    final dir = Directory.systemTemp.createTempSync('popoling_env_');
     addTearDown(() => dir.deleteSync(recursive: true));
     final file = File('${dir.path}/.env')
       ..writeAsStringSync('# 주석\n'

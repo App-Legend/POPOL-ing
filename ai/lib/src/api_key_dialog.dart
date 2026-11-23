@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/ui.dart';
 
 import 'api_key_store.dart';
 import 'messages.dart';
@@ -180,7 +180,7 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
       if (_check case final result?) _checkLine(result),
       const Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
         Icon(Icons.lock_outline, size: 15, color: C.muted),
-        Expanded(child: Text('키는 이 컴퓨터의 보안 저장소에만 두고, 화면과 로그에는 가려서 보여요. ppoling.yaml에는 쓰지 않아요.', style: note)),
+        Expanded(child: Text('키는 이 컴퓨터의 보안 저장소에만 두고, 화면과 로그에는 가려서 보여요. popoling.yaml에는 쓰지 않아요.', style: note)),
       ]),
       if (check != null) const Text('[연결 확인]은 이 키로 Google에 연결되는지만 봐요. 다른 내용은 보내지 않아요.', style: note),
       const Text('무료 등급은 사용량 제한이 있고, 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요. 자세한 조건은 Google 약관을 확인해 주세요.', style: note),

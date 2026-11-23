@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 /// 띄운 프로세스 하나의 실행 기록. 앱을 다시 켰을 때 소유권을 검증하는 데 쓴다(FR-11).
 class ProcessRecord {

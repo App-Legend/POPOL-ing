@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 상태 칩. 색만으로 구분하지 않게 라벨을 함께 쓴다(기획서 §6 라벨).
 StatusChip stateChip(ItemState state) => switch (state) {
@@ -44,7 +44,7 @@ StatusChip outcomeChip(ItemOutcome o) => switch (o) {
 
 /// 오케스트레이터 호출이 던진 예외를 화면 문장으로.
 String errorText(Object e) => switch (e) {
-      PpolingException(:final message) => message,
+      PopolingException(:final message) => message,
       ArgumentError(:final message) => '$message',
       _ => '처리하지 못했어요: $e',
     };

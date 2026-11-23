@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'api_key_store.dart';
 import 'redact.dart';
@@ -19,6 +19,7 @@ class AiSender {
   /// - 취소하면 아무것도 보내지 않고 null.
   /// - 키가 없으면 창을 띄우지 않고 [LlmException] ([LlmFailure.missingKey]).
   /// - [secrets] 는 꼭 가려야 하는 값(예: 그 프로젝트의 `.env` 값).
+  /// - [onConfirmed] 는 [보내기]를 누른 직후, 보내기 전에 한 번 부른다. 화면을 "분석 중"으로 바꿀 때 쓴다.
   Future<String?> send(
     BuildContext context, {
     required String requestName,
@@ -26,6 +27,7 @@ class AiSender {
     String? system,
     Iterable<String> secrets = const [],
     List<String> notes = const [],
+    VoidCallback? onConfirmed,
   }) async {
     if (!await client.isConfigured()) {
       throw LlmException(LlmFailure.missingKey);
@@ -44,6 +46,7 @@ class AiSender {
     if (confirmed != true) {
       return null;
     }
+    onConfirmed?.call();
     return client.complete(redacted.text, system: system);
   }
 }

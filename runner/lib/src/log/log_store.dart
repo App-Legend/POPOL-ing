@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_runner_relay/log_file.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_runner_relay/log_file.dart';
 
-/// 실행 항목 로그 `<root>/<projectId>/<serviceId>.log` 의 위치와 읽기. 쓰기는 중계(`ppoling-relay`)가 한다.
+/// 실행 항목 로그 `<root>/<projectId>/<serviceId>.log` 의 위치와 읽기. 쓰기는 중계(`popoling-relay`)가 한다.
 class LogStore {
   LogStore(this._root, {this.maxBytes = 10 * 1024 * 1024, this.keep = 3});
 

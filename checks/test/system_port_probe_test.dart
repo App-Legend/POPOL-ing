@@ -1,12 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_checks/src/port_owner/macos_port_owner.dart';
-import 'package:ppoling_checks/src/port_owner/port_owner_lookup.dart';
-import 'package:ppoling_checks/src/port_owner/windows_port_owner.dart';
-import 'package:ppoling_checks/src/system_port_probe.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_checks/src/port_owner/macos_port_owner.dart';
+import 'package:popoling_checks/src/port_owner/port_owner_lookup.dart';
+import 'package:popoling_checks/src/port_owner/windows_port_owner.dart';
+import 'package:popoling_checks/src/system_port_probe.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
 
 void main() {
   late ServerSocket server;

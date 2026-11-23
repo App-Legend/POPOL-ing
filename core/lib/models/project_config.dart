@@ -55,7 +55,7 @@ class GitConfig {
       };
 }
 
-/// ppoling.yaml 한 개의 내용 (스키마 v1).
+/// popoling.yaml 한 개의 내용 (스키마 v1).
 ///
 /// ```yaml
 /// version: 1             # 필수. 지금은 1만 읽는다

@@ -1,4 +1,4 @@
-/// 설정 파일(ppoling.yaml)에서 고쳐야 할 곳 하나.
+/// 설정 파일(popoling.yaml)에서 고쳐야 할 곳 하나.
 class ConfigIssue {
   const ConfigIssue({required this.path, required this.message, this.line});
 
@@ -8,7 +8,7 @@ class ConfigIssue {
   /// 화면에 그대로 보여줄 안내 문장.
   final String message;
 
-  /// ppoling.yaml 의 줄 번호(1부터). 알 수 없으면 null.
+  /// popoling.yaml 의 줄 번호(1부터). 알 수 없으면 null.
   final int? line;
 
   @override

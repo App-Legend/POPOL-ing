@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_runner/src/log/log_store.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_runner/src/log/log_store.dart';
 
 void main() {
   late Directory tmp;

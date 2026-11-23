@@ -4,15 +4,15 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
-import 'package:ppoling_runner/src/process/process_launcher.dart';
-import 'package:ppoling_runner/src/process/shell_path.dart';
+import 'package:popoling_runner/src/process/posix_process_launcher.dart';
+import 'package:popoling_runner/src/process/process_launcher.dart';
+import 'package:popoling_runner/src/process/shell_path.dart';
 
 import 'support/relay_binary.dart';
 
 /// [body] 를 실행하는 가짜 셸 스크립트를 만든다.
 String fakeShell(String body) {
-  final dir = Directory.systemTemp.createTempSync('ppoling_shell_');
+  final dir = Directory.systemTemp.createTempSync('popoling_shell_');
   addTearDown(() => dir.deleteSync(recursive: true));
   final file = File('${dir.path}/fake-shell')..writeAsStringSync('#!/bin/sh\n$body\n');
   Process.runSync('chmod', ['+x', file.path]);
@@ -23,7 +23,7 @@ void main() {
   late String relay;
   setUpAll(() async => relay = await relayBinary());
   test('로그인 셸의 PATH 를 앞에 두고, 지금 PATH 와 Homebrew 경로를 뒤에 붙인다', () async {
-    final shell = fakeShell(r'printf "noise from .zshrc\n__PPOLING_PATH__/nvm/bin:/usr/bin__PPOLING_PATH__\n"');
+    final shell = fakeShell(r'printf "noise from .zshrc\n__POPOLING_PATH__/nvm/bin:/usr/bin__POPOLING_PATH__\n"');
     final path = await loginShellPath(environment: {'SHELL': shell, 'PATH': '/usr/bin:/bin'});
     expect(path.split(':'), ['/nvm/bin', '/usr/bin', '/bin', '/opt/homebrew/bin', '/usr/local/bin']);
   });
@@ -46,18 +46,18 @@ void main() {
   });
 
   test('실행기는 받아온 PATH 로 명령을 찾고, 항목에 적은 PATH 가 있으면 그걸 쓴다', () async {
-    final dir = Directory.systemTemp.createTempSync('ppoling_bin_');
+    final dir = Directory.systemTemp.createTempSync('popoling_bin_');
     addTearDown(() => dir.deleteSync(recursive: true));
-    final tool = File('${dir.path}/ppoling-hello')..writeAsStringSync('#!/bin/sh\necho hello from tool\n');
+    final tool = File('${dir.path}/popoling-hello')..writeAsStringSync('#!/bin/sh\necho hello from tool\n');
     Process.runSync('chmod', ['+x', tool.path]);
 
     final launcher = PosixProcessLauncher(relay: relay, searchPath: () async => '${dir.path}:/usr/bin:/bin');
     final log = LogTarget(File('${dir.path}/s.log'));
-    final found = await launcher.start(['ppoling-hello'], workingDirectory: dir.path, log: log);
+    final found = await launcher.start(['popoling-hello'], workingDirectory: dir.path, log: log);
     expect((await found.output.toList()).map((l) => l.text), ['hello from tool']);
 
     final overridden =
-        await launcher.start(['ppoling-hello'], workingDirectory: dir.path, environment: {'PATH': '/usr/bin:/bin'}, log: log);
+        await launcher.start(['popoling-hello'], workingDirectory: dir.path, environment: {'PATH': '/usr/bin:/bin'}, log: log);
     await overridden.output.drain<void>();
     expect(await overridden.exitCode, 127);
   });

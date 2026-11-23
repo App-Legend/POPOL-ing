@@ -352,56 +352,56 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  ppoling_ai:
+  popoling_ai:
     dependency: "direct main"
     description:
       path: "../ai"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_catalog:
+  popoling_catalog:
     dependency: "direct main"
     description:
       path: "../catalog"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_checks:
+  popoling_checks:
     dependency: "direct main"
     description:
       path: "../checks"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_compose:
+  popoling_compose:
     dependency: "direct main"
     description:
       path: "../compose"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_core:
+  popoling_core:
     dependency: "direct main"
     description:
       path: "../core"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_project:
+  popoling_project:
     dependency: "direct main"
     description:
       path: "../project"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_runner:
+  popoling_runner:
     dependency: "direct main"
     description:
       path: "../runner"
       relative: true
     source: path
     version: "0.1.0"
-  ppoling_runner_relay:
+  popoling_runner_relay:
     dependency: transitive
     description:
       path: "../runner/relay"

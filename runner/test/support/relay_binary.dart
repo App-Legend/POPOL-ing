@@ -1,8 +1,8 @@
 import 'dart:io';
 
-/// 테스트용 중계(`ppoling-relay`) 실행 파일. 소스가 바뀌었을 때만 `build/test-relay/` 에 다시 컴파일한다.
+/// 테스트용 중계(`popoling-relay`) 실행 파일. 소스가 바뀌었을 때만 `build/test-relay/` 에 다시 컴파일한다.
 Future<String> relayBinary() async {
-  final out = File('build/test-relay/ppoling-relay${Platform.isWindows ? '.exe' : ''}');
+  final out = File('build/test-relay/popoling-relay${Platform.isWindows ? '.exe' : ''}');
   final sources = Directory('relay').listSync(recursive: true).whereType<File>().where((f) => f.path.endsWith('.dart'));
   final newest = sources.map((f) => f.lastModifiedSync()).reduce((a, b) => a.isAfter(b) ? a : b);
   if (out.existsSync() && out.lastModifiedSync().isAfter(newest)) return out.absolute.path;
@@ -18,7 +18,7 @@ Future<String> relayBinary() async {
   out.parent.createSync(recursive: true);
   // 테스트 파일 여러 개가 동시에 컴파일해도 반쯤 쓴 파일을 쓰지 않게 다른 이름으로 만든 뒤 바꿔 끼운다.
   final tmp = '${out.path}.$pid';
-  await run(['compile', 'exe', 'relay/bin/ppoling_relay.dart', '-o', tmp]);
+  await run(['compile', 'exe', 'relay/bin/popoling_relay.dart', '-o', tmp]);
   try {
     File(tmp).renameSync(out.path);
   } on FileSystemException {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 7. 확인 대화상자 — 여섯 대화상자를 나란히 보여주는 시안 화면.
 class DialogsScreen extends StatelessWidget {
@@ -71,7 +71,7 @@ class AddProjectDialog extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(color: C.ok.$1, borderRadius: BorderRadius.circular(8)),
-          child: Text('ppoling.yaml 을 찾았어요. 실행 항목 3개를 불러올게요.', style: TextStyle(fontSize: 13, color: C.ok.$2)),
+          child: Text('popoling.yaml 을 찾았어요. 실행 항목 3개를 불러올게요.', style: TextStyle(fontSize: 13, color: C.ok.$2)),
         ),
         field('이름', 'my-team-project'),
         field('한 줄 설명', '동아리 행사 예약 웹서비스 (2025 캡스톤)', hint: 'README 에서 가져옴'),
@@ -98,10 +98,10 @@ class ConfirmCommandsDialog extends StatelessWidget {
           ]),
         );
     return _DialogBody('이 명령들을 실행할까요?', [
-      const Text('이 프로젝트의 ppoling.yaml 을 처음 실행해요. 다른 사람이 만든 설정이라면 아래 명령이 믿을 만한지 확인해 주세요.',
+      const Text('이 프로젝트의 popoling.yaml 을 처음 실행해요. 다른 사람이 만든 설정이라면 아래 명령이 믿을 만한지 확인해 주세요.',
           style: TextStyle(fontSize: 14, color: C.text2, height: 1.6)),
       Column(spacing: 6, children: [
-        cmd('db', 'docker compose -p ppoling-my-team-project up -d mysql'),
+        cmd('db', 'docker compose -p popoling-my-team-project up -d mysql'),
         cmd('api', './gradlew bootRun', 'in ./backend'),
         cmd('web', 'npm run dev', 'in ./frontend'),
       ]),
@@ -120,7 +120,7 @@ class QuitDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DialogBody('실행 중인 항목이 있어요', [
         const Text('포폴링을 닫기 전에 어떻게 할까요?', style: TextStyle(fontSize: 14, color: C.text2)),
-        const Text('•  my-team-project — db, api\n•  ppoling — app', style: TextStyle(fontSize: 14, height: 1.8)),
+        const Text('•  my-team-project — db, api\n•  popoling — app', style: TextStyle(fontSize: 14, height: 1.8)),
         Btn('모두 종료하고 닫기', primary: true, onPressed: () => _close(context)),
         Btn('그대로 두고 닫기', onPressed: () => _close(context)),
         Btn('취소', ghost: true, onPressed: () => _close(context)),
@@ -155,7 +155,7 @@ class ChangedCommandsDialog extends StatelessWidget {
           Expanded(child: Text(cmd, style: mono.copyWith(fontSize: 12.5, fontWeight: now ? FontWeight.w500 : null))),
         ]);
     return _DialogBody('실행 명령이 바뀌었어요', [
-      const Text('전체 실행 전에 최신 코드를 받았더니 ppoling.yaml 의 실행 명령이 바뀌었어요. 바뀐 명령을 확인한 뒤 실행해 주세요.',
+      const Text('전체 실행 전에 최신 코드를 받았더니 popoling.yaml 의 실행 명령이 바뀌었어요. 바뀐 명령을 확인한 뒤 실행해 주세요.',
           style: TextStyle(fontSize: 14, color: C.text2, height: 1.6)),
       _box(Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
         const Text('api', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
@@ -176,7 +176,7 @@ class ApiKeyDialog extends StatelessWidget {
         const Text('AI 검사에 쓸 내 API 키를 넣어 주세요. 키가 없어도 실행·종료 같은 다른 기능은 그대로 쓸 수 있어요.',
             style: TextStyle(fontSize: 14, color: C.text2, height: 1.6)),
         field('API 키', 'xxxxxxxxxxxxxxxxxxxx', isMono: true, obscure: true),
-        _box(const Text('키는 이 컴퓨터의 앱 설정에만 저장해요. ppoling.yaml·로그·화면에는 그대로 남기지 않아요.',
+        _box(const Text('키는 이 컴퓨터의 앱 설정에만 저장해요. popoling.yaml·로그·화면에는 그대로 남기지 않아요.',
             style: TextStyle(fontSize: 13, color: C.text2, height: 1.6))),
         _box(warn: true, const Text('무료 등급은 사용량 제한이 있고, 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요. [착수 전 최신 약관을 확인해 문구 확정]',
             style: TextStyle(fontSize: 13, color: Color(0xFF5A3B00), height: 1.6))),

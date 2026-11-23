@@ -5,7 +5,7 @@ import '../models/probe.dart';
 /// - 진짜 구현: C (`checks/`)
 /// - 쓰는 곳: A(시작 전 포트 확인, `type: port` 준비 조건), D(QA 의 port 검사), C(원격 연결 FR-18)
 ///
-/// 지켜야 할 약속. `package:ppoling_core/testing.dart` 의 [portProbeContract] 로 확인한다.
+/// 지켜야 할 약속. `package:popoling_core/testing.dart` 의 [portProbeContract] 로 확인한다.
 /// - 포트 번호가 1~65535 밖이면 [ArgumentError]. 그 밖의 실패는 예외 대신 결과로 돌려준다.
 /// - 프로세스를 종료하지 않는다. 누가 쓰는지 알려주기만 한다.
 abstract interface class PortProbe {

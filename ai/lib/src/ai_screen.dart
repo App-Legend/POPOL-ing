@@ -1,17 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
 
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
+import 'qa_summary_panel.dart';
 
 /// 화면에 보여 줄 키. 끝 4자리만 남긴다. 8자 이하로 짧으면 4자리도 많이 드러나서 모두 가린다.
 String maskedApiKey(String key) => key.length <= 8 ? '••••••••' : '••••••••${key.substring(key.length - 4)}';
 
-/// 8. AI 검사. 지금은 머리(API 키 상태와 [키 입력]·[키 바꾸기])만 있다.
-// 4주차에 실행 실패 원인 분석(AI-02)·QA 결과 요약(AI-03) 카드를 아래에 붙인다.
+/// 8. AI 검사. 머리(API 키 상태와 [키 입력]·[키 바꾸기])와 헬스체크 결과 요약(AI-03) 카드.
+// 실행 실패 원인 분석(AI-02) 카드는 다음에 붙인다.
 class AiScreen extends StatefulWidget {
-  const AiScreen({super.key, required this.keys, required this.client, this.checkKey});
+  const AiScreen({
+    super.key,
+    required this.keys,
+    required this.client,
+    this.checkKey,
+    this.projectId,
+    this.qa,
+    this.orchestrator,
+    this.clock = DateTime.now,
+  });
 
   final ApiKeyStore keys;
 
@@ -20,6 +30,14 @@ class AiScreen extends StatefulWidget {
 
   /// 키 입력 창의 [연결 확인]. null 이면 버튼이 없다.
   final ApiKeyCheck? checkKey;
+
+  /// 대시보드 [AI 검사]가 넘긴 프로젝트. [qa]·[orchestrator] 와 함께 있으면 헬스체크 결과 요약 카드를 그린다.
+  final String? projectId;
+  final QaRunner? qa;
+  final Orchestrator? orchestrator;
+
+  /// 카드 머리의 "오늘" 판단에 쓴다.
+  final DateTime Function() clock;
 
   @override
   State<AiScreen> createState() => _AiScreenState();
@@ -33,10 +51,84 @@ class _AiScreenState extends State<AiScreen> {
   /// 가린 키. 키 전체는 화면 상태에 두지 않는다.
   String? _masked;
 
+  /// 요약할 최근 헬스체크. [_qaLoaded] 가 true 인데 null 이면 아직 검사한 적이 없다.
+  QaRun? _latest;
+  bool _qaLoaded = false;
+  bool _checking = false;
+
+  bool get _hasCard => widget.projectId != null && widget.qa != null && widget.orchestrator != null;
+
   @override
   void initState() {
     super.initState();
     _load();
+    if (_hasCard) {
+      _loadQa();
+    }
+  }
+
+  Future<void> _loadQa() async {
+    QaRun? latest;
+    try {
+      latest = (await widget.qa!.history(widget.projectId!)).firstOrNull;
+    } on Exception {
+      latest = null;
+    }
+    if (mounted) {
+      setState(() {
+        _latest = latest;
+        _qaLoaded = true;
+      });
+    }
+  }
+
+  /// 카드의 [헬스체크]. 누를 때만 검사한다.
+  Future<void> _runCheck() async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _checking = true);
+    try {
+      await widget.qa!.runChecks(widget.projectId!);
+    } on Exception {
+      messenger.showSnackBar(const SnackBar(content: Text('헬스체크를 하지 못했어요.')));
+    }
+    await _loadQa();
+    if (mounted) {
+      setState(() => _checking = false);
+    }
+  }
+
+  /// "오늘 14:05" 또는 "11/22 14:05".
+  String _when(DateTime t) {
+    final now = widget.clock();
+    final hm = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final today = t.year == now.year && t.month == now.month && t.day == now.day;
+    return today ? '오늘 $hm' : '${t.month}/${t.day} $hm';
+  }
+
+  Widget _qaCard() {
+    final latest = _latest;
+    return Panel(
+      title: '헬스체크 결과 요약',
+      titleAction: latest == null ? null : Text('${_when(latest.startedAt)} 검사 기준', style: const TextStyle(fontSize: 13, color: C.muted)),
+      child: !_qaLoaded
+          ? const SizedBox.shrink()
+          : latest == null
+              ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
+                  const Text('아직 헬스체크 결과가 없어요.', style: TextStyle(fontSize: 14, height: 1.6)),
+                  Align(alignment: Alignment.centerRight, child: Btn('헬스체크', onPressed: _checking ? null : _runCheck)),
+                ])
+              : QaSummaryPanel(
+                  // 새 검사나 키 상태가 바뀌면 패널을 새로 그린다(키를 넣은 뒤 "API 키 필요"가 남지 않게).
+                  key: ValueKey('${latest.startedAt}-$_status'),
+                  run: latest,
+                  client: widget.client,
+                  keys: widget.keys,
+                  qa: widget.qa!,
+                  orchestrator: widget.orchestrator!,
+                  checkKey: widget.checkKey,
+                  onKeysChanged: _load, // 카드에서 키를 바꿔도 머리의 키 상태가 맞게
+                ),
+    );
   }
 
   Future<void> _load() async {
@@ -125,7 +217,11 @@ class _AiScreenState extends State<AiScreen> {
               style: body,
             ),
           ),
-        const Text('실행 실패 원인 분석과 QA 결과 요약은 준비 중이에요.', style: TextStyle(fontSize: 13, color: C.muted)),
+        if (_hasCard) _qaCard(),
+        Text(
+          _hasCard ? '실행 실패 원인 분석은 준비 중이에요.' : '실행 실패 원인 분석과 헬스체크 결과 요약은 준비 중이에요.',
+          style: const TextStyle(fontSize: 13, color: C.muted),
+        ),
       ],
     );
   }
