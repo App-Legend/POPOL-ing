@@ -5,12 +5,14 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import '../git/git_adapter.dart';
+import '../log/log_store.dart';
 import 'item_status.dart';
+import 'log_preview.dart';
 
 /// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다.
 ///
 /// 전체 실행·종료(FR-04·05), 항목 시작·중지(FR-03), 포트 주인이 내 다른 항목이면 [그 항목 중지](AT-17).
-// 환경 배너(EnvBanner)·최근 로그(LogPreview)는 4주차에 여기 더한다.
+// 환경 배너(EnvBanner)는 4주차에 여기 더한다.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -20,6 +22,7 @@ class DashboardScreen extends StatefulWidget {
     required this.ports,
     required this.runtime,
     this.git,
+    this.logs,
   });
 
   final String projectId;
@@ -28,6 +31,9 @@ class DashboardScreen extends StatefulWidget {
   final PortProbe ports;
   final RuntimeQuery runtime;
   final GitAdapter? git;
+
+  /// 최근 로그를 읽는 곳. 없으면 최근 로그를 숨긴다.
+  final LogStore? logs;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -99,6 +105,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   List<ServiceConfig> get _services => _project?.config?.services ?? const [];
+
+  /// 먼저 볼 실패한 항목. 지금 실패한 항목이 없으면 마지막 전체 실행에서 실패했고 아직 안 뜬 항목.
+  String? _failedOf(List<ServiceConfig> services) {
+    final lastFailed = {
+      for (final r in _summary?.items ?? const <ItemResult>[])
+        if (r.outcome == ItemOutcome.failed) r.item.serviceId,
+    };
+    bool failed(ServiceConfig s) => widget.runner.stateOf(_ref(s)) == ItemState.failed;
+    bool failedLast(ServiceConfig s) => lastFailed.contains(s.id) && !isUp(widget.runner.stateOf(_ref(s)));
+    return (services.where(failed).firstOrNull ?? services.where(failedLast).firstOrNull)?.id;
+  }
 
   ItemRef _ref(ServiceConfig s) => ItemRef(projectId: _id, serviceId: s.id);
 
@@ -174,6 +191,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ]);
     }
     final allBusy = _busy.contains('all');
+    final logged = [for (final s in _services) if (s is! RemoteService) s];
     return AppPage(
       crumbs: [('개발', '/home'), (p.name, null)],
       children: [
@@ -224,14 +242,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: _summary == null
               ? const Text('아직 전체 실행 기록이 없어요.', style: TextStyle(color: C.muted))
               : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
+                  if (_summary!.items.isNotEmpty) Text(_counts(_summary!), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
                   if (_summary!.pull case final pull?) _resultRow(pull.outcome, 'Git pull — ${pull.message}'),
                   for (final r in _summary!.items)
                     _resultRow(r.outcome, '${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}'),
                 ]),
         ),
+        if (widget.logs case final logs? when logged.isNotEmpty)
+          LogPreview(projectId: _id, services: logged, failed: _failedOf(logged), logs: logs),
       ],
     );
   }
+
+  /// `성공 2 · 실패 1` 처럼 있는 결과만. Git pull 은 항목이 아니라 세지 않는다.
+  static String _counts(RunSummary s) => [
+        for (final (outcome, label) in const [(ItemOutcome.ok, '성공'), (ItemOutcome.failed, '실패'), (ItemOutcome.skipped, '건너뜀')])
+          if (s.items.where((r) => r.outcome == outcome).length case final n when n > 0) '$label $n',
+      ].join(' · ');
 
   static Widget _resultRow(ItemOutcome outcome, String text) => Row(spacing: 8, children: [
         SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(outcome))),

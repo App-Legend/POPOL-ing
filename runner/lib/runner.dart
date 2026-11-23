@@ -57,6 +57,7 @@ void register(AppRegistry app) {
             ports: app.read<PortProbe>(),
             runtime: app.read<RuntimeQuery>(),
             git: git,
+            logs: logs,
           ));
   app.route(
       '/detail',
