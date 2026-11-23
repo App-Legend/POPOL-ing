@@ -9,7 +9,7 @@ import '../models/run.dart';
 /// - 쓰는 곳: `app/` 대시보드·항목 상세, C(포트 알림의 [그 항목 중지], [RunSucceeded] 로 환경 기록),
 ///   D(카드의 [전체 실행]·마지막 실행, 오래된 프로젝트 점검, AI-02·03 실행 요약)
 ///
-/// 지켜야 할 약속. `package:ppoling_core/testing.dart` 의 [orchestratorContract] 로 확인한다.
+/// 지켜야 할 약속. `package:popoling_core/testing.dart` 의 [orchestratorContract] 로 확인한다.
 /// 1. 전체 실행은 `dependsOn` 순서를 지킨다. 항목은 의존하는 항목이 모두 성공한 뒤에 시작한다.
 /// 2. 항목이 실패하면 그 항목에 의존하는 항목은 시작하지 않고 [ItemOutcome.skipped] 다.
 ///    나머지 독립 항목은 계속하고, 이미 시작한 항목은 자동으로 멈추지 않는다.

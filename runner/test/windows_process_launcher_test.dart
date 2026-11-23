@@ -4,10 +4,10 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner_relay/relay_request.dart';
-import 'package:ppoling_runner/src/process/process_launcher.dart';
-import 'package:ppoling_runner/src/process/windows_job.dart';
-import 'package:ppoling_runner/src/process/windows_process_launcher.dart';
+import 'package:popoling_runner_relay/relay_request.dart';
+import 'package:popoling_runner/src/process/process_launcher.dart';
+import 'package:popoling_runner/src/process/windows_job.dart';
+import 'package:popoling_runner/src/process/windows_process_launcher.dart';
 
 import 'support/relay_binary.dart';
 
@@ -16,7 +16,7 @@ void main() {
   late Directory dir;
 
   setUpAll(() async => launcher = WindowsProcessLauncher(relay: await relayBinary()));
-  setUp(() => dir = Directory.systemTemp.createTempSync('ppoling_win_'));
+  setUp(() => dir = Directory.systemTemp.createTempSync('popoling_win_'));
   tearDown(() => dir.deleteSync(recursive: true));
 
   LogTarget log() => LogTarget(File('${dir.path}\\s.log'));
@@ -28,7 +28,7 @@ void main() {
   }
 
   test('ProcessLauncher.forPlatform 은 Windows 실행기를 고른다', () {
-    expect(ProcessLauncher.forPlatform(relay: 'ppoling-relay.exe'), isA<WindowsProcessLauncher>());
+    expect(ProcessLauncher.forPlatform(relay: 'popoling-relay.exe'), isA<WindowsProcessLauncher>());
   });
 
   test('stdout·stderr 를 줄 단위로 나눠 보내고 종료 코드를 알려준다', () async {
@@ -56,7 +56,7 @@ void main() {
   });
 
   test('없는 명령은 예외 대신 종료 코드 127', () async {
-    final p = await start(['no-such-command-ppoling']);
+    final p = await start(['no-such-command-popoling']);
     expect(await p.exitCode, 127);
   });
 
@@ -106,7 +106,7 @@ void main() {
   group('다시 붙기', () {
     test('앱이 꺼져 Job 핸들이 닫혀도 중계가 쥐고 있으면 Job 이름이 남는다', () async {
       // 앱이 꺼진 상황: Job 을 만든 쪽 핸들을 닫는다. 중계가 같은 이름으로 연 핸들만 남는다.
-      final name = 'ppoling-test-${DateTime.now().microsecondsSinceEpoch}';
+      final name = 'popoling-test-${DateTime.now().microsecondsSinceEpoch}';
       final job = WindowsJob(name: name);
       final relay = await Process.start(await relayBinary(), const [], workingDirectory: dir.path);
       expect(job.assign(relay.pid), isTrue);

@@ -1,8 +1,8 @@
 /// 카탈로그(D). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_catalog/catalog.dart' as catalog;`
+/// `import 'package:popoling_catalog/catalog.dart' as catalog;`
 library;
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/catalog_screen.dart';
 import 'src/category_screen.dart';

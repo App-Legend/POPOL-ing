@@ -1,4 +1,4 @@
-/// 기본 QA 검사 하나. ppoling.yaml 의 `checks` 목록 한 칸이다(FR-10).
+/// 기본 QA 검사 하나. popoling.yaml 의 `checks` 목록 한 칸이다(FR-10).
 ///
 /// ```yaml
 /// checks:

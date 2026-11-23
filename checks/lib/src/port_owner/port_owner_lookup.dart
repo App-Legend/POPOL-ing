@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 import 'macos_port_owner.dart';
 import 'windows_port_owner.dart';

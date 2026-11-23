@@ -9,11 +9,11 @@ import '../models/service_config.dart';
 /// - 쓰는 곳: A(전체 실행·종료, `compose-healthy` 준비 대기, `RuntimeQuery` 의 Compose 포트 주인 판단),
 ///   C(화면 5 Docker 상태)
 ///
-/// 지켜야 할 약속. `package:ppoling_core/testing.dart` 의 [itemLauncherContract] 로 확인한다.
-/// 1. Compose 는 `docker compose -p ppoling-<프로젝트ID>` 로만 다룬다. 사용자가 직접 띄운 같은 compose 는 건드리지 않는다.
+/// 지켜야 할 약속. `package:popoling_core/testing.dart` 의 [itemLauncherContract] 로 확인한다.
+/// 1. Compose 는 `docker compose -p popoling-<프로젝트ID>` 로만 다룬다. 사용자가 직접 띄운 같은 compose 는 건드리지 않는다.
 /// 2. 멈출 때 이 항목의 컨테이너만 멈추고 지운다. 같은 compose 파일의 다른 항목과 볼륨은 그대로 둔다(`down -v` 금지).
 /// 3. 원격 항목은 켜고 끄지 않는다. 연결만 확인하고, [stop] 은 아무것도 하지 않는다.
-/// 4. [ProcessService] 를 받으면 [ArgumentError]. 그 밖의 실패는 [PpolingException] 계열로 알린다.
+/// 4. [ProcessService] 를 받으면 [ArgumentError]. 그 밖의 실패는 [PopolingException] 계열로 알린다.
 /// 5. 준비 완료를 기다리지 않는다. 기다리는 일은 전체 실행(A)이 [status] 를 되풀이해 부르며 한다.
 abstract interface class ItemLauncher {
   /// 항목을 시작한다. Compose 는 `up -d`, 원격은 연결 확인만 한다. 시작 직후 상태를 돌려준다.

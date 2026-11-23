@@ -1,16 +1,16 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
-import 'package:ppoling_project/src/file_project_repository.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
+import 'package:popoling_project/src/file_project_repository.dart';
 
 void main() {
   late Directory root;
   late File listFile;
 
   setUp(() async {
-    root = await Directory.systemTemp.createTemp('ppoling_project_test');
+    root = await Directory.systemTemp.createTemp('popoling_project_test');
     listFile = File('${root.path}/app/projects.json');
   });
   tearDown(() => root.delete(recursive: true));
@@ -36,9 +36,9 @@ void main() {
     expect(reopened.first.registeredAt, a.registeredAt);
   });
 
-  test('삭제해도 폴더와 ppoling.yaml 은 그대로 남는다', () async {
+  test('삭제해도 폴더와 popoling.yaml 은 그대로 남는다', () async {
     final dir = await folder('keep');
-    final yaml = File('${dir.path}/ppoling.yaml');
+    final yaml = File('${dir.path}/popoling.yaml');
     await yaml.writeAsString('version: 1\n');
     final r = repo();
     final project = await r.addProject(dir.path);
@@ -49,9 +49,9 @@ void main() {
     expect(await yaml.readAsString(), 'version: 1\n');
   });
 
-  test('ppoling.yaml 이 있으면 읽어서 설정에 넣는다', () async {
+  test('popoling.yaml 이 있으면 읽어서 설정에 넣는다', () async {
     final dir = await folder('with-config');
-    await File('${dir.path}/ppoling.yaml').writeAsString('''
+    await File('${dir.path}/popoling.yaml').writeAsString('''
 version: 1
 about:
   summary: 동아리 예약
@@ -67,9 +67,9 @@ services:
     expect(project.config!.services.single.id, 'web');
   });
 
-  test('ppoling.yaml 이 YAML 로 깨져 있으면 줄 번호와 함께 문제로 담고 등록은 된다', () async {
+  test('popoling.yaml 이 YAML 로 깨져 있으면 줄 번호와 함께 문제로 담고 등록은 된다', () async {
     final dir = await folder('broken');
-    await File('${dir.path}/ppoling.yaml').writeAsString('version: 1\nservices: [\n');
+    await File('${dir.path}/popoling.yaml').writeAsString('version: 1\nservices: [\n');
     final project = await repo().addProject(dir.path);
 
     expect(project.config, isNull);
@@ -77,9 +77,9 @@ services:
     expect(await repo().listProjects(), hasLength(1));
   });
 
-  test('ppoling.yaml 형식이 틀리면 core 가 찾은 문제를 그대로 담는다', () async {
+  test('popoling.yaml 형식이 틀리면 core 가 찾은 문제를 그대로 담는다', () async {
     final dir = await folder('bad-format');
-    await File('${dir.path}/ppoling.yaml').writeAsString('version: 99\n');
+    await File('${dir.path}/popoling.yaml').writeAsString('version: 99\n');
     final project = await repo().addProject(dir.path);
 
     expect(project.config, isNull);
@@ -90,8 +90,8 @@ services:
     await listFile.parent.create(recursive: true);
     await listFile.writeAsString('{망가진 파일');
 
-    await expectLater(repo().listProjects(), throwsA(isA<PpolingException>()));
-    await expectLater(repo().addProject((await folder('x')).path), throwsA(isA<PpolingException>()));
+    await expectLater(repo().listProjects(), throwsA(isA<PopolingException>()));
+    await expectLater(repo().addProject((await folder('x')).path), throwsA(isA<PopolingException>()));
     expect(await listFile.readAsString(), '{망가진 파일');
   });
 

@@ -1,4 +1,4 @@
-/// 환경 점검 대상 하나. ppoling.yaml 의 `requires` 목록 한 칸이다.
+/// 환경 점검 대상 하나. popoling.yaml 의 `requires` 목록 한 칸이다.
 ///
 /// ```yaml
 /// requires:

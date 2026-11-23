@@ -1,4 +1,4 @@
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 import 'run_info.dart';
 
@@ -61,7 +61,7 @@ String? lastRunText(RunInfo run, DateTime now) {
 }
 
 /// 전체 실행·종료 결과를 카드에 남길 한 줄. 모두 성공했으면 null.
-/// 예: `시작하지 못한 항목: api · 건너뜀: web`. 항목 이름은 ppoling.yaml 의 id 그대로 쓴다.
+/// 예: `시작하지 못한 항목: api · 건너뜀: web`. 항목 이름은 popoling.yaml 의 id 그대로 쓴다.
 String? runProblemText(RunSummary summary, {required bool stopping}) {
   List<String> idsOf(ItemOutcome outcome) => [
         for (final r in summary.items)

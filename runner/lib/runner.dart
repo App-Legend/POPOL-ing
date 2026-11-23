@@ -1,5 +1,5 @@
 /// 실행 제어(A). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_runner/runner.dart' as runner;`
+/// `import 'package:popoling_runner/runner.dart' as runner;`
 library;
 
 import 'dart:async';
@@ -7,12 +7,13 @@ import 'dart:io';
 
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/log/log_store.dart';
 import 'src/log/runner_log_excerpt.dart';
 import 'src/orchestrator/runner_orchestrator.dart';
 import 'src/process/process_launcher.dart';
+import 'src/runtime/legacy_data.dart';
 import 'src/runtime/runner_runtime_query.dart';
 import 'src/runtime/runtime_store.dart';
 import 'src/screens/dashboard_screen.dart';
@@ -66,4 +67,7 @@ void register(AppRegistry app) {
 
 /// 앱에 함께 넣은 중계 실행 파일. 앱 실행 파일과 같은 폴더에 있다(macOS 는 `앱.app/Contents/MacOS/`).
 String relayPath() =>
-    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}ppoling-relay${Platform.isWindows ? '.exe' : ''}';
+    '${File(Platform.resolvedExecutable).parent.path}${Platform.pathSeparator}popoling-relay${Platform.isWindows ? '.exe' : ''}';
+
+/// 앱 이름을 ppoling 에서 popoling 으로 바꾸기 전의 앱 데이터를 새 폴더로 옮긴다. 다른 기능이 데이터를 읽기 전에 `main` 에서 한 번 부른다.
+Future<void> moveLegacyData() async => moveLegacyDataDir(await getApplicationSupportDirectory());

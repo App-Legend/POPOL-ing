@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ppoling_runner_relay/relay_request.dart';
+import 'package:popoling_runner_relay/relay_request.dart';
 
 import 'process_launcher.dart';
 import 'windows_command.dart';
@@ -67,7 +67,7 @@ class WindowsProcessLauncher implements ProcessLauncher {
       case RunCommand(:final executable, :final arguments):
         if (!File(relay).existsSync()) return RefusedProcess('중계 프로그램을 찾을 수 없어요.', 127);
         // Job 을 먼저 만든다. 띄운 뒤에 만들다 실패하면 띄운 프로세스를 아무도 모르게 된다.
-        final jobName = 'ppoling-$pid-${DateTime.now().microsecondsSinceEpoch}';
+        final jobName = 'popoling-$pid-${DateTime.now().microsecondsSinceEpoch}';
         final job = WindowsJob(name: jobName);
         final Process process;
         try {

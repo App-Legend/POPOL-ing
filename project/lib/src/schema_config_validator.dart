@@ -1,4 +1,4 @@
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 /// [ConfigValidator] 의 진짜 구현. 실행 항목끼리의 관계(중복 id, 없는 의존 대상, 순환 의존)를 찾는다.
 class SchemaConfigValidator implements ConfigValidator {

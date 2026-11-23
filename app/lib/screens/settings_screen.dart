@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 6. 프로젝트 설정
 class SettingsScreen extends StatelessWidget {
@@ -13,9 +13,9 @@ class SettingsScreen extends StatelessWidget {
       children: [
         const PageHead(
           title: '프로젝트 설정',
-          sub: '~/projects/my-team-project/ppoling.yaml',
+          sub: '~/projects/my-team-project/popoling.yaml',
           subMono: true,
-          actions: [Btn('ppoling.yaml 열기'), Btn('저장', primary: true)],
+          actions: [Btn('popoling.yaml 열기'), Btn('저장', primary: true)],
         ),
         Notice(
           bg: C.bad.$1,

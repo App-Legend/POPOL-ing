@@ -2,7 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 /// Gemini API 키를 이 컴퓨터에만 보관하는 곳.
 ///
-/// 키는 저장소·`ppoling.yaml`·로그에 남기지 않는다. 사용자가 앱에서 직접 넣고, 앱 빌드에는 넣지 않는다.
+/// 키는 저장소·`popoling.yaml`·로그에 남기지 않는다. 사용자가 앱에서 직접 넣고, 앱 빌드에는 넣지 않는다.
 abstract interface class ApiKeyStore {
   /// 저장된 키. 없으면 null.
   Future<String?> read();

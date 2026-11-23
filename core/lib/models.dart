@@ -1,4 +1,4 @@
-/// 기능 사이에 주고받는 데이터. `import 'package:ppoling_core/models.dart';`
+/// 기능 사이에 주고받는 데이터. `import 'package:popoling_core/models.dart';`
 library;
 
 export 'models/check_config.dart';

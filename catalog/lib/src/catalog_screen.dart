@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
 
 import 'catalog_view.dart';
 import 'run_info.dart';
@@ -84,7 +84,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       problem = runProblemText(summary, stopping: stop);
     } catch (e) {
       final what = stop ? '멈추지' : '실행하지';
-      problem = e is PpolingException ? '$what 못했어요. ${e.message}' : '$what 못했어요.';
+      problem = e is PopolingException ? '$what 못했어요. ${e.message}' : '$what 못했어요.';
     }
     if (!mounted) return;
     setState(() {
@@ -184,7 +184,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         border: C.bad.$2.withValues(alpha: 0.3),
         icon: Icons.error_outline,
         iconColor: C.bad.$2,
-        child: Text(error is PpolingException ? '프로젝트 목록을 읽지 못했어요. ${error.message}' : '프로젝트 목록을 읽지 못했어요.'),
+        child: Text(error is PopolingException ? '프로젝트 목록을 읽지 못했어요. ${error.message}' : '프로젝트 목록을 읽지 못했어요.'),
       );
 
   Widget _card(CatalogEntry e, DateTime now) {

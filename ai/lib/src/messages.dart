@@ -1,4 +1,4 @@
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 /// AI 오류 안내 한 가지. 원인([title], [body])과 다음 조치([action] 버튼 이름)를 함께 보여준다.
 class LlmErrorText {

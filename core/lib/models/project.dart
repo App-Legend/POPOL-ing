@@ -16,7 +16,7 @@ class Project {
     this.configIssues = const [],
   });
 
-  /// [id] 형식: 소문자·숫자·- 만. Compose 프로젝트 이름 `ppoling-<id>` 에 그대로 쓰기 때문이다.
+  /// [id] 형식: 소문자·숫자·- 만. Compose 프로젝트 이름 `popoling-<id>` 에 그대로 쓰기 때문이다.
   static final idPattern = RegExp(r'^[a-z0-9][a-z0-9-]*$');
 
   /// 등록할 때 정해지고 바뀌지 않는 ID. 다른 프로젝트와 겹치지 않는다.
@@ -33,10 +33,10 @@ class Project {
 
   final ProjectCategory category;
 
-  /// 폴더의 ppoling.yaml 내용. 파일이 없거나 형식이 잘못돼 읽지 못했으면 null.
+  /// 폴더의 popoling.yaml 내용. 파일이 없거나 형식이 잘못돼 읽지 못했으면 null.
   final ProjectConfig? config;
 
-  /// ppoling.yaml 을 읽다 찾은 문제. 문제가 없으면 빈 목록.
+  /// popoling.yaml 을 읽다 찾은 문제. 문제가 없으면 빈 목록.
   final List<ConfigIssue> configIssues;
 
   /// 프로젝트 소개. 설정이 없으면 빈 소개.

@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner_relay/log_file.dart';
-import 'package:ppoling_runner_relay/relay_request.dart';
+import 'package:popoling_runner_relay/log_file.dart';
+import 'package:popoling_runner_relay/relay_request.dart';
 
 import 'support/relay_binary.dart';
 
@@ -77,8 +77,8 @@ void main() {
     /// [shell] 이 띄운 중계의 PID. 다른 테스트 파일이 띄운 중계와 섞이지 않게 부모로 찾는다.
     Future<int?> relayPid(Process shell) async {
       for (var i = 0; i < 50; i++) {
-        // 이름(comm)이 아니라 명령줄로 찾는다. Linux 에서 Dart 실행 파일은 comm 을 'dart:ppoling-re' 로 바꾼다.
-        final r = await Process.run('pgrep', ['-P', '${shell.pid}', '-f', 'ppoling-relay']);
+        // 이름(comm)이 아니라 명령줄로 찾는다. Linux 에서 Dart 실행 파일은 comm 을 'dart:popoling-re' 로 바꾼다.
+        final r = await Process.run('pgrep', ['-P', '${shell.pid}', '-f', 'popoling-relay']);
         final pids = (r.stdout as String).trim().split('\n').where((l) => l.isNotEmpty).map(int.parse).toList();
         if (pids.isNotEmpty) return pids.last;
         await Future<void>.delayed(const Duration(milliseconds: 100));

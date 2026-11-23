@@ -1,4 +1,4 @@
-name: ppoling_checks
+name: popoling_checks
 description: "환경·연결 점검(C): 포트·HTTP 확인, 환경 점검, 실행 환경 기록·비교."
 publish_to: 'none'
 version: 0.1.0
@@ -9,7 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  ppoling_core:
+  popoling_core:
     path: ../core
 
 dev_dependencies:

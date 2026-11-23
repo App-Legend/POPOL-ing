@@ -5,8 +5,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart';
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_ai/ai.dart';
+import 'package:popoling_core/models.dart';
 
 void main() {
   final key = Platform.environment['GEMINI_API_KEY'];
@@ -38,7 +38,7 @@ void main() {
       try {
         await client.checkKey(key!);
         await expectLater(
-          client.checkKey('AQ.not-a-real-key-for-ppoling-test'),
+          client.checkKey('AQ.not-a-real-key-for-popoling-test'),
           throwsA(isA<LlmException>().having((e) => e.failure, 'failure', LlmFailure.invalidKey)),
         );
       } on LlmException catch (e) {
