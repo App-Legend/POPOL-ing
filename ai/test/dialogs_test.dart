@@ -85,6 +85,28 @@ void main() {
       expect(caught, LlmFailure.missingKey);
       expect(find.text('이 내용을 Google로 보낼까요?'), findsNothing);
     });
+
+    testWidgets('onConfirmed 는 [보내기]를 누른 직후·보내기 전에 한 번, [취소]하면 부르지 않는다', (tester) async {
+      desktop(tester);
+      final ai = FakeLlmClient();
+      final sentWhenConfirmed = <int>[];
+      await tester.pumpWidget(host((c) async {
+        await AiSender(ai).send(c, requestName: 'QA 결과 요약', content: 'x', onConfirmed: () => sentWhenConfirmed.add(ai.sent.length));
+      }));
+
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      await tester.tap(btn('취소'));
+      await tester.pumpAndSettle();
+      expect(sentWhenConfirmed, isEmpty);
+
+      await tester.tap(find.text('열기'));
+      await tester.pumpAndSettle();
+      await tester.tap(btn('보내기'));
+      await tester.pumpAndSettle();
+      expect(sentWhenConfirmed, [0], reason: '보내기 전에 불렸다');
+      expect(ai.sent, hasLength(1));
+    });
   });
 
   group('API 키 입력', () {

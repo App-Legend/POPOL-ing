@@ -56,4 +56,28 @@ void main() {
     await openAi(tester, app);
     expect(find.text('local-model · 키 ••••••••9876'), findsOneWidget);
   });
+
+  testWidgets('/ai 에 프로젝트 ID 를 넘기면 등록된 QaRunner·Orchestrator 로 헬스체크 결과 요약 카드를 그린다', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
+    final projects = FakeProjectRepository.withSamples();
+    final qa = FakeQaRunner(projects, failing: {'API 헬스'});
+    await qa.runChecks('my-team-project');
+    final app = TestRegistry()
+      ..provide<QaRunner>(qa)
+      ..provide<Orchestrator>(FakeOrchestrator(projects));
+    ai.register(app);
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      routes: app.routes,
+      home: Builder(builder: (c) => Btn('열기', onPressed: () => Navigator.pushNamed(c, '/ai', arguments: 'my-team-project'))),
+    ));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('헬스체크 결과 요약'), findsOneWidget);
+    expect(find.text('AI 요약'), findsOneWidget);
+  });
 }
