@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-lockup-dark.svg">
+    <img src="docs/assets/logo-lockup.svg" alt="포폴링 로고" width="160">
+  </picture>
+</p>
+
 # 포폴링 (POPOL-ing)
 
 내 프로젝트가 무엇이 있는지 한눈에 보고, 바로 실행하고, 계속 실행 가능한 상태로 관리하는 데스크톱 앱이에요.
