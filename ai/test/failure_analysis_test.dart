@@ -125,6 +125,77 @@ void main() {
     expect(envChangeLabel(const EnvChange(name: 'java', before: '17')), 'java 17 → 없음');
   });
 
+  group('답 읽기', () {
+    final input = FailureAnalysisInput(item: api, run: run, envChanges: [nodeChange], logs: apiLogs);
+    String reply(List<String> candidates) => '{"candidates":[${candidates.join(',')}]}';
+
+    test('울타리를 벗기고 근거 번호로 실제 줄을 찾는다', () {
+      final out = parseFailureAnalysis(
+        '```json\n${reply(['{"cause":"Node 버전이 바뀌었어요.","likelihood":"high","logs":[2],"env":[1],"fixes":["npm install 을 다시 해 주세요."]}'])}\n```',
+        input,
+      )!;
+      expect(out, hasLength(1));
+      expect(out.single.cause, 'Node 버전이 바뀌었어요.');
+      expect(out.single.likelihood, Likelihood.high);
+      expect(out.single.logLines, ['Error: The module was compiled against a different Node.js version']);
+      expect(out.single.envChanges.single.name, 'node');
+      expect(out.single.reason, isFalse);
+      expect(out.single.fixes, ['npm install 을 다시 해 주세요.']);
+    });
+
+    test('범위 밖·숫자 아닌 번호는 그 번호만 무시', () {
+      final out = parseFailureAnalysis(reply(['{"cause":"a","logs":[2, 9, "1", 0, 2],"env":[3]}']), input)!;
+      expect(out.single.logLines, ['Error: The module was compiled against a different Node.js version']);
+      expect(out.single.envChanges, isEmpty);
+    });
+
+    test('근거가 하나도 남지 않은 후보는 빼고, reason 만 있어도 남는다', () {
+      final out = parseFailureAnalysis(reply(['{"cause":"A","logs":[9]}', '{"cause":"B","reason":true}']), input)!;
+      expect(out.map((c) => c.cause), ['B']);
+      expect(out.single.reason, isTrue);
+    });
+
+    test('cause 가 비면 빼고, likelihood 가 없거나 모르는 값이면 가능성 있음', () {
+      final out = parseFailureAnalysis(
+        reply(['{"cause":"  ","logs":[1]}', '{"cause":"없음","logs":[1]}', '{"cause":"이상함","likelihood":"very","logs":[1]}']),
+        input,
+      )!;
+      expect(out.map((c) => c.cause), ['없음', '이상함']);
+      expect(out.every((c) => c.likelihood == Likelihood.possible), isTrue);
+    });
+
+    test('가능성 높음을 앞으로, 후보 3개·방법 4개까지', () {
+      final out = parseFailureAnalysis(
+        reply([
+          '{"cause":"P1","likelihood":"possible","logs":[1],"fixes":["a",""," b ","c","d","e"]}',
+          '{"cause":"H1","likelihood":"high","logs":[1]}',
+          '{"cause":"P2","likelihood":"possible","logs":[1]}',
+          '{"cause":"H2","likelihood":"high","logs":[1]}',
+        ]),
+        input,
+      )!;
+      expect(out.map((c) => c.cause), ['H1', 'H2', 'P1']);
+      expect(out.last.fixes, ['a', 'b', 'c', 'd']);
+    });
+
+    test('로그를 못 읽은 입력에 logs 번호가 오면 무시', () {
+      final noLogs = FailureAnalysisInput(item: api, run: run, envChanges: const []);
+      expect(parseFailureAnalysis(reply(['{"cause":"a","logs":[1],"env":[]}']), noLogs), isNull);
+    });
+
+    test('JSON 이 아니거나 남는 후보가 없으면 null', () {
+      expect(parseFailureAnalysis('죄송해요, 모르겠어요.', input), isNull);
+      expect(parseFailureAnalysis('{"candidates": "없음"}', input), isNull);
+      expect(parseFailureAnalysis(reply([]), input), isNull);
+    });
+
+    test('likelihoodLabel 과 지시문', () {
+      expect(likelihoodLabel(Likelihood.high), '가능성 높음');
+      expect(likelihoodLabel(Likelihood.possible), '가능성 있음');
+      expect(failureAnalysisSystem, allOf(contains('"candidates"'), contains('rm -rf'), contains('down -v')));
+    });
+  });
+
   group('collect', () {
     final projects = FakeProjectRepository.withSamples();
 
