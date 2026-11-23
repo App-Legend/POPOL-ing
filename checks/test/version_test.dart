@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_checks/src/env/version.dart';
+import 'package:popoling_checks/src/env/version.dart';
 
 void main() {
   group('readVersion: 버전 출력에서 처음 나오는 숫자 버전', () {

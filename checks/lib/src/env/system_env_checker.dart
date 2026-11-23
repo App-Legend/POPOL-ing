@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import '../port_owner/port_owner_lookup.dart';
 import 'version.dart';
@@ -17,7 +17,7 @@ typedef ResolveCli = List<String>? Function(String cli, List<String> args);
 ///
 /// - 버전은 `<명령> --version` 의 출력(stdout·stderr)에서 처음 나오는 `x.y(.z)` 로 읽는다.
 ///   출력 방식이 다른 도구만 [_versionArgs] 에 따로 적는다.
-/// - 명령 이름은 [_safeName] 만 실행한다. ppoling.yaml 은 남이 만든 것일 수 있어서.
+/// - 명령 이름은 [_safeName] 만 실행한다. popoling.yaml 은 남이 만든 것일 수 있어서.
 /// - 명령마다 [timeout] 안에 답이 없으면 점검 실패로 본다.
 class SystemEnvChecker implements EnvChecker {
   SystemEnvChecker({RunProcess run = runProcess, ResolveCli? resolve, this.timeout = const Duration(seconds: 10)})
@@ -69,8 +69,13 @@ class SystemEnvChecker implements EnvChecker {
         return result(EnvStatus.notInstalled, message: '$cli 명령을 찾을 수 없어요. 설치했다면 PATH 에 들어 있는지 확인해 주세요.');
       case _Failed(:final message):
         return result(EnvStatus.checkFailed, message: message);
-      case _Output(:final text):
+      case _Output(:final text, :final exitCode):
         final found = readVersion(text);
+        // 실패로 끝났고 버전도 없으면 설치됐다고 볼 수 없다(예: Java 가 없는 macOS 의 /usr/bin/java).
+        if (exitCode != 0 && found == null) {
+          final said = text.split('\n').map((l) => l.trim()).firstWhere((l) => l.isNotEmpty, orElse: () => '');
+          return result(EnvStatus.checkFailed, message: '$cli 가 실패했어요(종료 코드 $exitCode)${said.isEmpty ? '' : ': $said'}');
+        }
         final range = r.version;
         if (range == null) return result(EnvStatus.passed, found: found);
         if (versionAllows(range, '0') == null) return result(EnvStatus.checkFailed, found: found, message: '버전 조건을 읽을 수 없어요: $range');
@@ -106,7 +111,7 @@ class SystemEnvChecker implements EnvChecker {
       // shortcut: 시간을 넘긴 명령은 기다리지 않을 뿐 끝까지 죽이지는 않는다. 버전 명령은 금방 끝나서.
       final r = await _run(command.first, command.sublist(1)).timeout(timeout);
       if (requireSuccess && r.exitCode != 0) return _Failed('${r.stderr}'.trim());
-      return _Output('${r.stdout}\n${r.stderr}');
+      return _Output('${r.stdout}\n${r.stderr}', r.exitCode);
     } on ProcessException {
       return const _NotFound();
     } on TimeoutException {
@@ -142,6 +147,7 @@ class _Failed extends _CallResult {
 }
 
 class _Output extends _CallResult {
-  const _Output(this.text);
+  const _Output(this.text, this.exitCode);
   final String text;
+  final int exitCode;
 }

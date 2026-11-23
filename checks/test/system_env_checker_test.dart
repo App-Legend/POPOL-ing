@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_checks/src/env/system_env_checker.dart';
-import 'package:ppoling_checks/src/env/windows_cli.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_checks/src/env/system_env_checker.dart';
+import 'package:popoling_checks/src/env/windows_cli.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
 
 void main() {
   group('SystemEnvChecker (이 컴퓨터)', () {
@@ -62,6 +62,24 @@ void main() {
       final [withRange, withoutRange] = await checker.check(const [CliRequirement('tool', version: '>=1'), CliRequirement('tool')]);
       expect(withRange.status, EnvStatus.checkFailed);
       expect(withoutRange.status, EnvStatus.passed);
+    });
+
+    test('명령이 실패하고 버전도 못 읽으면 버전 조건이 없어도 점검 실패', () async {
+      // macOS 의 /usr/bin/java 는 Java 가 없으면 이렇게 답하고 1 로 끝난다.
+      final checker = SystemEnvChecker(
+        resolve: _direct,
+        run: (_, _) async => ProcessResult(0, 1, '', 'The operation couldn’t be completed. Unable to locate a Java Runtime.\n'),
+      );
+      final [r] = await checker.check([const CliRequirement('java')]);
+      expect(r.status, EnvStatus.checkFailed);
+      expect(r.message, contains('Unable to locate a Java Runtime'));
+    });
+
+    test('명령이 실패해도 버전을 읽었으면 그 버전으로 판단한다', () async {
+      final checker = SystemEnvChecker(resolve: _direct, run: (_, _) async => ProcessResult(0, 2, 'tool 1.4.0\n', ''));
+      final [r] = await checker.check([const CliRequirement('tool', version: '>=1')]);
+      expect(r.status, EnvStatus.passed);
+      expect(r.foundVersion, '1.4.0');
     });
 
     test('Windows 에서 PATH 에 없으면 실행하지 않고 미설치', () async {
