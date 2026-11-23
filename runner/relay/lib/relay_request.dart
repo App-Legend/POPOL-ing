@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-/// 앱이 중계(`ppoling-relay`) stdin 에 한 줄로 넘기는 요청. 비밀값을 명령 인자로 넘기지 않으려고 stdin 을 쓴다.
+/// 앱이 중계(`popoling-relay`) stdin 에 한 줄로 넘기는 요청. 비밀값을 명령 인자로 넘기지 않으려고 stdin 을 쓴다.
 class RelayRequest {
   RelayRequest({
     required this.command,

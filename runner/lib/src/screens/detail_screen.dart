@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
 
 import '../log/log_store.dart';
 import '../orchestrator/runner_orchestrator.dart';
@@ -204,7 +204,7 @@ class _DetailScreenState extends State<DetailScreen> {
             ('PID', Text(live == null ? '—' : '${live.process.pid}', style: mono)),
             ('소유권', Text(live == null ? '띄운 프로세스 없음' : '포폴링이 시작함', style: TextStyle(color: live == null ? C.muted : C.ok.$2))),
           ],
-          if (s is ComposeService) ('Compose 프로젝트', Text('ppoling-${_item.projectId}', style: mono)),
+          if (s is ComposeService) ('Compose 프로젝트', Text('popoling-${_item.projectId}', style: mono)),
         ]),
         if (s is RemoteService)
           Btn('다시 확인', onPressed: _busy ? null : () => _act(() => widget.runner.start(_item)))

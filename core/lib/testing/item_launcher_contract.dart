@@ -23,7 +23,7 @@ class ItemLauncherFixture {
   /// 아무 항목도 띄우지 않은 ItemLauncher.
   final ItemLauncher launcher;
 
-  /// 등록된 프로젝트. 아래 항목들이 이 프로젝트의 ppoling.yaml 에 있어야 한다.
+  /// 등록된 프로젝트. 아래 항목들이 이 프로젝트의 popoling.yaml 에 있어야 한다.
   final String projectId;
 
   /// Compose 항목. 띄우면 [composePort] 를 열고, 시작할 때 로그를 한 줄 이상 남겨야 한다.

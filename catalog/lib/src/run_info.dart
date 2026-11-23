@@ -36,7 +36,7 @@ class FakeRunInfoSource implements RunInfoSource {
     DateTime ago(Duration d) => now.subtract(d);
     return FakeRunInfoSource({
       'my-team-project': RunInfo(lastRunAt: ago(const Duration(hours: 1)), lastSucceeded: true, running: 3),
-      'ppoling': RunInfo(lastRunAt: ago(const Duration(days: 1)), lastSucceeded: true),
+      'popoling': RunInfo(lastRunAt: ago(const Duration(days: 1)), lastSucceeded: true),
       'weather-bot': RunInfo(lastRunAt: ago(const Duration(days: 249)), lastSucceeded: false),
       'shop-clone': RunInfo(lastRunAt: ago(const Duration(days: 349)), lastSucceeded: true),
     });

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart' as ai;
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_ai/ai.dart' as ai;
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
 
 /// `app/` 의 Registry 와 같은 규칙(나중에 등록한 것이 이긴다)의 테스트용 구현.
 class TestRegistry implements AppRegistry {

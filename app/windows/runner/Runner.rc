@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "dev.ppoling" "\0"
-            VALUE "FileDescription", "ppoling" "\0"
+            VALUE "CompanyName", "dev.popoling" "\0"
+            VALUE "FileDescription", "popoling" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "ppoling" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.ppoling. All rights reserved." "\0"
-            VALUE "OriginalFilename", "ppoling.exe" "\0"
-            VALUE "ProductName", "ppoling" "\0"
+            VALUE "InternalName", "popoling" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 dev.popoling. All rights reserved." "\0"
+            VALUE "OriginalFilename", "popoling.exe" "\0"
+            VALUE "ProductName", "popoling" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

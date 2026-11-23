@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 /// 준비 확인 결과.
 class ReadyResult {
@@ -58,7 +58,7 @@ class Readiness {
         if (regex.hasMatch(line)) finish(const ReadyResult.ready());
       }, onError: (Object e) {
         // 로그를 못 읽으면 제한 시간까지 기다려도 소용없으니 진짜 원인으로 바로 실패한다
-        finish(ReadyResult.failed('출력을 읽지 못했어요: ${e is PpolingException ? e.message : e}'));
+        finish(ReadyResult.failed('출력을 읽지 못했어요: ${e is PopolingException ? e.message : e}'));
       });
       final timer = Timer(condition.timeout, () => finish(_timedOut(condition, '"$pattern" 이 출력에 나오지 않았어요')));
       result.future.whenComplete(() {

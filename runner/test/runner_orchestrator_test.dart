@@ -5,15 +5,15 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/testing.dart';
-import 'package:ppoling_runner_relay/log_file.dart';
-import 'package:ppoling_runner/src/log/log_store.dart';
-import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
-import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
-import 'package:ppoling_runner/src/process/process_launcher.dart';
-import 'package:ppoling_runner/src/runtime/runtime_store.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/testing.dart';
+import 'package:popoling_runner_relay/log_file.dart';
+import 'package:popoling_runner/src/log/log_store.dart';
+import 'package:popoling_runner/src/orchestrator/runner_orchestrator.dart';
+import 'package:popoling_runner/src/process/posix_process_launcher.dart';
+import 'package:popoling_runner/src/process/process_launcher.dart';
+import 'package:popoling_runner/src/runtime/runtime_store.dart';
 
 import 'support/relay_binary.dart';
 
@@ -76,7 +76,7 @@ class _SlowStartLauncher extends FakeItemLauncher {
 
 /// 테스트마다 새 프로젝트 폴더. 테스트가 끝나면 지운다.
 String tempProject() {
-  final dir = Directory.systemTemp.createTempSync('ppoling_project_');
+  final dir = Directory.systemTemp.createTempSync('popoling_project_');
   addTearDown(() => dir.deleteSync(recursive: true));
   return dir.resolveSymbolicLinksSync();
 }
@@ -100,14 +100,14 @@ Project demo(String folder, {String api = 'echo "Started api"; exec sleep 30', L
 
 /// 테스트마다 새 로그 폴더. 테스트가 끝나면 지운다.
 LogStore tempLogs() {
-  final dir = Directory.systemTemp.createTempSync('ppoling_logs_');
+  final dir = Directory.systemTemp.createTempSync('popoling_logs_');
   addTearDown(() => dir.deleteSync(recursive: true));
   return LogStore(() async => dir);
 }
 
 /// 테스트마다 새 실행 기록 파일. 테스트가 끝나면 지운다.
 RuntimeStore tempStore() {
-  final dir = Directory.systemTemp.createTempSync('ppoling_runtime_');
+  final dir = Directory.systemTemp.createTempSync('popoling_runtime_');
   addTearDown(() => dir.deleteSync(recursive: true));
   return RuntimeStore(() async => File('${dir.path}/runtime.json'));
 }
@@ -496,7 +496,7 @@ void main() {
 
   group('실행 기록', () {
     test('마지막 전체 실행 결과는 앱을 다시 켜도 남는다', () async {
-      final dir = Directory.systemTemp.createTempSync('ppoling_runtime_');
+      final dir = Directory.systemTemp.createTempSync('popoling_runtime_');
       addTearDown(() => dir.deleteSync(recursive: true));
       RuntimeStore store() => RuntimeStore(() async => File('${dir.path}/runtime.json'));
       final project = demo(tempProject());
@@ -540,7 +540,7 @@ void main() {
     }
 
     test('앱을 다시 켜면 증명된 프로세스를 실행 중으로 되살리고 멈출 수 있다 (AT-06)', () async {
-      final dir = Directory.systemTemp.createTempSync('ppoling_recover_');
+      final dir = Directory.systemTemp.createTempSync('popoling_recover_');
       addTearDown(() => dir.deleteSync(recursive: true));
       RuntimeStore store() => RuntimeStore(() async => File('${dir.path}/runtime.json'));
       final project = withX();

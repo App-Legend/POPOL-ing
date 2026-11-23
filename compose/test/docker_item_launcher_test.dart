@@ -4,11 +4,11 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_compose/src/docker_cli.dart';
-import 'package:ppoling_compose/src/docker_item_launcher.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/testing.dart';
+import 'package:popoling_compose/src/docker_cli.dart';
+import 'package:popoling_compose/src/docker_item_launcher.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/testing.dart';
 
 void main() {
   group('DockerItemLauncher (실제 Docker)', () {
@@ -16,7 +16,7 @@ void main() {
     setUpAll(() async => dockerRunning = await DockerCli().daemonRunning());
 
     itemLauncherContract(() async {
-      final folder = await Directory.systemTemp.createTemp('ppoling-compose-test');
+      final folder = await Directory.systemTemp.createTemp('popoling-compose-test');
       addTearDown(() => folder.delete(recursive: true));
       final port = await _freePort();
       File('${folder.path}/docker-compose.yml').writeAsStringSync('''
@@ -72,10 +72,10 @@ services:
       );
     });
 
-    test('Compose 는 항상 -p ppoling-<프로젝트ID> 와 프로젝트 폴더 안의 compose 파일로 부른다', () async {
+    test('Compose 는 항상 -p popoling-<프로젝트ID> 와 프로젝트 폴더 안의 compose 파일로 부른다', () async {
       await launcher.start('shop', db);
       final up = docker.calls.firstWhere((c) => c.contains('up'));
-      expect(up.sublist(0, 3), ['compose', '-p', 'ppoling-shop']);
+      expect(up.sublist(0, 3), ['compose', '-p', 'popoling-shop']);
       expect(up[4], endsWith('docker-compose.yml'));
       expect(up.sublist(5), ['up', '-d', 'mysql']);
     });
@@ -95,7 +95,7 @@ services:
     test('프로젝트에 컨테이너가 안 남으면 볼륨 없이 down 해서 네트워크를 정리한다', () async {
       await launcher.stop('shop', db);
       final down = docker.calls.last;
-      expect(down.sublist(0, 3), ['compose', '-p', 'ppoling-shop']);
+      expect(down.sublist(0, 3), ['compose', '-p', 'popoling-shop']);
       expect(down.sublist(5), ['down']);
     });
 
@@ -107,7 +107,7 @@ services:
 
     test('compose 파일이 프로젝트 폴더 밖이면 거절하고 docker 를 부르지 않는다', () async {
       const escape = ComposeService(id: 'x', file: '../other/docker-compose.yml');
-      await expectLater(launcher.start('shop', escape), throwsA(isA<PpolingException>()));
+      await expectLater(launcher.start('shop', escape), throwsA(isA<PopolingException>()));
       expect(docker.calls.where((c) => c.contains('up')), isEmpty);
     });
 
@@ -127,10 +127,10 @@ services:
       expect(docker.calls.where((c) => c.first == 'compose'), isEmpty);
     });
 
-    test('포트 주인은 ppoling- 프로젝트의 컨테이너만 보고, 서비스 이름으로 항목을 찾는다', () async {
+    test('포트 주인은 popoling- 프로젝트의 컨테이너만 보고, 서비스 이름으로 항목을 찾는다', () async {
       docker.stdout['ps'] = 'shop\tmysql\t0.0.0.0:3306->3306/tcp\n'
-          'ppoling-shop\tmysql\t0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp\n'
-          'ppoling-shop\tredis\t0.0.0.0:6379->6379/tcp\n';
+          'popoling-shop\tmysql\t0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp\n'
+          'popoling-shop\tredis\t0.0.0.0:6379->6379/tcp\n';
       expect(await launcher.composeOwnerOf(3306), const ItemRef(projectId: 'shop', serviceId: 'db'));
       expect(await launcher.composeOwnerOf(6379), const ItemRef(projectId: 'shop', serviceId: 'all'));
       expect(await launcher.composeOwnerOf(8080), isNull);
@@ -138,7 +138,7 @@ services:
   });
 
   group('출력 읽기', () {
-    const row = '{"Service":"mysql","Name":"ppoling-shop-mysql-1","State":"running","Health":"healthy",'
+    const row = '{"Service":"mysql","Name":"popoling-shop-mysql-1","State":"running","Health":"healthy",'
         '"ExitCode":0,"Publishers":[{"PublishedPort":3306},{"PublishedPort":3306},{"PublishedPort":0}]}';
 
     test('ps json 은 한 줄에 하나 형식과 배열 형식을 모두 읽는다', () {

@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_catalog/src/catalog_view.dart';
-import 'package:ppoling_catalog/src/run_info.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_catalog/src/catalog_view.dart';
+import 'package:popoling_catalog/src/run_info.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/models.dart';
 
 final now = DateTime(2026, 11, 16, 15);
 
@@ -19,7 +19,7 @@ Project project(String id, {List<String> stack = const [], String? summary}) => 
       config: ProjectConfig(about: About(summary: summary, stack: stack)),
     );
 
-CatalogEntry ran(DateTime at) => CatalogEntry(SampleProjects.ppoling, RunInfo(lastRunAt: at, lastSucceeded: true));
+CatalogEntry ran(DateTime at) => CatalogEntry(SampleProjects.popoling, RunInfo(lastRunAt: at, lastSucceeded: true));
 
 List<String> names(List<CatalogEntry> entries) => [for (final e in entries) e.project.name];
 
@@ -43,7 +43,7 @@ void main() {
   });
 
   test('기록이 있으면 중지, 없으면 실행 기록 없음', () async {
-    expect(cardStateLabel(await sample('ppoling'), now), '중지');
+    expect(cardStateLabel(await sample('popoling'), now), '중지');
     expect(cardStateOf(await sample('algo-study'), now), CardState.never);
     expect(cardStateLabel(await sample('algo-study'), now), '실행 기록 없음');
   });
@@ -84,17 +84,17 @@ void main() {
 
   test('최근 실행순: 기록 없는 것은 맨 뒤', () async {
     expect(names(visibleEntries(await samples(), sort: CatalogSort.recent, now: now)),
-        ['my-team-project', 'ppoling', 'weather-bot', 'shop-clone', 'algo-study']);
+        ['my-team-project', 'popoling', 'weather-bot', 'shop-clone', 'algo-study']);
   });
 
   test('오래 방치된 순: 오래된 것부터, 기록 없는 것은 맨 뒤', () async {
     expect(names(visibleEntries(await samples(), sort: CatalogSort.neglected, now: now)),
-        ['shop-clone', 'weather-bot', 'ppoling', 'my-team-project', 'algo-study']);
+        ['shop-clone', 'weather-bot', 'popoling', 'my-team-project', 'algo-study']);
   });
 
   test('이름순', () async {
     expect(names(visibleEntries(await samples(), sort: CatalogSort.name, now: now)),
-        ['algo-study', 'my-team-project', 'ppoling', 'shop-clone', 'weather-bot']);
+        ['algo-study', 'my-team-project', 'popoling', 'shop-clone', 'weather-bot']);
   });
 
   test('가짜 실행 정보는 구독하면 지금 것부터 보내고 update 로 다시 보낸다', () async {

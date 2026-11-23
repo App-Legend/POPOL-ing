@@ -53,7 +53,7 @@ class FakeItemLauncher implements ItemLauncher {
           for (final name in names)
             ContainerStatus(
               service: name,
-              name: 'ppoling-$projectId-$name-1',
+              name: 'popoling-$projectId-$name-1',
               state: ContainerState.running,
               ports: List.unmodifiable(ports[name] ?? const <int>[]),
             ),

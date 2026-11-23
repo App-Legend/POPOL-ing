@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart';
-import 'package:ppoling_ai/src/send_confirm_dialog.dart' show withObjectParticle;
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/models.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_ai/ai.dart';
+import 'package:popoling_ai/src/send_confirm_dialog.dart' show withObjectParticle;
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/models.dart';
+import 'package:popoling_core/ui.dart';
 
 /// 버튼 하나만 있는 화면. 누르면 [onTap] 을 부른다.
 Widget host(Future<void> Function(BuildContext) onTap) => MaterialApp(

@@ -1,12 +1,12 @@
 /// AI 프로젝트 검사(D). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_ai/ai.dart' as ai;`
+/// `import 'package:popoling_ai/ai.dart' as ai;`
 ///
 /// Gemini API 는 이 패키지의 [GeminiLlmClient] 한 곳에서만 부른다.
 /// 보낼 때는 [AiSender] 로 비밀값을 가리고 보내기 전 확인 창을 거친다.
 library;
 
 import 'package:flutter/widgets.dart';
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/ai_screen.dart';
 import 'src/api_key_store.dart';

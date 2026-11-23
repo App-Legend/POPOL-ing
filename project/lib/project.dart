@@ -1,11 +1,11 @@
 /// 프로젝트·설정(B). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_project/project.dart' as project;`
+/// `import 'package:popoling_project/project.dart' as project;`
 library;
 
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/file_project_repository.dart';
 import 'src/schema_config_validator.dart';

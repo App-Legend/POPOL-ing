@@ -1,7 +1,7 @@
 import '../src/map_writer.dart';
 import 'ready_condition.dart';
 
-/// 실행 항목 하나. ppoling.yaml 의 `services` 목록 한 칸이다.
+/// 실행 항목 하나. popoling.yaml 의 `services` 목록 한 칸이다.
 ///
 /// 종류마다 하위 클래스가 있다: [ProcessService], [ComposeService], [RemoteService].
 /// 종류별로 다르게 처리할 때는 `switch` 로 나눈다.

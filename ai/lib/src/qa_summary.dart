@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_core/models.dart';
 
 /// AI-03 QA 결과 요약에 쓰는 화면 없는 로직(기획서 §2 "기본 QA와의 연계").
 ///

@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling/main.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling/main.dart';
+import 'package:popoling_core/ui.dart';
 
 Future<void> _open(WidgetTester tester, String route) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(PpolingApp(registry: buildRegistry(features: false)));
+  await tester.pumpWidget(PopolingApp(registry: buildRegistry(features: false)));
   tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
   await tester.pumpAndSettle();
 }

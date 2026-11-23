@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// 실행 항목 로그 파일의 줄 형식과 회전 쓰기. 중계(`ppoling-relay`)가 쓰고, 앱은 같은 형식으로 읽는다.
+/// 실행 항목 로그 파일의 줄 형식과 회전 쓰기. 중계(`popoling-relay`)가 쓰고, 앱은 같은 형식으로 읽는다.
 
 /// [secrets] 를 모두 `****` 로 가린다. 빈 값은 무시하고, 긴 값부터 가린다.
 String maskSecrets(String text, Iterable<String> secrets) {

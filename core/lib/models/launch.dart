@@ -7,7 +7,7 @@ sealed class LaunchStatus {
   const LaunchStatus();
 }
 
-/// Compose 항목의 컨테이너 상태(FR-08). 포폴링이 `ppoling-<프로젝트ID>` 로 띄운 컨테이너만 담는다.
+/// Compose 항목의 컨테이너 상태(FR-08). 포폴링이 `popoling-<프로젝트ID>` 로 띄운 컨테이너만 담는다.
 final class ComposeStatus extends LaunchStatus {
   const ComposeStatus(this.containers);
 
@@ -36,7 +36,7 @@ class ContainerStatus {
   /// compose 파일 안의 서비스 이름. 예: `mysql`
   final String service;
 
-  /// 컨테이너 이름. 예: `ppoling-my-team-project-mysql-1`
+  /// 컨테이너 이름. 예: `popoling-my-team-project-mysql-1`
   final String name;
 
   final ContainerState state;

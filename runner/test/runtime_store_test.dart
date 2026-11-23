@@ -1,15 +1,15 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_runner/src/runtime/runtime_store.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_runner/src/runtime/runtime_store.dart';
 
 void main() {
   late Directory dir;
   late File file;
 
   setUp(() {
-    dir = Directory.systemTemp.createTempSync('ppoling_runtime_');
+    dir = Directory.systemTemp.createTempSync('popoling_runtime_');
     file = File('${dir.path}${Platform.pathSeparator}runtime.json');
   });
   tearDown(() => dir.deleteSync(recursive: true));
@@ -58,8 +58,8 @@ void main() {
   test('jobName 을 저장하고 다시 읽는다', () async {
     final s = store();
     await s.putProcess(ProcessRecord(
-        item: api, pid: 1, pgid: 1, command: const ['a'], startedAt: DateTime(2026, 11, 22), appRunId: 'r', jobName: 'ppoling-1-2'));
-    expect((await store().processes()).single.jobName, 'ppoling-1-2');
+        item: api, pid: 1, pgid: 1, command: const ['a'], startedAt: DateTime(2026, 11, 22), appRunId: 'r', jobName: 'popoling-1-2'));
+    expect((await store().processes()).single.jobName, 'popoling-1-2');
   });
 
   test('jobName 이 없는 예전 기록도 읽는다', () async {

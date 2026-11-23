@@ -4,14 +4,14 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/testing.dart';
-import 'package:ppoling_runner/src/log/log_store.dart';
-import 'package:ppoling_runner/src/orchestrator/runner_orchestrator.dart';
-import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
-import 'package:ppoling_runner/src/runtime/runner_runtime_query.dart';
-import 'package:ppoling_runner/src/runtime/runtime_store.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/testing.dart';
+import 'package:popoling_runner/src/log/log_store.dart';
+import 'package:popoling_runner/src/orchestrator/runner_orchestrator.dart';
+import 'package:popoling_runner/src/process/posix_process_launcher.dart';
+import 'package:popoling_runner/src/runtime/runner_runtime_query.dart';
+import 'package:popoling_runner/src/runtime/runtime_store.dart';
 
 import 'support/relay_binary.dart';
 
@@ -28,7 +28,7 @@ Future<int> foreignProcess() async {
 /// web(프로세스, 포트 5173. `sh` 가 띄운 자식 `sleep` 이 포트를 잡았다고 친다)과 db(Compose, 포트 5432)를 띄운다.
 /// 다른 프로젝트 shop 의 web 도 5173 을 쓰지만 띄우지 않는다. 오케스트레이터도 돌려받은 RuntimeQuery 로 포트 주인을 찾는다.
 Future<(RunnerOrchestrator, RunnerRuntimeQuery, FakePortProbe)> setUpRunning() async {
-  final tmp = Directory.systemTemp.createTempSync('ppoling_rq_');
+  final tmp = Directory.systemTemp.createTempSync('popoling_rq_');
   addTearDown(() => tmp.deleteSync(recursive: true));
   final repo = FakeProjectRepository(projects: [
     Project(

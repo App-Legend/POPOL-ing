@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner_relay/log_file.dart';
+import 'package:popoling_runner_relay/log_file.dart';
 
 void main() {
   late Directory tmp;

@@ -4,8 +4,8 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_runner/src/process/posix_process_launcher.dart';
-import 'package:ppoling_runner/src/process/process_launcher.dart';
+import 'package:popoling_runner/src/process/posix_process_launcher.dart';
+import 'package:popoling_runner/src/process/process_launcher.dart';
 
 import 'support/relay_binary.dart';
 
@@ -52,7 +52,7 @@ void main() {
   });
 
   test('작업 폴더와 환경변수를 넘긴다', () async {
-    final p = await start(r'echo "$PPOLING_TEST"; pwd -P', env: {'PPOLING_TEST': 'ok'});
+    final p = await start(r'echo "$POPOLING_TEST"; pwd -P', env: {'POPOLING_TEST': 'ok'});
     final lines = (await p.output.toList()).map((l) => l.text).toList();
     expect(lines.first, 'ok');
     expect(lines.last, Directory(cwd).resolveSymbolicLinksSync());
@@ -78,7 +78,7 @@ void main() {
   });
 
   test('없는 명령은 예외 없이 종료 코드 127 과 이유를 남긴다', () async {
-    final p = await launch(['no-such-command-ppoling']);
+    final p = await launch(['no-such-command-popoling']);
     final lines = await p.output.toList();
     expect(await p.exitCode, 127);
     expect(lines.where((l) => l.isError), isNotEmpty);
@@ -99,10 +99,10 @@ void main() {
   });
 
   test("'-' 로 시작하는 명령도 옵션이 아니라 명령으로 넘긴다", () async {
-    final p = await launch(['-x-ppoling']);
+    final p = await launch(['-x-popoling']);
     final lines = await p.output.toList();
     expect(await p.exitCode, 127);
-    expect(lines.where((l) => l.isError).map((l) => l.text), contains(contains('-x-ppoling')));
+    expect(lines.where((l) => l.isError).map((l) => l.text), contains(contains('-x-popoling')));
   });
 
   test('입력을 기다리는 명령은 기다리지 않고 빈 입력을 받는다', () async {
@@ -116,7 +116,7 @@ void main() {
   });
 
   test('중계가 없으면 시작이 실패로 끝나고 이유를 알린다', () async {
-    final p = await PosixProcessLauncher(relay: '/nonexistent/ppoling-relay')
+    final p = await PosixProcessLauncher(relay: '/nonexistent/popoling-relay')
         .start(['sleep', '1'], workingDirectory: cwd, log: log());
     final lines = await p.output.toList();
     expect(await p.exitCode, 127);

@@ -6,7 +6,7 @@
 
 **Architecture:** 화면 없는 로직(`qa_summary.dart`: 보낼 글·안 부르는 조건·느려짐·답 읽기·근거 라벨)과 위젯(`qa_summary_panel.dart`)을 나눈다. 보내기는 기존 `AiSender` 한 길로만 한다. 화면 8은 `/ai` 인자로 받은 프로젝트 ID의 최근 검사로 패널을 그린다.
 
-**Tech Stack:** Flutter/Dart, `ppoling_core`(contracts·fakes·ui), `flutter_test`. 새 패키지 없음.
+**Tech Stack:** Flutter/Dart, `popoling_core`(contracts·fakes·ui), `flutter_test`. 새 패키지 없음.
 
 **Spec:** `docs/superpowers/specs/2026-11-22-ai-qa-summary-design.md`
 

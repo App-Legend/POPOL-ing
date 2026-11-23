@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_ai/ai.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
 
 const storedKey = 'AQ.test-key-abcdefghijklmnop';
 final checkedAt = DateTime(2026, 11, 22, 14, 5, 2);

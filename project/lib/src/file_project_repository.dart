@@ -2,18 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 import 'package:yaml/yaml.dart';
 
 /// [ProjectRepository] 의 진짜 구현.
 ///
 /// 등록 목록(ID·이름·폴더·등록 시각)은 앱 데이터 폴더의 JSON 파일 하나에 두고,
-/// 각 프로젝트의 설정은 그 폴더의 ppoling.yaml 에서 읽는다. 폴더와 ppoling.yaml 은 지우지 않는다.
+/// 각 프로젝트의 설정은 그 폴더의 popoling.yaml 에서 읽는다. 폴더와 popoling.yaml 은 지우지 않는다.
 class FileProjectRepository implements ProjectRepository {
   /// [listFile] 은 등록 목록 파일을 돌려준다. 처음 쓸 때 한 번만 부른다.
   FileProjectRepository(this._listFile, {DateTime Function()? clock}) : _clock = clock ?? DateTime.now;
 
-  static const configFileName = 'ppoling.yaml';
+  static const configFileName = 'popoling.yaml';
 
   final Future<File> Function() _listFile;
   final DateTime Function() _clock;
@@ -71,7 +71,7 @@ class FileProjectRepository implements ProjectRepository {
   Future<Project> updateProject(Project project) async {
     final projects = await _projects();
     final i = _indexOf(projects, project.id);
-    // shortcut: 설정은 메모리에만 바꾸고 ppoling.yaml 에는 아직 쓰지 않는다. core 1.0 의 toMap() 이 dev 에 들어오면 yaml_edit 로 저장한다.
+    // shortcut: 설정은 메모리에만 바꾸고 popoling.yaml 에는 아직 쓰지 않는다. core 1.0 의 toMap() 이 dev 에 들어오면 yaml_edit 로 저장한다.
     final updated = projects[i].copyWith(name: project.name, config: project.config);
     final next = [...projects]..[i] = updated;
     await _save(next);
@@ -101,9 +101,9 @@ class FileProjectRepository implements ProjectRepository {
       raw = jsonDecode(await file.readAsString()) as List<Object?>;
     } on FormatException {
       // 덮어쓰면 등록 목록을 잃으므로 고치지 않고 알린다.
-      throw PpolingException('등록한 프로젝트 목록 파일을 읽지 못했어요: ${file.path}');
+      throw PopolingException('등록한 프로젝트 목록 파일을 읽지 못했어요: ${file.path}');
     } on TypeError {
-      throw PpolingException('등록한 프로젝트 목록 파일을 읽지 못했어요: ${file.path}');
+      throw PopolingException('등록한 프로젝트 목록 파일을 읽지 못했어요: ${file.path}');
     }
     return [
       for (final item in raw.cast<Map<String, Object?>>())
@@ -128,7 +128,7 @@ class FileProjectRepository implements ProjectRepository {
     await temp.rename(file.path);
   }
 
-  /// 폴더의 ppoling.yaml 을 읽어 붙인다. 없으면 설정 없음, 형식이 틀리면 문제 목록에 담는다(등록은 된다).
+  /// 폴더의 popoling.yaml 을 읽어 붙인다. 없으면 설정 없음, 형식이 틀리면 문제 목록에 담는다(등록은 된다).
   Future<Project> _withConfig(Project project) async {
     final file = File('${project.folderPath}${Platform.pathSeparator}$configFileName');
     if (!await file.exists()) {
@@ -138,19 +138,19 @@ class FileProjectRepository implements ProjectRepository {
       final doc = loadYaml(await file.readAsString(), sourceUrl: file.uri);
       if (doc is! Map) {
         return project.copyWith(configIssues: const [
-          ConfigIssue(path: '', message: 'ppoling.yaml 의 맨 위는 "이름: 값" 형태여야 해요.'),
+          ConfigIssue(path: '', message: 'popoling.yaml 의 맨 위는 "이름: 값" 형태여야 해요.'),
         ]);
       }
       return project.copyWith(config: ProjectConfig.fromMap(doc));
     } on YamlException catch (e) {
       return project.copyWith(configIssues: [
-        ConfigIssue(path: '', message: 'ppoling.yaml 을 읽지 못했어요: ${e.message}', line: e.span == null ? null : e.span!.start.line + 1),
+        ConfigIssue(path: '', message: 'popoling.yaml 을 읽지 못했어요: ${e.message}', line: e.span == null ? null : e.span!.start.line + 1),
       ]);
     } on ConfigFormatException catch (e) {
       return project.copyWith(configIssues: e.issues);
     } on FileSystemException catch (e) {
       return project.copyWith(configIssues: [
-        ConfigIssue(path: '', message: 'ppoling.yaml 을 열지 못했어요: ${e.message}'),
+        ConfigIssue(path: '', message: 'popoling.yaml 을 열지 못했어요: ${e.message}'),
       ]);
     }
   }

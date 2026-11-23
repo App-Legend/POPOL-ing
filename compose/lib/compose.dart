@@ -1,8 +1,8 @@
 /// Docker·원격 연결(C). `app/` 은 [register] 하나만 부른다.
-/// `import 'package:ppoling_compose/compose.dart' as compose;`
+/// `import 'package:popoling_compose/compose.dart' as compose;`
 library;
 
-import 'package:ppoling_core/contracts.dart';
+import 'package:popoling_core/contracts.dart';
 
 import 'src/docker_item_launcher.dart';
 

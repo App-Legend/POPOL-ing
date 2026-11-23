@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_catalog/src/orchestrator_run_info.dart';
-import 'package:ppoling_catalog/src/run_info.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_catalog/src/orchestrator_run_info.dart';
+import 'package:popoling_catalog/src/run_info.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/models.dart';
 
 void main() {
   late FakeProjectRepository repo;
@@ -37,9 +37,9 @@ void main() {
   });
 
   test('전체 종료하면 실행 중은 0 이 되고 마지막 실행은 남는다', () async {
-    await runner.runAll('ppoling');
-    await runner.stopAll('ppoling');
-    final info = (await source.watchRunInfo().first)['ppoling']!;
+    await runner.runAll('popoling');
+    await runner.stopAll('popoling');
+    final info = (await source.watchRunInfo().first)['popoling']!;
     expect(info.running, 0);
     expect(info.lastRunAt, isNotNull);
   });
@@ -48,11 +48,11 @@ void main() {
     final got = <Map<String, RunInfo>>[];
     final sub = source.watchRunInfo().listen(got.add);
     await pumpEventQueue();
-    await runner.runAll('ppoling');
+    await runner.runAll('popoling');
     await pumpEventQueue();
     await sub.cancel();
     expect(got.first, isEmpty);
-    expect(got.last['ppoling']!.running, 1);
+    expect(got.last['popoling']!.running, 1);
   });
 
   test('실행 기록을 읽다 생긴 오류는 스트림 오류로 알린다', () async {
@@ -61,15 +61,15 @@ void main() {
   });
 
   test('프로젝트가 빠지면 그 실행 정보도 빠진다', () async {
-    await runner.runAll('ppoling');
+    await runner.runAll('popoling');
     final got = <Map<String, RunInfo>>[];
     final sub = source.watchRunInfo().listen(got.add);
     await pumpEventQueue();
-    await repo.removeProject('ppoling');
+    await repo.removeProject('popoling');
     await pumpEventQueue();
     await sub.cancel();
-    expect(got.first.keys, contains('ppoling'));
-    expect(got.last.keys, isNot(contains('ppoling')));
+    expect(got.first.keys, contains('popoling'));
+    expect(got.last.keys, isNot(contains('popoling')));
   });
 }
 

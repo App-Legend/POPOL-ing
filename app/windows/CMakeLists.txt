@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(ppoling LANGUAGES CXX)
+project(popoling LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "ppoling")
+set(BINARY_NAME "popoling")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -107,17 +107,17 @@ install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
 
-# 중계(ppoling-relay.exe)를 만들어 앱 실행 파일 옆에 둔다. 실행 제어(runner)가 서비스를 이 중계로 띄운다.
+# 중계(popoling-relay.exe)를 만들어 앱 실행 파일 옆에 둔다. 실행 제어(runner)가 서비스를 이 중계로 띄운다.
 # FLUTTER_ROOT 는 flutter/ 하위 폴더 범위에서만 정의되므로 같은 설정 파일을 여기서도 읽는다.
 include("${CMAKE_CURRENT_SOURCE_DIR}/flutter/ephemeral/generated_config.cmake")
 set(RELAY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../runner/relay")
-set(RELAY_EXE "${CMAKE_CURRENT_BINARY_DIR}/ppoling-relay.exe")
+set(RELAY_EXE "${CMAKE_CURRENT_BINARY_DIR}/popoling-relay.exe")
 file(GLOB_RECURSE RELAY_SOURCES "${RELAY_DIR}/*.dart")
 add_custom_command(
   OUTPUT "${RELAY_EXE}"
   COMMAND "${FLUTTER_ROOT}/bin/dart.bat" pub get --directory "${RELAY_DIR}"
-  COMMAND "${FLUTTER_ROOT}/bin/dart.bat" compile exe "${RELAY_DIR}/bin/ppoling_relay.dart" -o "${RELAY_EXE}"
+  COMMAND "${FLUTTER_ROOT}/bin/dart.bat" compile exe "${RELAY_DIR}/bin/popoling_relay.dart" -o "${RELAY_EXE}"
   DEPENDS ${RELAY_SOURCES}
   VERBATIM)
-add_custom_target(ppoling_relay ALL DEPENDS "${RELAY_EXE}")
+add_custom_target(popoling_relay ALL DEPENDS "${RELAY_EXE}")
 install(FILES "${RELAY_EXE}" DESTINATION "${CMAKE_INSTALL_PREFIX}" COMPONENT Runtime)

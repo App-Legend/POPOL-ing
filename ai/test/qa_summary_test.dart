@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/src/qa_summary.dart';
-import 'package:ppoling_core/models.dart';
+import 'package:popoling_ai/src/qa_summary.dart';
+import 'package:popoling_core/models.dart';
 
 final nowAt = DateTime(2026, 11, 22, 14, 5, 2);
 final prev1At = DateTime(2026, 11, 21, 18, 41);

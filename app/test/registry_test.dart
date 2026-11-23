@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling/main.dart';
-import 'package:ppoling/registry.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
+import 'package:popoling/main.dart';
+import 'package:popoling/registry.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
 
 void main() {
   test('나중에 등록한 구현이 가짜를 덮어쓴다', () {

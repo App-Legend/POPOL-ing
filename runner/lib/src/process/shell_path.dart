@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-const _marker = '__PPOLING_PATH__';
+const _marker = '__POPOLING_PATH__';
 const _fallbackDirs = ['/opt/homebrew/bin', '/usr/local/bin'];
 
 /// 터미널에서 쓰는 것과 같은 PATH. macOS 에서 아이콘으로 켠 앱은 PATH 가 `/usr/bin:/bin` 정도라

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ppoling_ai/ai.dart';
-import 'package:ppoling_ai/src/ai_screen.dart';
-import 'package:ppoling_core/contracts.dart';
-import 'package:ppoling_core/fakes.dart';
-import 'package:ppoling_core/ui.dart';
+import 'package:popoling_ai/ai.dart';
+import 'package:popoling_ai/src/ai_screen.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/fakes.dart';
+import 'package:popoling_core/ui.dart';
 
 const fullKey = 'AQ.stored-key-abcdefghijklmnop';
 

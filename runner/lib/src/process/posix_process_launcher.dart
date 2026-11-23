@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:ppoling_runner_relay/relay_request.dart';
+import 'package:popoling_runner_relay/relay_request.dart';
 
 import 'process_launcher.dart';
 import 'shell_path.dart';
@@ -50,15 +50,15 @@ class PosixProcessLauncher implements ProcessLauncher {
   @override
   Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName}) async {
     try {
-      // comm 대신 명령줄(args)을 본다. Linux 에서 Dart 실행 파일은 comm 을 'dart:ppoling-re' 로 바꾼다.
+      // comm 대신 명령줄(args)을 본다. Linux 에서 Dart 실행 파일은 comm 을 'dart:popoling-re' 로 바꾼다.
       // 중계는 인자 없이 띄우니 명령줄이 실행 파일 경로로 끝난다.
       final r = await Process.run('ps', ['-o', 'pgid=,lstart=,args=', '-p', '$pid'], environment: {'LC_ALL': 'C'});
-      // 예: "  812 Sun Nov 22 10:00:00 2026     /Applications/포폴링.app/Contents/MacOS/ppoling-relay"
+      // 예: "  812 Sun Nov 22 10:00:00 2026     /Applications/포폴링.app/Contents/MacOS/popoling-relay"
       final f = (r.stdout as String).trim().split(RegExp(r'\s+'));
       if (r.exitCode == 0 && f.length >= 7) {
         final lstart = _parseLstart(f.sublist(1, 6));
         final mine = int.tryParse(f[0]) == pid &&
-            f.sublist(6).join(' ').endsWith('ppoling-relay') &&
+            f.sublist(6).join(' ').endsWith('popoling-relay') &&
             lstart != null &&
             lstart.difference(startedAt).abs() <= const Duration(seconds: 2);
         return mine ? Attached(_AttachedProcess(pid, startedAt)) : const Unverified();
