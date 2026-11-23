@@ -772,7 +772,17 @@ void main() {
       o = orchestrator(project(), git: _FakeGit(ok, () => unawaited(o.stopAll('demo'))));
       final s = await o.runAll('demo');
       expect(s.items.single.outcome, ItemOutcome.skipped);
+      expect(s.pull!.message, contains('전체 종료'));
       expect(o.liveProcesses, isEmpty);
+    });
+
+    test('실행 중인 항목이 있으면 코드를 바꾸지 않는다', () async {
+      final o = orchestrator(project(), git: _FakeGit(ok));
+      addTearDown(() => o.stopAll('demo'));
+      await o.start(const ItemRef(projectId: 'demo', serviceId: 'x'));
+      final s = await o.runAll('demo');
+      expect(s.pull!.outcome, ItemOutcome.skipped);
+      expect(s.pull!.message, contains('실행 중인 항목'));
     });
   });
 }
@@ -786,10 +796,13 @@ class _FakeGit extends GitAdapter {
   var calls = 0;
 
   @override
-  Future<PullResult?> pull(String folder) async {
+  Future<PullResult?> pull(String folder, {String? Function()? veto}) async {
     calls++;
     onPull?.call();
-    return result;
+    return switch (veto?.call()) {
+      final reason? => PullResult(outcome: ItemOutcome.skipped, message: reason),
+      null => result,
+    };
   }
 }
 

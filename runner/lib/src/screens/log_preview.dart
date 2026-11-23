@@ -1,23 +1,28 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import '../log/log_line.dart';
 import '../log/log_store.dart';
+import 'log_tab.dart';
 
 /// 대시보드의 최근 로그. 실패한 항목을 먼저 보여 주고 다른 항목을 고를 수 있다. 비밀값은 파일에 쓸 때 이미 가려져 있다.
 class LogPreview extends StatefulWidget {
-  const LogPreview({super.key, required this.projectId, required this.services, required this.failed, required this.logs});
+  const LogPreview({super.key, required this.projectId, required this.services, required this.failed, required this.failedNow, required this.logs});
 
   final String projectId;
 
   /// 로그가 있는 항목(원격 제외). 비어 있으면 안 된다.
   final List<ServiceConfig> services;
 
-  /// 실패한 항목 ID. 새로 실패하면 고른 항목 대신 이것을 보여 준다.
+  /// 고르지 않았을 때 먼저 보여 줄 실패한 항목 ID.
   final String? failed;
+
+  /// 지금 실패 상태인 항목 ID. 여기 새로 들어온 항목은 고른 항목 대신 보여 준다.
+  final Set<String> failedNow;
   final LogStore logs;
 
   @override
@@ -44,13 +49,15 @@ class _LogPreviewState extends State<LogPreview> {
   void initState() {
     super.initState();
     unawaited(_read());
-    _poll = Timer.periodic(const Duration(seconds: 1), (_) => _read());
+    _poll = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (ModalRoute.of(context)?.isCurrent ?? true) unawaited(_read()); // 다른 화면에 가려졌으면 읽지 않는다
+    });
   }
 
   @override
   void didUpdateWidget(LogPreview old) {
     super.didUpdateWidget(old);
-    if (widget.failed != null && widget.failed != old.failed) _picked = null;
+    _picked = widget.failedNow.difference(old.failedNow).firstOrNull ?? _picked;
     if (_service.id != _linesOf) unawaited(_read());
   }
 
@@ -65,9 +72,11 @@ class _LogPreviewState extends State<LogPreview> {
     final item = _item;
     final raw = await widget.logs.tail(item, lines: 8, maxRead: 64 * 1024);
     if (!mounted || item != _item) return; // 읽는 사이 다른 항목을 골랐다
+    final lines = [for (final l in raw) parseLogLine(l)];
+    if (_linesOf == item.serviceId && listEquals(lines, _lines)) return;
     setState(() {
       _linesOf = item.serviceId;
-      _lines = [for (final l in raw) parseLogLine(l)];
+      _lines = lines;
     });
   }
 
@@ -91,9 +100,11 @@ class _LogPreviewState extends State<LogPreview> {
           ),
           LinkText('전체 로그', size: 13, color: const Color(0xFF9DB6FF), onTap: () => Navigator.pushNamed(context, '/detail', arguments: _item)),
         ]),
-        if (widget.services.length > 1) Wrap(spacing: 4, runSpacing: 4, children: [for (final o in widget.services) _tab(o.id, o.id == s.id)]),
+        if (widget.services.length > 1) Wrap(spacing: 4, runSpacing: 4, children: [for (final o in widget.services) LogTab(o.id, selected: o.id == s.id, onPressed: () => _pick(o.id))]),
         if (s is! ProcessService)
           const Text('Compose 로그는 [전체 로그]에서 볼 수 있어요.', style: TextStyle(fontSize: 13, color: Color(0xFF8A909C)))
+        else if (_linesOf != s.id)
+          const Text('로그를 읽고 있어요.', style: TextStyle(fontSize: 13, color: Color(0xFF8A909C)))
         else if (lines.isEmpty)
           const Text('아직 로그가 없어요. 항목을 시작하면 여기에 출력이 보여요.', style: TextStyle(fontSize: 13, color: Color(0xFF8A909C)))
         else
@@ -112,18 +123,4 @@ class _LogPreviewState extends State<LogPreview> {
     final chars = text.characters;
     return chars.length > 300 ? '${chars.take(300)}…' : text;
   }
-
-  Widget _tab(String id, bool selected) => Semantics(
-        selected: selected,
-        child: TextButton(
-          onPressed: () => _pick(id),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, 36),
-            backgroundColor: selected ? C.darkLine : null,
-            foregroundColor: selected ? Colors.white : const Color(0xFF9AA1AD),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          ),
-          child: Text(id),
-        ),
-      );
 }

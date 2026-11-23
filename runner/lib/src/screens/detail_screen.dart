@@ -9,6 +9,7 @@ import '../log/log_line.dart';
 import '../log/log_store.dart';
 import '../orchestrator/runner_orchestrator.dart';
 import 'item_status.dart';
+import 'log_tab.dart';
 
 /// 4. 실행 항목 상세 · 로그. 대시보드가 `arguments` 로 [ItemRef] 를 넘긴다.
 ///
@@ -236,16 +237,7 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _logBox(ServiceConfig s) {
-    Widget tab(String label, int i) => TextButton(
-          onPressed: () => setState(() => _filter = i),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, 36),
-            backgroundColor: _filter == i ? C.darkLine : null,
-            foregroundColor: _filter == i ? Colors.white : const Color(0xFF9AA1AD),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          ),
-          child: Text(label),
-        );
+    Widget tab(String label, int i) => LogTab(label, selected: _filter == i, onPressed: () => setState(() => _filter = i));
     final visible = _visible;
     final empty = switch (s) {
       RemoteService() => '원격 항목은 포폴링이 띄우지 않아 로그가 없어요.',

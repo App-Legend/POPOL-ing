@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -34,6 +35,26 @@ class _PortBusyOrchestrator extends FakeOrchestrator {
   Future<ItemResult> stop(ItemRef item) async {
     stopped.add(item);
     return super.stop(item);
+  }
+}
+
+/// [gate] 를 열 때까지 전체 실행이 기다린다.
+class _SlowRunAll extends FakeOrchestrator {
+  _SlowRunAll(super.projects);
+
+  final gate = Completer<void>();
+  var stopAlls = 0;
+
+  @override
+  Future<RunSummary> runAll(String projectId) async {
+    await gate.future;
+    return super.runAll(projectId);
+  }
+
+  @override
+  Future<RunSummary> stopAll(String projectId) {
+    stopAlls++;
+    return super.stopAll(projectId);
   }
 }
 
@@ -166,6 +187,36 @@ void main() {
       await tester.tap(tab('db'));
       await tester.pumpAndSettle();
       expect(find.text('Compose 로그는 [전체 로그]에서 볼 수 있어요.'), findsOneWidget);
+    });
+
+    testWidgets('새 실패가 아니면 고른 로그를 유지하고, 다른 항목이 새로 실패하면 그것을 보여 준다', (tester) async {
+      final projects = FakeProjectRepository.withSamples();
+      final services = (await projects.getProject('my-team-project')).config!.services.where((s) => s is! RemoteService).toList();
+      Future<void> show(String? failed, Set<String> now) => tester.pumpWidget(MaterialApp(
+          home: Scaffold(body: LogPreview(projectId: 'p', services: services, failed: failed, failedNow: now, logs: _FakeLogs({})))));
+      await show(null, {});
+      await tester.tap(find.widgetWithText(TextButton, 'web'));
+      await show('api', {}); // 지난 실행의 실패
+      await tester.pump();
+      expect(find.text('최근 로그 · web'), findsOneWidget);
+      await show('api', {'api'});
+      expect(find.text('최근 로그 · api'), findsOneWidget);
+      await show('api', {'api', 'db'});
+      expect(find.text('최근 로그 · db'), findsOneWidget);
+    });
+
+    testWidgets('최신 코드를 기다리는 동안 알리고 전체 종료를 누를 수 있다', (tester) async {
+      final runner = _SlowRunAll(projects);
+      await pumpScreen(tester, dashboard(runner, git: _FakeGit(const GitStatus(branch: 'dev', changed: 0))));
+      await tester.tap(find.text('전체 실행'));
+      await tester.pump();
+      expect(find.textContaining('전체 실행을 준비하고'), findsOneWidget);
+      await tester.tap(find.text('전체 종료'));
+      await tester.pumpAndSettle();
+      expect(runner.stopAlls, 1);
+      runner.gate.complete();
+      await tester.pumpAndSettle();
+      expect(find.textContaining('전체 실행을 준비하고'), findsNothing);
     });
 
     testWidgets('고르지 않았으면 첫 항목이 아니라 실패한 항목의 로그를 보여 준다', (tester) async {

@@ -30,6 +30,12 @@ void main() {
     expect(cut.every((l) => RegExp(r'^line \d+$').hasMatch(l)), isTrue);
   });
 
+  test('tail 은 아주 긴 한 줄뿐이면 그 끝부분을 돌려준다', () async {
+    logOf('').createSync(recursive: true);
+    logOf('').writeAsStringSync('${'x' * 200}끝\n');
+    expect((await store().tail(item, maxRead: 50)).single, endsWith('x끝'));
+  });
+
   test('tail 은 지금 파일 줄이 모자라면 막 밀려난 .log.1 끝에서 채운다', () async {
     logOf('.1').createSync(recursive: true);
     logOf('.1').writeAsStringSync('old 1\nold 2\nold 3\n');

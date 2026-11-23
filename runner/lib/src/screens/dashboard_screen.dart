@@ -138,7 +138,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_project case final p?) unawaited(_loadGit(p.folderPath));
       });
 
-  Future<void> _stopAll() => _run('all', () async {
+  /// 전체 실행이 최신 코드를 기다리는 중에도 누를 수 있게 따로 막는다.
+  Future<void> _stopAll() => _run('stopAll', () async {
         final s = await widget.runner.stopAll(_id);
         final failed = s.items.where((r) => r.outcome == ItemOutcome.failed).toList();
         if (mounted && failed.isNotEmpty) toast(context, '${failed.first.item.serviceId}: ${failed.first.reason}');
@@ -190,7 +191,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_loadError != null) Text(_loadError!, style: const TextStyle(color: C.muted)) else const LinearProgressIndicator(),
       ]);
     }
-    final allBusy = _busy.contains('all');
+    final allBusy = _busy.contains('all') || _busy.contains('stopAll');
+    final waitingPull = _busy.contains('all') &&
+        _git != null &&
+        (p.config?.git.pullBeforeRun ?? false) &&
+        !_services.any((s) => isUp(widget.runner.stateOf(_ref(s))));
     final logged = [for (final s in _services) if (s is! RemoteService) s];
     return AppPage(
       crumbs: [('개발', '/home'), (p.name, null)],
@@ -202,11 +207,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text(p.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
               Text(p.folderPath, style: mono.copyWith(fontSize: 13, color: C.muted)),
               if (_git case final git?) _gitLine(git),
+              if (waitingPull)
+                const Text('전체 실행을 준비하고 있어요. 최신 코드를 확인하느라 1분쯤 걸릴 수 있어요.', style: TextStyle(fontSize: 13, color: C.text2)),
             ]),
           ),
           Wrap(spacing: 8, runSpacing: 8, children: [
             Btn('전체 실행', primary: true, icon: Icons.play_arrow, onPressed: allBusy || _services.isEmpty ? null : _runAll),
-            Btn('전체 종료', icon: Icons.stop, onPressed: allBusy || _services.isEmpty ? null : _stopAll),
+            Btn('전체 종료', icon: Icons.stop, onPressed: _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll),
             Btn('헬스체크', onPressed: () => Navigator.pushNamed(context, '/qa', arguments: _id)),
             Btn('AI 검사', onPressed: () => Navigator.pushNamed(context, '/ai', arguments: _id)),
             Btn('설정', icon: Icons.settings_outlined, onPressed: () => Navigator.pushNamed(context, '/settings', arguments: _id)),
@@ -249,7 +256,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ]),
         ),
         if (widget.logs case final logs? when logged.isNotEmpty)
-          LogPreview(projectId: _id, services: logged, failed: _failedOf(logged), logs: logs),
+          LogPreview(projectId: _id, services: logged, failed: _failedOf(logged), failedNow: {for (final s in logged) if (widget.runner.stateOf(_ref(s)) == ItemState.failed) s.id}, logs: logs),
       ],
     );
   }
@@ -283,7 +290,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _itemRow(ServiceConfig s) {
     final item = _ref(s);
     final state = widget.runner.stateOf(item);
-    final busy = _busy.contains(s.id) || _busy.contains('all');
+    final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
     final reason = _reasons[item];
     final owner = _owners[item];
     final Widget action = switch (s) {

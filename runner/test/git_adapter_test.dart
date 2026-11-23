@@ -142,6 +142,59 @@ void main() {
     expect(File('$mine/hook-ran').existsSync(), isFalse);
   });
 
+  for (final key in ['core.sshCommand', 'credential.helper', 'credential.https://x.y.helper', 'remote.origin.uploadpack', 'filter.x.clean']) {
+    test('저장소 설정에 $key 가 있으면 명령을 실행하지 않고 건너뛴다', () async {
+      teammate('2');
+      git(mine, ['config', key, 'echo ran > "$mine/ran"; false']);
+      if (key.startsWith('filter')) {
+        write(mine, '.gitattributes', '* filter=x');
+        write(mine, 'a.txt', '3');
+        expect(await adapter.status(mine), isNull);
+      } else {
+        expect(await adapter.status(mine), isNotNull);
+        expect(await adapter.fetch(mine), isFalse);
+      }
+      expect((await adapter.pull(mine))!.message, contains('Git 설정'));
+      expect(File('$mine/ran').existsSync(), isFalse);
+    });
+  }
+
+  test('폴더를 추적하지 않는 상위 저장소는 무시한다', () async {
+    final sub = Directory('$mine/projects/demo')..createSync(recursive: true);
+    write(sub.path, 'x.txt', 'x');
+    write(mine, '.git/info/exclude', 'projects');
+    teammate('2');
+    expect(await adapter.status(sub.path), isNull);
+    expect(await adapter.fetch(sub.path), isFalse);
+    expect(await adapter.pull(sub.path), isNull);
+    expect(read(mine, 'a.txt'), '1');
+  });
+
+  test('새 폴더 안의 파일도 하나씩 세고, 숨기는 설정을 따르지 않는다', () async {
+    git(mine, ['config', 'status.showUntrackedFiles', 'no']);
+    Directory('$mine/new').createSync();
+    write(mine, 'new/a', 'a');
+    write(mine, 'new/b', 'b');
+    expect((await adapter.status(mine))!.changed, 2);
+  });
+
+  test('fetch 하는 사이 막으면 파일을 바꾸지 않는다', () async {
+    teammate('2');
+    var asked = 0;
+    final r = (await adapter.pull(mine, veto: () => asked++ == 0 ? null : '멈춤'))!;
+    expect((r.outcome, r.message), (ItemOutcome.skipped, '멈춤'));
+    expect(read(mine, 'a.txt'), '1');
+  });
+
+  test('같은 저장소의 다른 폴더에서 동시에 받아도 서로 방해하지 않는다', () async {
+    Directory('${at('other')}/app').createSync();
+    teammate('x', name: 'app/x.txt');
+    await adapter.pull(mine);
+    teammate('2');
+    final all = await Future.wait([for (var i = 0; i < 3; i++) ...[adapter.pull(mine), adapter.pull('$mine/app')]]);
+    expect(all.map((r) => r!.outcome), everyElement(ItemOutcome.ok));
+  });
+
   test('동시에 불러도 서로 방해하지 않는다', () async {
     teammate('2');
     final (fetched, pulled) = await (adapter.fetch(mine), adapter.pull(mine)).wait;
