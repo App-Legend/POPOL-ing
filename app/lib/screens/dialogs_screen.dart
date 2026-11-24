@@ -112,6 +112,113 @@ class _AddProjectDialogState extends State<AddProjectDialog> {
       ]);
 }
 
+/// 프로젝트 이름 수정 대화상자. [projectId] 로 기존 프로젝트를 찾아 이름만 바꾼다.
+/// id·폴더·등록 시각은 바뀌지 않는다.
+class EditProjectDialog extends StatefulWidget {
+  const EditProjectDialog({super.key, required this.projectId, required this.initialName});
+  final String projectId;
+  final String initialName;
+
+  @override
+  State<EditProjectDialog> createState() => _EditProjectDialogState();
+}
+
+class _EditProjectDialogState extends State<EditProjectDialog> {
+  late final TextEditingController _name;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _name = TextEditingController(text: widget.initialName);
+  }
+
+  Future<void> _save() async {
+    setState(() => _error = null);
+    try {
+      final repo = RegistryHolder.of(context).read<ProjectRepository>();
+      final existing = await repo.getProject(widget.projectId);
+      await repo.updateProject(existing.copyWith(name: _name.text.trim()));
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on PpolingException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _DialogBody('프로젝트 이름 수정', [
+        if (_error != null)
+          Notice(
+            bg: C.bad.$1,
+            border: const Color(0xFFF3B8B2),
+            icon: Icons.error_outline,
+            iconColor: const Color(0xFF7A1C14),
+            child: Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFF7A1C14))),
+          ),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, spacing: 8, children: [
+          Expanded(child: field('이름', widget.initialName, controller: _name)),
+        ]),
+        const Text('프로젝트 화면에 표시될 이름이에요. 폴더 경로와 등록 시각은 바뀌지 않아요.',
+            style: TextStyle(fontSize: 13, color: C.text2, height: 1.6)),
+        Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
+          Btn('취소', onPressed: () => _close(context)),
+          Btn('저장', primary: true, onPressed: _save),
+        ]),
+      ]);
+}
+
+/// 프로젝트 삭제 확인 대화상자. 앱 목록에서만 빼고 폴더·설정 파일은 지우지 않는다.
+class DeleteProjectDialog extends StatefulWidget {
+  const DeleteProjectDialog({super.key, required this.projectId, required this.projectName});
+  final String projectId;
+  final String projectName;
+
+  @override
+  State<DeleteProjectDialog> createState() => _DeleteProjectDialogState();
+}
+
+class _DeleteProjectDialogState extends State<DeleteProjectDialog> {
+  String? _error;
+
+  Future<void> _remove() async {
+    setState(() => _error = null);
+    try {
+      await RegistryHolder.of(context).read<ProjectRepository>().removeProject(widget.projectId);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } on PpolingException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => _DialogBody('프로젝트 삭제', [
+        if (_error != null)
+          Notice(
+            bg: C.bad.$1,
+            border: const Color(0xFFF3B8B2),
+            icon: Icons.error_outline,
+            iconColor: const Color(0xFF7A1C14),
+            child: Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFF7A1C14))),
+          ),
+        Text.rich(TextSpan(style: const TextStyle(fontSize: 14, color: C.text2, height: 1.6), children: [
+          TextSpan(text: '${widget.projectName} 프로젝트를 앱 목록에서 없앨까요?\n'),
+          TextSpan(text: '폴더와 설정 파일은 지우지 않아요.', style: const TextStyle(fontWeight: FontWeight.w500)),
+        ])),
+        Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
+          Btn('취소', onPressed: () => _close(context)),
+          Btn('삭제', primary: true, onPressed: _remove),
+        ]),
+      ]);
+}
+
 class ConfirmCommandsDialog extends StatelessWidget {
   const ConfirmCommandsDialog({super.key});
 

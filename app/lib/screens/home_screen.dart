@@ -12,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 typedef _Project = ({
+  String id,
   String name,
   String desc,
   (String, (Color, Color), bool) status,
@@ -26,11 +27,11 @@ typedef _Project = ({
 // shortcut: 목업용 고정 데이터, 프로젝트 모듈이 생기면 그 인터페이스에서 받아온다.
 // idleDays: 마지막 실행 뒤 지난 날수(목업 기준일 2026-11-11). null 은 실행 기록 없음.
 const List<_Project> _projects = [
-  (name: 'my-team-project', desc: '동아리 행사 예약 웹서비스 (2025 캡스톤)', status: ('실행 중 3/3', C.ok, true), stack: ['Spring Boot', 'React', 'MySQL'], last: '마지막 실행 오늘 14:02 · ', idleDays: 0, ok: true, actions: ['전체 종료'], focus: true),
-  (name: 'popoling', desc: '포폴링 데스크톱 앱', status: ('중지', C.idle, true), stack: ['Flutter'], last: '마지막 실행 어제 · ', idleDays: 1, ok: true, actions: ['전체 실행'], focus: false),
-  (name: 'weather-bot', desc: '날씨 알림 디스코드 봇', status: ('오래됨 · 8개월', C.warn, false), stack: ['Node.js'], last: '마지막 실행 2026-03-12 · ', idleDays: 244, ok: false, actions: ['실행 점검'], focus: false),
-  (name: 'shop-clone', desc: '쇼핑몰 클론 코딩', status: ('오래됨 · 11개월', C.warn, false), stack: ['Next.js', 'PostgreSQL'], last: '마지막 실행 2025-12-02 · ', idleDays: 344, ok: true, actions: ['실행 점검'], focus: false),
-  (name: 'algo-study', desc: '설명이 없어요 — README에서 가져오거나 직접 적어 주세요.', status: ('실행 기록 없음', C.idle, false), stack: ['Python'], last: null, idleDays: null, ok: true, actions: <String>[], focus: false),
+  (id: 'my-team-project', name: 'my-team-project', desc: '동아리 행사 예약 웹서비스 (2025 캡스톤)', status: ('실행 중 3/3', C.ok, true), stack: ['Spring Boot', 'React', 'MySQL'], last: '마지막 실행 오늘 14:02 · ', idleDays: 0, ok: true, actions: ['전체 종료'], focus: true),
+  (id: 'popoling', name: 'popoling', desc: '포폴링 데스크톱 앱', status: ('중지', C.idle, true), stack: ['Flutter'], last: '마지막 실행 어제 · ', idleDays: 1, ok: true, actions: ['전체 실행'], focus: false),
+  (id: 'weather-bot', name: 'weather-bot', desc: '날씨 알림 디스코드 봇', status: ('오래됨 · 8개월', C.warn, false), stack: ['Node.js'], last: '마지막 실행 2026-03-12 · ', idleDays: 244, ok: false, actions: ['실행 점검'], focus: false),
+  (id: 'shop-clone', name: 'shop-clone', desc: '쇼핑몰 클론 코딩', status: ('오래됨 · 11개월', C.warn, false), stack: ['Next.js', 'PostgreSQL'], last: '마지막 실행 2025-12-02 · ', idleDays: 344, ok: true, actions: ['실행 점검'], focus: false),
+  (id: 'algo-study', name: 'algo-study', desc: '설명이 없어요 — README에서 가져오거나 직접 적어 주세요.', status: ('실행 기록 없음', C.idle, false), stack: ['Python'], last: null, idleDays: null, ok: true, actions: <String>[], focus: false),
 ];
 
 /// 필터 칩 이름에 맞는 프로젝트인지. 상태 필터가 아니면 기술 스택 이름으로 본다.
@@ -163,6 +164,26 @@ class _HomeScreenState extends State<HomeScreen> {
             for (final a in p.actions)
               Expanded(child: Btn(a, onPressed: a == '실행 점검' ? () => Navigator.pushNamed(context, '/env') : () {})),
           ],
+        ]),
+        Row(spacing: 8, children: [
+          Expanded(
+            child: Btn('수정', onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (_) => Dialog(child: EditProjectDialog(projectId: p.id, initialName: p.name)),
+              );
+              if (ok == true && mounted) setState(() {});
+            }),
+          ),
+          Expanded(
+            child: Btn('삭제', onPressed: () async {
+              final ok = await showDialog<bool>(
+                context: context,
+                builder: (_) => Dialog(child: DeleteProjectDialog(projectId: p.id, projectName: p.name)),
+              );
+              if (ok == true && mounted) setState(() {});
+            }),
+          ),
         ]),
       ]),
     );
