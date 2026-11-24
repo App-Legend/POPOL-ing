@@ -10,6 +10,7 @@ class EnvCheckerFixture {
     required this.checker,
     required this.installedCli,
     required this.dockerRunning,
+    this.dockerInstalled = true,
     this.missingCli = 'popoling-no-such-cli',
   });
 
@@ -23,6 +24,9 @@ class EnvCheckerFixture {
 
   /// 이 환경에서 Docker 데몬이 켜져 있는가. 진짜 구현 테스트에서는 CI 환경에 맞춰 넘긴다.
   final bool dockerRunning;
+
+  /// 이 환경에 docker 명령이 있는가. 없으면 데몬 미실행이 아니라 미설치여야 한다.
+  final bool dockerInstalled;
 }
 
 /// [EnvChecker] 구현이 계약을 지키는지 확인하는 테스트 묶음. [setUp] 은 테스트마다 불린다.
@@ -75,14 +79,14 @@ void envCheckerContract(Future<EnvCheckerFixture> Function() setUp) {
     expect(installed.status, EnvStatus.passed);
   });
 
-  test('Docker 는 켜져 있으면 통과와 버전, 꺼져 있으면 데몬 미실행', () async {
+  test('Docker 는 켜져 있으면 통과와 버전, 꺼져 있으면 데몬 미실행, 없으면 미설치', () async {
     final f = await setUp();
     final [result] = await f.checker.check([const DockerRequirement()]);
     if (f.dockerRunning) {
       expect(result.status, EnvStatus.passed);
       expect(result.foundVersion, isNotNull);
     } else {
-      expect(result.status, EnvStatus.daemonNotRunning);
+      expect(result.status, f.dockerInstalled ? EnvStatus.daemonNotRunning : EnvStatus.notInstalled);
       expect(result.foundVersion, isNull);
     }
   });

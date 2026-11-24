@@ -10,15 +10,24 @@ import 'package:popoling_core/testing.dart';
 void main() {
   group('SystemEnvChecker (이 컴퓨터)', () {
     late bool dockerRunning;
+    var dockerInstalled = true;
     setUpAll(() async {
       try {
         dockerRunning = (await Process.run('docker', ['version', '--format', '{{.Server.Version}}'])).exitCode == 0;
       } on ProcessException {
         dockerRunning = false;
+        dockerInstalled = false;
       }
     });
 
-    envCheckerContract(() async => EnvCheckerFixture(checker: SystemEnvChecker(), installedCli: 'git', dockerRunning: dockerRunning));
+    envCheckerContract(
+      () async => EnvCheckerFixture(
+        checker: SystemEnvChecker(),
+        installedCli: 'git',
+        dockerRunning: dockerRunning,
+        dockerInstalled: dockerInstalled,
+      ),
+    );
   });
 
   group('SystemEnvChecker (기록된 출력)', () {
