@@ -49,8 +49,9 @@ class FileProjectRepository implements ProjectRepository {
     if (!await Directory(folderPath).exists()) {
       throw FolderNotFoundException(folderPath);
     }
+    final normalized = _canonical(folderPath);
     for (final p in projects) {
-      if (p.folderPath == folderPath) {
+      if (_canonical(p.folderPath) == normalized) {
         throw ProjectAlreadyRegisteredException(folderPath, projectId: p.id);
       }
     }
@@ -187,4 +188,7 @@ class FileProjectRepository implements ProjectRepository {
     final parts = path.split(RegExp(r'[\\/]')).where((part) => part.isNotEmpty);
     return parts.isEmpty ? path : parts.last;
   }
+
+  /// 같은 폴더를 다른 표기로 등록하지 않게 경로를 정규화한다(끝의 /, 혼합 구분자).
+  static String _canonical(String path) => path.replaceAll('\\', Platform.pathSeparator).replaceAll(RegExp(r'[/\\]+$'), '');
 }

@@ -100,4 +100,12 @@ services:
     expect(project.id, 'project');
     expect(project.name, '내프로젝트');
   });
+
+  test('폴더 경로 끝에 / 를 붙여도 같은 폴더로 보고 중복 등록을 막는다', () async {
+    final dir = await folder('dup');
+    final first = await repo().addProject(dir.path);
+
+    await expectLater(repo().addProject('${dir.path}/'), throwsA(isA<ProjectAlreadyRegisteredException>().having((e) => e.projectId, 'projectId', first.id)));
+    expect(await repo().listProjects(), hasLength(1));
+  });
 }

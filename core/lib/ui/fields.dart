@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'theme.dart';
 
 /// 라벨 + 입력칸. 대화상자 화면도 같이 쓴다. [obscure] 면 API 키처럼 값을 가린다.
-Widget field(String label, String value, {bool isMono = false, int lines = 1, String? hint, bool obscure = false}) => Column(
+/// [controller] 를 주면 그 컨트롤러로 텍스트를 읽고, 없으면 [value] 를 초기값으로 쓴다.
+Widget field(String label, String value,
+    {bool isMono = false, int lines = 1, String? hint, bool obscure = false, TextEditingController? controller}) =>
+    Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 6,
       children: [
@@ -12,7 +15,8 @@ Widget field(String label, String value, {bool isMono = false, int lines = 1, St
           if (hint != null) TextSpan(text: '  $hint', style: const TextStyle(fontWeight: FontWeight.w400, color: C.muted)),
         ])),
         TextFormField(
-          initialValue: value,
+          controller: controller,
+          initialValue: controller == null ? value : null,
           maxLines: lines,
           obscureText: obscure,
           style: isMono ? mono.copyWith(fontSize: 13) : const TextStyle(fontSize: 14),

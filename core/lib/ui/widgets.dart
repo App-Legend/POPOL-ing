@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:ppoling_core/contracts.dart';
+
 import 'theme.dart';
 
 /// 상단 바(로고 + 경로) + 가운데 정렬된 본문. 모든 내부 화면이 공유한다.
@@ -287,6 +289,24 @@ class Notice extends StatelessWidget {
           ...trailing,
         ]),
       );
+}
+
+/// 화면 트리 어딘가에 있는 [AppRegistry] 를 꺼내 쓴다.
+/// `app/` 은 `RegistryHolder` 로 앱 루트를 감싸서 모든 화면이 이 위젯을 쓸 수 있게 한다.
+class RegistryHolder extends InheritedWidget {
+  const RegistryHolder({super.key, required this.app, required super.child});
+  final AppRegistry app;
+
+  static AppRegistry of(BuildContext context) {
+    final holder = context.dependOnInheritedWidgetOfExactType<RegistryHolder>();
+    if (holder == null) {
+      throw StateError('화면 트리 안에 AppRegistry 가 없어요. app/ 의 루트에 RegistryHolder 가 감싸 있는지 확인하세요.');
+    }
+    return holder.app;
+  }
+
+  @override
+  bool updateShouldNotify(covariant RegistryHolder old) => old.app != app;
 }
 
 /// 어두운 로그 상자 안의 한 줄. [level]은 INFO/WARN/포폴링 색을 정한다.

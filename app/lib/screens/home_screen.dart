@@ -81,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
           title: '내 프로젝트  5',
           sub: "오래 실행하지 않은 프로젝트는 '오래됨'으로 표시돼요.",
           actions: [
-            Btn('프로젝트 추가', primary: true, icon: Icons.add, onPressed: () => showDialog(context: context, builder: (_) => const Dialog(child: AddProjectDialog()))),
+            Btn('프로젝트 추가', primary: true, icon: Icons.add, onPressed: () => showDialog(context: context, builder: (_) => Dialog(child: AddProjectDialog()))),
           ],
         ),
         Wrap(spacing: 12, runSpacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [

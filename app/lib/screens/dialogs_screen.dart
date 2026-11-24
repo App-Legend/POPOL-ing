@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 /// 7. 확인 대화상자 — 여섯 대화상자를 나란히 보여주는 시안 화면.
@@ -59,26 +60,54 @@ void _close(BuildContext context) {
   if (ModalRoute.of(context) is DialogRoute) Navigator.pop(context);
 }
 
-class AddProjectDialog extends StatelessWidget {
+class AddProjectDialog extends StatefulWidget {
   const AddProjectDialog({super.key});
 
   @override
+  State<AddProjectDialog> createState() => _AddProjectDialogState();
+}
+
+class _AddProjectDialogState extends State<AddProjectDialog> {
+  final _folder = TextEditingController();
+  String? _error;
+
+  Future<void> _add() async {
+    setState(() => _error = null);
+    try {
+      await RegistryHolder.of(context).read<ProjectRepository>().addProject(_folder.text.trim());
+      if (!mounted) return;
+      Navigator.pop(context);
+      Navigator.pushNamed(context, '/home');
+    } on PpolingException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  @override
+  void dispose() {
+    _folder.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) => _DialogBody('프로젝트 추가', [
+        if (_error != null)
+          Notice(
+            bg: C.bad.$1,
+            border: const Color(0xFFF3B8B2),
+            icon: Icons.error_outline,
+            iconColor: const Color(0xFF7A1C14),
+            child: Text(_error!, style: const TextStyle(fontSize: 13, color: Color(0xFF7A1C14))),
+          ),
         Row(crossAxisAlignment: CrossAxisAlignment.end, spacing: 8, children: [
-          Expanded(child: field('폴더', '~/projects/my-team-project', isMono: true)),
+          Expanded(child: field('폴더 경로', '', isMono: true, controller: _folder)),
           const Btn('찾기'),
         ]),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(color: C.ok.$1, borderRadius: BorderRadius.circular(8)),
-          child: Text('popoling.yaml 을 찾았어요. 실행 항목 3개를 불러올게요.', style: TextStyle(fontSize: 13, color: C.ok.$2)),
-        ),
-        field('이름', 'my-team-project'),
-        field('한 줄 설명', '동아리 행사 예약 웹서비스 (2025 캡스톤)', hint: 'README 에서 가져옴'),
-        field('저장소', 'github.com/example/my-team-project', isMono: true, hint: 'Git 원격에서 가져옴'),
+        const Text('등록할 프로젝트 폴더 경로를 적어 주세요. popoling.yaml 이 있으면 실행 항목을 함께 불러와요.',
+            style: TextStyle(fontSize: 13, color: C.text2, height: 1.6)),
         Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
           Btn('취소', onPressed: () => _close(context)),
-          Btn('추가', primary: true, onPressed: () => _close(context)),
+          Btn('추가', primary: true, onPressed: _add),
         ]),
       ]);
 }
