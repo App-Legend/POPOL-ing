@@ -14,7 +14,10 @@ void main() {
 
       await tester.pumpWidget(PopolingApp(registry: buildRegistry(features: false)));
       if (route != '/') {
-        tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(route);
+        tester.state<NavigatorState>(find.byType(Navigator)).pushNamed(
+          route,
+          arguments: route == '/settings' ? 'my-team-project' : null,
+        );
         await tester.pumpAndSettle();
       }
       expect(tester.takeException(), isNull);

@@ -22,7 +22,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // initState 안에서는 InheritedWidget(RegistryHolder)을 참조할 수 없어 프레임 후 로드한다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
