@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:popoling_core/contracts.dart';
 
+import '../git/git_adapter.dart';
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
 import '../ready/readiness.dart';
@@ -30,6 +31,7 @@ class RunnerOrchestrator implements Orchestrator {
     required this.processes,
     required this.logs,
     required this.store,
+    this.git,
   });
 
   final ProjectRepository Function() projects;
@@ -40,6 +42,9 @@ class RunnerOrchestrator implements Orchestrator {
   final ProcessLauncher processes;
   final LogStore logs;
   final RuntimeStore store;
+
+  /// 전체 실행 전에 최신 코드를 받는다. 없으면 받지 않는다.
+  final GitAdapter? git;
 
   final _events = StreamController<RunEvent>.broadcast();
   final _states = <ItemRef, ItemState>{};
@@ -171,6 +176,7 @@ class RunnerOrchestrator implements Orchestrator {
     final stopAlls = _stopAlls[projectId] ?? 0; // 첫 await 전에 읽어야 그 사이 누른 전체 종료를 놓치지 않는다
     final project = await _project(projectId);
     final startedAt = DateTime.now();
+    final pull = project.config?.git.pullBeforeRun ?? false ? await git?.pull(project.folderPath, veto: () => _noPull(projectId, stopAlls)) : null;
     final results = <String, ItemResult>{};
     // shortcut: 의존이 없는 항목도 차례로 띄운다(§6: MVP 는 순차 허용). 느리면 병렬로 바꾼다.
     for (final s in inStartOrder(_services(project))) {
@@ -182,11 +188,21 @@ class RunnerOrchestrator implements Orchestrator {
                   item: _ref(project, s), outcome: ItemOutcome.skipped, reason: '${failedDep.first} 항목이 실패해서 시작하지 않았어요.')
               : await _up(project, s);
     }
-    final summary =
-        RunSummary(projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values]);
+    final summary = RunSummary(
+        projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values], pull: pull);
     await store.saveRun(summary);
     if (summary.succeeded) _events.add(RunSucceeded(summary));
     return summary;
+  }
+
+  /// 지금 코드를 바꾸면 안 되는 이유. [stopAlls] 는 전체 실행을 시작할 때의 전체 종료 횟수.
+  String? _noPull(String projectId, int stopAlls) {
+    if ((_stopAlls[projectId] ?? 0) != stopAlls) return '전체 종료를 눌러서 최신 코드를 받지 않았어요.';
+    const up = {ItemState.starting, ItemState.running, ItemState.ready, ItemState.stopping};
+    final busy = _running.keys.any((i) => i.projectId == projectId) ||
+        _starting.keys.any((i) => i.projectId == projectId) ||
+        _launched.keys.any((i) => i.projectId == projectId && up.contains(stateOf(i)));
+    return busy ? '실행 중인 항목이 있어 최신 코드를 받지 않았어요. 전체 종료 뒤 다시 실행하면 받아요.' : null;
   }
 
   @override

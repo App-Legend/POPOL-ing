@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
+import '../log/log_line.dart';
 import '../log/log_store.dart';
 import '../orchestrator/runner_orchestrator.dart';
 import 'item_status.dart';
+import 'log_tab.dart';
 
 /// 4. 실행 항목 상세 · 로그. 대시보드가 `arguments` 로 [ItemRef] 를 넘긴다.
 ///
@@ -39,12 +41,10 @@ class DetailScreen extends StatefulWidget {
 /// 화면에 보여 주는 최근 줄 수.
 const _maxLines = 5000;
 
-typedef _Line = ({String time, String stream, String text});
-
 class _DetailScreenState extends State<DetailScreen> {
   Project? _project;
   String? _loadError;
-  var _lines = <_Line>[];
+  var _lines = <LogLine>[];
   var _filter = 0; // 0 전체, 1 stdout, 2 stderr
   var _query = '';
   var _autoScroll = true;
@@ -98,7 +98,7 @@ class _DetailScreenState extends State<DetailScreen> {
   Future<void> _readProcessLog() async {
     final raw = await widget.logs.tail(_item, lines: _maxLines);
     if (!mounted) return;
-    final lines = [for (final l in raw) _parse(l)];
+    final lines = [for (final l in raw) parseLogLine(l)];
     if (lines.length == _lines.length && (lines.isEmpty || lines.last == _lines.last)) return;
     setState(() => _lines = lines);
     _scrollToEnd();
@@ -119,20 +119,6 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
-  /// `LogStore` 한 줄(`<시각> out|err | <내용>` 또는 `--- 시작 <시각> ---`)을 나눈다.
-  static _Line _parse(String l) {
-    if (RegExp(r'^--- 시작 (\S+) ---$').firstMatch(l) case final m?) {
-      return (time: _clock(m[1]!), stream: '포폴링', text: '실행 시작');
-    }
-    if (RegExp(r'^(\S+) (out|err) \| (.*)$').firstMatch(l) case final m?) {
-      return (time: _clock(m[1]!), stream: m[2]!, text: m[3]!);
-    }
-    return (time: '', stream: 'out', text: l);
-  }
-
-  /// ISO 시각에서 `HH:mm:ss` 만.
-  static String _clock(String iso) => DateTime.tryParse(iso)?.toIso8601String().substring(11, 19) ?? iso;
-
   void _scrollToEnd() {
     if (!_autoScroll) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -140,7 +126,7 @@ class _DetailScreenState extends State<DetailScreen> {
     });
   }
 
-  List<_Line> get _visible => [
+  List<LogLine> get _visible => [
         for (final l in _lines)
           if ((_filter == 0 || l.stream == (_filter == 1 ? 'out' : 'err') || l.stream == '포폴링') &&
               (_query.isEmpty || l.text.toLowerCase().contains(_query.toLowerCase())))
@@ -200,7 +186,7 @@ class _DetailScreenState extends State<DetailScreen> {
         if (_reason != null && !isUp(state)) Text(_reason!, style: TextStyle(fontSize: 13, color: C.bad.$2)),
         KeyValues([
           if (s is ProcessService) ...[
-            ('시작 시각', Text(started == null ? '—' : '${started.month}/${started.day} ${_clock(started.toIso8601String())}')),
+            ('시작 시각', Text(started == null ? '—' : '${started.month}/${started.day} ${clockOf(started.toIso8601String())}')),
             ('PID', Text(live == null ? '—' : '${live.process.pid}', style: mono)),
             ('소유권', Text(live == null ? '띄운 프로세스 없음' : '포폴링이 시작함', style: TextStyle(color: live == null ? C.muted : C.ok.$2))),
           ],
@@ -251,16 +237,7 @@ class _DetailScreenState extends State<DetailScreen> {
   }
 
   Widget _logBox(ServiceConfig s) {
-    Widget tab(String label, int i) => TextButton(
-          onPressed: () => setState(() => _filter = i),
-          style: TextButton.styleFrom(
-            minimumSize: const Size(0, 36),
-            backgroundColor: _filter == i ? C.darkLine : null,
-            foregroundColor: _filter == i ? Colors.white : const Color(0xFF9AA1AD),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          ),
-          child: Text(label),
-        );
+    Widget tab(String label, int i) => LogTab(label, selected: _filter == i, onPressed: () => setState(() => _filter = i));
     final visible = _visible;
     final empty = switch (s) {
       RemoteService() => '원격 항목은 포폴링이 띄우지 않아 로그가 없어요.',

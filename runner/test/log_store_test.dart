@@ -16,7 +16,8 @@ void main() {
   File logOf(String suffix) => File('${tmp.path}/p1/s1.log$suffix');
 
   test('로그 파일은 <root>/<프로젝트>/<항목>.log', () async {
-    expect((await store().fileOf(item)).path, logOf('').path);
+    // Windows 는 구분자가 \ 라 글자가 아니라 URI 로 비교한다.
+    expect((await store().fileOf(item)).uri, logOf('').uri);
   });
 
   test('tail 은 마지막 줄들만 돌려주고, 중간부터 읽으면 잘린 첫 줄은 버린다', () async {
@@ -28,6 +29,12 @@ void main() {
     final cut = await s.tail(item, maxRead: 50);
     expect(cut, isNotEmpty);
     expect(cut.every((l) => RegExp(r'^line \d+$').hasMatch(l)), isTrue);
+  });
+
+  test('tail 은 아주 긴 한 줄뿐이면 그 끝부분을 돌려준다', () async {
+    logOf('').createSync(recursive: true);
+    logOf('').writeAsStringSync('${'x' * 200}끝\n');
+    expect((await store().tail(item, maxRead: 50)).single, endsWith('x끝'));
   });
 
   test('tail 은 지금 파일 줄이 모자라면 막 밀려난 .log.1 끝에서 채운다', () async {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'posix_process_launcher.dart';
+import 'shell_path.dart';
 import 'windows_process_launcher.dart';
 
 /// 실행 항목 프로세스를 띄우는 부품. OS별 구현이 프로세스 트리를 통째로 멈출 수 있게 띄운다.
@@ -29,6 +30,9 @@ abstract interface class ProcessLauncher {
   /// 그 프로세스가 내가 띄운 중계라고 증명될 때만 [Attached] 다. 예외를 던지지 않는다.
   Future<AttachResult> attach({required int pid, required DateTime startedAt, String? jobName});
 }
+
+/// 도구(git 과 그 도우미 등)를 찾을 환경 변수. macOS 에서 아이콘으로 켠 앱은 PATH 가 짧다.
+Future<Map<String, String>> toolEnvironment() async => Platform.isWindows ? const {} : {'PATH': await loginShellPath()};
 
 /// 출력을 남길 로그 파일과 거기서 가릴 `.env` 값.
 class LogTarget {
