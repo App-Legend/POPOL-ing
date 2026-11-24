@@ -158,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 4),
         Row(spacing: 8, children: [
           if (p.last == null)
-            Expanded(child: Btn('실행 방법 설정하기', onPressed: () => Navigator.pushNamed(context, '/settings')))
+            Expanded(child: Btn('실행 방법 설정하기', onPressed: () => Navigator.pushNamed(context, '/settings', arguments: p.id)))
           else ...[
             Expanded(child: Btn('열기', primary: p.focus, onPressed: () => Navigator.pushNamed(context, '/dashboard'))),
             for (final a in p.actions)
