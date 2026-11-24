@@ -33,7 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _project = project;
         _loading = false;
       });
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.message;
@@ -62,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await RegistryHolder.of(context).read<ProjectRepository>().updateProject(project);
       if (!mounted) return;
       setState(() => _loading = false);
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
     }

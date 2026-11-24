@@ -78,7 +78,7 @@ class _AddProjectDialogState extends State<AddProjectDialog> {
       if (!mounted) return;
       Navigator.pop(context);
       Navigator.pushNamed(context, '/home');
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
   }
@@ -141,7 +141,7 @@ class _EditProjectDialogState extends State<EditProjectDialog> {
       await repo.updateProject(existing.copyWith(name: _name.text.trim()));
       if (!mounted) return;
       Navigator.pop(context, true);
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
   }
@@ -193,7 +193,7 @@ class _DeleteProjectDialogState extends State<DeleteProjectDialog> {
       await RegistryHolder.of(context).read<ProjectRepository>().removeProject(widget.projectId);
       if (!mounted) return;
       Navigator.pop(context, true);
-    } on PpolingException catch (e) {
+    } on PopolingException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
   }
