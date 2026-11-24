@@ -4,8 +4,9 @@ import 'theme.dart';
 
 /// 라벨 + 입력칸. 대화상자 화면도 같이 쓴다. [obscure] 면 API 키처럼 값을 가린다.
 /// [controller] 를 주면 그 컨트롤러로 텍스트를 읽고, 없으면 [value] 를 초기값으로 쓴다.
+/// [onChanged] 가 있으면 입력 시 호출한다.
 Widget field(String label, String value,
-    {bool isMono = false, int lines = 1, String? hint, bool obscure = false, TextEditingController? controller}) =>
+    {bool isMono = false, int lines = 1, String? hint, bool obscure = false, TextEditingController? controller, ValueChanged<String>? onChanged}) =>
     Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       spacing: 6,
@@ -17,6 +18,7 @@ Widget field(String label, String value,
         TextFormField(
           controller: controller,
           initialValue: controller == null ? value : null,
+          onChanged: onChanged,
           maxLines: lines,
           obscureText: obscure,
           style: isMono ? mono.copyWith(fontSize: 13) : const TextStyle(fontSize: 14),

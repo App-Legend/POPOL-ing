@@ -35,6 +35,13 @@ class About {
         if (links.isNotEmpty) 'links': Map<String, String>.of(links),
         if (memo != null) 'memo': memo,
       };
+
+  About copyWith({String? summary, List<String>? stack, Map<String, String>? links, String? memo}) => About(
+        summary: summary ?? this.summary,
+        stack: stack ?? this.stack,
+        links: links ?? this.links,
+        memo: memo ?? this.memo,
+      );
 }
 
 /// Git 연동 설정(FR-19).
@@ -113,4 +120,22 @@ class ProjectConfig {
       if (checks.isNotEmpty) 'checks': [for (final c in checks) c.toMap()],
     };
   }
+
+  ProjectConfig copyWith({
+    String? name,
+    About? about,
+    List<Requirement>? requires,
+    GitConfig? git,
+    List<ServiceConfig>? services,
+    List<CheckConfig>? checks,
+  }) =>
+      ProjectConfig(
+        version: version,
+        name: name ?? this.name,
+        about: about ?? this.about,
+        requires: requires ?? this.requires,
+        git: git ?? this.git,
+        services: services ?? this.services,
+        checks: checks ?? this.checks,
+      );
 }
