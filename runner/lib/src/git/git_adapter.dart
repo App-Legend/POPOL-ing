@@ -30,18 +30,25 @@ class GitStatus {
 /// - 폴더를 추적하지 않는 상위 저장소(홈 폴더 dotfiles 등)는 이 프로젝트의 저장소로 보지 않는다.
 /// - git 의 오류 글은 주소에 든 토큰이 섞일 수 있어 화면에 옮기지 않는다.
 class GitAdapter {
-  GitAdapter({this.environment = _noEnvironment, this.timeout = const Duration(seconds: 30)});
+  GitAdapter({this.environment = _noEnvironment, this.timeout = const Duration(seconds: 30), this.fetchTimeout = const Duration(minutes: 5)});
 
   /// git 에 더 줄 환경 변수(PATH).
   final Future<Map<String, String>> Function() environment;
 
   /// git 명령 하나를 기다리는 시간. 파일을 바꾸는 병합에는 쓰지 않는다.
+  /// [pull] 은 fetch 도 이만큼만 기다리고, fetch 는 끊지 않고 둔다.
   final Duration timeout;
+
+  /// fetch 를 끊는 시간. 일찍 끊으면 큰 변경을 매번 처음부터 다시 받는다.
+  final Duration fetchTimeout;
 
   Future<Map<String, String>>? _env;
 
-  /// 같은 저장소에서 fetch 가 겹치면 서로 잠금에 걸리니 차례로 한다.
+  /// 같은 저장소의 pull 은 차례로 한다.
   final _queue = <String, Future<void>>{};
+
+  /// 저장소마다 하고 있는 fetch. 겹치면 서로 잠금에 걸리니 하나만 한다.
+  final _fetches = <String, ({String remote, Future<bool> done})>{};
 
   static Future<Map<String, String>> _noEnvironment() async => const {};
 
@@ -60,7 +67,13 @@ class GitAdapter {
   }
 
   /// 원격을 한 번 확인한다. 작업 중인 파일은 바뀌지 않는다. 실패하면 false.
-  Future<bool> fetch(String folder) => _inTurn(folder, () => _fetch(folder)).catchError((_) => false);
+  Future<bool> fetch(String folder) async {
+    try {
+      return await _fetch(folder) ?? false;
+    } on Object {
+      return false;
+    }
+  }
 
   /// 안전하게 받을 수 있으면 받는다. 저장소가 아니면 null.
   /// [veto] 가 문장을 돌려주면 파일을 바꾸지 않고 그 문장으로 건너뛴다. 병합 직전에 묻는다.
@@ -87,7 +100,13 @@ class GitAdapter {
     if (before.branch == null) return _skip('브랜치가 아닌 커밋을 보고 있어요.');
     if (before.changed > 0) return _skip('커밋하지 않은 변경 ${before.changed}개가 있어요.');
     if (!await _hasUpstreamConfig(folder, before.branch!)) return _skip('이 브랜치에 연결된 원격 브랜치가 없어요.');
-    if (!await _fetch(folder)) return _skip('원격 저장소에 접속할 수 없어요.');
+    switch (await _fetch(folder).timeout(timeout, onTimeout: () => null)) {
+      case null:
+        return _skip('원격 저장소를 확인하는 데 오래 걸리고 있어요.');
+      case false:
+        return _skip('원격 저장소에 접속할 수 없어요.');
+      case true:
+    }
 
     final now = await status(folder); // 기다리는 사이 바뀌었을 수 있다
     if (now == null || now.upstream == null) return _skip('연결된 원격 브랜치를 찾을 수 없어요.');
@@ -117,10 +136,25 @@ class GitAdapter {
   static PullResult _skip(String reason) =>
       PullResult(outcome: ItemOutcome.skipped, message: '$reason 지금 코드로 실행했어요.');
 
-  Future<bool> _fetch(String folder) async =>
-      await _isProjectRepository(folder) &&
-      !await _hasLocalConfig(folder, _remoteCommands) &&
-      await _git(folder, ['fetch', '--quiet', '--no-recurse-submodules']) != null;
+  /// 같은 원격을 이미 확인하는 중이면 그 결과를 함께 쓴다. null 은 [pull] 이 시간 초과에 쓴다.
+  Future<bool?> _fetch(String folder) async {
+    if (!await _isProjectRepository(folder) || await _hasLocalConfig(folder, _remoteCommands)) return false;
+    final key = await _repositoryKey(folder);
+    final branch = (await _git(folder, ['branch', '--show-current']))?.trim() ?? '';
+    final remote = (await _git(folder, ['config', '--get', 'branch.$branch.remote']))?.trim() ?? '';
+    while (_fetches[key] != null) {
+      final running = _fetches[key]!;
+      if (running.remote == remote) return running.done;
+      await running.done; // worktree 는 브랜치마다 원격이 다를 수 있다
+    }
+    final done = _gitWithin(folder, ['fetch', '--quiet', '--no-recurse-submodules'], fetchTimeout)
+        .then((out) => out != null, onError: (_) => false)
+        .whenComplete(() {
+      _fetches.remove(key);
+    });
+    _fetches[key] = (remote: remote, done: done);
+    return done;
+  }
 
   Future<bool> _hasUpstreamConfig(String folder, String branch) async =>
       await _git(folder, ['config', '--get', 'branch.$branch.merge']) != null;

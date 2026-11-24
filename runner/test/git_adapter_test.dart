@@ -201,4 +201,33 @@ void main() {
     expect(fetched, isTrue);
     expect(pulled!.outcome, ItemOutcome.ok);
   });
+
+  test('원격이 느리면 이미 하는 확인을 함께 기다리고, 끊지 않은 채 지금 코드로 실행한다', () async {
+    final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0); // 받기만 하고 답하지 않는 원격
+    addTearDown(server.close);
+    final sockets = <Socket>[];
+    server.listen((s) {
+      sockets.add(s);
+      s.listen((_) {}, onError: (_) {});
+    });
+    final slow = GitAdapter(timeout: const Duration(seconds: 3));
+    final url = git(mine, ['remote', 'get-url', 'origin']);
+    git(mine, ['remote', 'set-url', 'origin', 'git://127.0.0.1:${server.port}/x']);
+
+    var done = false;
+    final shown = slow.fetch(mine).whenComplete(() => done = true);
+    final r = (await slow.pull(mine))!;
+    expect((r.outcome, r.message), (ItemOutcome.skipped, '원격 저장소를 확인하는 데 오래 걸리고 있어요. 지금 코드로 실행했어요.'));
+    expect(sockets, hasLength(1));
+    expect(done, isFalse);
+
+    for (final s in sockets) {
+      s.destroy();
+    }
+    expect(await shown, isFalse);
+    git(mine, ['remote', 'set-url', 'origin', url]);
+    teammate('2');
+    expect((await slow.pull(mine))!.outcome, ItemOutcome.ok);
+    expect(read(mine, 'a.txt'), '2');
+  });
 }
