@@ -113,7 +113,7 @@ services:
     final yaml = File('${dir.path}/popoling.yaml');
     expect(await yaml.exists(), isTrue);
     final content = await yaml.readAsString();
-    expect(content, contains('name: "최초"')); // 설정 값(수정 전)은 그대로 남고
+    expect(content, contains('name: 최초')); // 설정 값(수정 전)은 그대로 남고
   });
 
   test('설정이 없는 프로젝트는 popoling.yaml 을 만들지 않는다', () async {
@@ -126,5 +126,41 @@ services:
 
     final yaml = File('${dir.path}/popoling.yaml');
     expect(await yaml.exists(), isFalse);
+  });
+
+  test('설정을 저장하고 다시 읽으면 같다 (about·services·따옴표·역슬래시)', () async {
+    final dir = await folder('roundtrip');
+    final r = repo();
+
+    // 중첩된 about, services, 따옴표, Windows 경로 역슬래시 포함
+    const yamlContent = '''version: 1
+about:
+  summary: "테스트 프로젝트"
+  memo: "메모: \\"인용\\"과 경로 C:\\\\Users\\\\name"
+  stack: ["Dart", "Flutter"]
+services:
+  - id: api
+    type: process
+    command: ["./gradlew", "bootRun"]
+    cwd: ".\\\\backend"
+''';
+    await File('${dir.path}/popoling.yaml').writeAsString(yamlContent);
+
+    // 등록해서 설정을 읽는다
+    final project = await r.addProject(dir.path);
+    expect(project.config, isNotNull);
+    expect(project.about.summary, '테스트 프로젝트');
+    expect(project.about.memo, contains('인용'));
+    expect(project.config!.services, isNotEmpty);
+
+    // 같은 설정으로 업데이트하면 저장된다
+    await r.updateProject(project);
+
+    // 다시 읽어서 비교한다
+    final reread = await r.getProject(project.id);
+    expect(reread.about.summary, project.about.summary);
+    expect(reread.about.memo, project.about.memo);
+    expect(reread.config!.services.length, project.config!.services.length);
+    expect(reread.config!.services[0].id, 'api');
   });
 }

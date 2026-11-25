@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:popoling_core/contracts.dart';
 import 'package:yaml/yaml.dart';
+import 'package:yaml_edit/yaml_edit.dart';
 
 /// [ProjectRepository] 의 진짜 구현.
 ///
@@ -80,48 +81,38 @@ class FileProjectRepository implements ProjectRepository {
     return updated;
   }
 
-  /// 수정한 설정을 그 폴더의 popoling.yaml 에 저장한다. 설정이 없으면何も 쓰지 않는다.
+  /// 수정한 설정을 그 폴더의 popoling.yaml 에 저장한다. 설정이 없으면 쓰지 않는다.
+  /// 원자적 저장: 임시 파일에 다 쓴 뒤 바꿔 끼워, 쓰다가 멈춰도 원본을 잃지 않는다.
+  /// 기존 파일이 있으면 주석을 보존하면서 값만 바꾼다.
   Future<void> _saveConfig(Project project) async {
     final config = project.config;
     if (config == null) return;
     final file = File('${project.folderPath}${Platform.pathSeparator}$configFileName');
-    await file.writeAsString(_toYaml(config.toMap()));
+    await file.parent.create(recursive: true);
+
+    String content;
+    if (await file.exists()) {
+      // 기존 파일에서 주석을 보존하면서 값만 바꾼다.
+      var doc = YamlEditor(await file.readAsString());
+      _updateYamlEditor(doc, config.toMap());
+      content = doc.toString();
+    } else {
+      // 새 파일을 만든다.
+      var doc = YamlEditor('');
+      _updateYamlEditor(doc, config.toMap());
+      content = doc.toString();
+    }
+
+    final temp = File('${file.path}.tmp');
+    await temp.writeAsString(content, flush: true);
+    await temp.rename(file.path);
   }
 
-  /// [map] 을 YAML 텍스트로 바꾼다. package:yaml 에 인코더가 없어 직접 구현했다.
-  /// shortcut: 중첩 깊이·특수문자(콜론·큰따옴표 등)는 간단하게만 처리한다. 표시 문제가 생기면 yaml_edit 로 교체한다.
-  String _toYaml(Map<String, Object?> map, {int indent = 0}) {
-    final buf = StringBuffer();
-    final space = ' ' * indent;
+  /// YamlEditor 에 맵을 재귀적으로 반영한다.
+  void _updateYamlEditor(YamlEditor doc, Map<String, Object?> map) {
     for (final entry in map.entries) {
-      buf.write('$space${entry.key}: ${_yamlValue(entry.value, indent + 2)}\n');
+      doc.update([entry.key], entry.value);
     }
-    return buf.toString();
-  }
-
-  String _yamlValue(Object? value, int indent) {
-    final space = ' ' * indent;
-    if (value == null) return 'null';
-    if (value is bool) return value.toString();
-    if (value is num) return value.toString();
-    if (value is String) return '"${value.replaceAll('"', '"')}"';
-    if (value is List) {
-      if (value.isEmpty) return '[]';
-      final lines = <String>[];
-      for (final item in value) {
-        lines.add('$space- ${_yamlValue(item, indent + 2)}');
-      }
-      return lines.join('\n');
-    }
-    if (value is Map) {
-      if (value.isEmpty) return '{}';
-      final lines = <String>[];
-      value.forEach((k, v) {
-        lines.add('$space$k: ${_yamlValue(v, indent + 2)}');
-      });
-      return lines.join('\n');
-    }
-    return value.toString();
   }
 
   @override
