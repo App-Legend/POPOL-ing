@@ -28,12 +28,14 @@ void main() {
         ItemResult(item: api, outcome: ItemOutcome.failed, reason: '준비 시간(60초)을 넘겼어요.', exitCode: 1, forced: true),
         ItemResult(item: web, outcome: ItemOutcome.skipped),
       ],
+      pull: const PullResult(outcome: ItemOutcome.skipped, message: '오프라인'),
     );
     await store().saveRun(summary);
 
     final read = (await store().lastRun('demo'))!;
     expect(read.startedAt, summary.startedAt);
     expect(read.finishedAt, summary.finishedAt);
+    expect((read.pull?.outcome, read.pull?.message), (ItemOutcome.skipped, '오프라인'));
     expect(read.items.map((r) => (r.item, r.outcome, r.reason, r.exitCode, r.forced)), [
       (api, ItemOutcome.failed, '준비 시간(60초)을 넘겼어요.', 1, true),
       (web, ItemOutcome.skipped, null, null, false),

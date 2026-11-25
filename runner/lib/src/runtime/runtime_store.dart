@@ -55,6 +55,12 @@ class RuntimeStore {
 
   Future<void> removeProcess(ItemRef item) => _change((d) => d.processes.remove(item));
 
+  /// 지금까지 요청한 쓰기가 파일에 다 남을 때까지 기다린다. 앱을 닫기 전에 부른다.
+  Future<void> flush() async {
+    await _load(); // 먼저 요청한 변경이 [_writing] 에 이어진 뒤에 본다
+    await _writing;
+  }
+
   Future<_Data> _load() => _data ??= () async {
         try {
           return _Data.fromJson(jsonDecode(await (await _file()).readAsString()) as Map<String, dynamic>);
@@ -132,6 +138,7 @@ Map<String, dynamic> _summaryToJson(RunSummary s) => {
       'projectId': s.projectId,
       'startedAt': s.startedAt.toIso8601String(),
       'finishedAt': s.finishedAt.toIso8601String(),
+      if (s.pull case final pull?) 'pull': {'outcome': pull.outcome.name, 'message': pull.message},
       'items': [
         for (final r in s.items)
           {
@@ -148,6 +155,11 @@ RunSummary _summaryFromJson(Map<String, dynamic> j) => RunSummary(
       projectId: j['projectId'] as String,
       startedAt: DateTime.parse(j['startedAt'] as String),
       finishedAt: DateTime.parse(j['finishedAt'] as String),
+      pull: switch (j['pull']) {
+        final Map<String, dynamic> p =>
+          PullResult(outcome: ItemOutcome.values.byName(p['outcome'] as String), message: p['message'] as String),
+        _ => null,
+      },
       items: [
         for (final r in (j['items'] as List).cast<Map<String, dynamic>>())
           ItemResult(

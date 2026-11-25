@@ -47,7 +47,7 @@ class LogStore {
         final start = length > maxRead ? length - maxRead : 0;
         await raf.setPosition(start);
         final all = const LineSplitter().convert(utf8.decode(await raf.read(length - start), allowMalformed: true));
-        final whole = start == 0 ? all : all.skip(1).toList(); // 중간부터 읽었으면 첫 줄은 잘린 줄이다
+        final whole = start == 0 ? all : all.length > 1 ? all.skip(1).toList() : all; // 중간부터 읽었으면 첫 줄은 잘린 줄이다. 그 줄뿐이면 끝부분이라도 보여 준다
         return (whole.length > lines ? whole.sublist(whole.length - lines) : whole, start == 0);
       } finally {
         await raf.close();

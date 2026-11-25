@@ -9,6 +9,7 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/fakes.dart';
 import 'package:popoling_core/testing.dart';
 import 'package:popoling_runner_relay/log_file.dart';
+import 'package:popoling_runner/src/git/git_adapter.dart';
 import 'package:popoling_runner/src/log/log_store.dart';
 import 'package:popoling_runner/src/orchestrator/runner_orchestrator.dart';
 import 'package:popoling_runner/src/process/posix_process_launcher.dart';
@@ -118,7 +119,8 @@ RunnerOrchestrator orchestrator(Project project,
     LogStore? logs,
     RuntimeStore? store,
     RuntimeQuery? runtime,
-    ProcessLauncher? processes}) {
+    ProcessLauncher? processes,
+    GitAdapter? git}) {
   final repo = FakeProjectRepository(projects: [project]);
   final launcher0 = launcher?.call(repo) ?? FakeItemLauncher(repo, reachable: {'storage'});
   final ports0 = ports ?? FakePortProbe();
@@ -133,6 +135,7 @@ RunnerOrchestrator orchestrator(Project project,
     processes: processes ?? PosixProcessLauncher(relay: relay, searchPath: () async => '/usr/bin:/bin'),
     logs: logs ?? tempLogs(),
     store: store ?? tempStore(),
+    git: git,
   );
 }
 
@@ -641,6 +644,166 @@ void main() {
       expect(after.stateOf(const ItemRef(projectId: 'demo', serviceId: 'api')), ItemState.stopped);
     });
   });
+
+  group('앱 종료 (FR-12)', () {
+    const api = ItemRef(projectId: 'demo', serviceId: 'api');
+    const db = ItemRef(projectId: 'demo', serviceId: 'db');
+
+    test('떠 있는 것만 알려 주고 모두 멈춘다 (원격 제외)', () async {
+      final o = orchestrator(demo(tempProject()));
+      expect(await o.stillUp(), isEmpty);
+      await o.runAll('demo');
+      expect((await o.stillUp()).map((i) => i.serviceId), unorderedEquals(['db', 'api', 'web']));
+      expect(await o.stopEverything(), isEmpty);
+      expect(await o.stillUp(), isEmpty);
+      expect(o.liveProcesses, isEmpty);
+    });
+
+    test('준비 시간을 넘겨 실패했지만 살아 있는 프로세스도 포함한다', () async {
+      const slow = ProcessService(
+          id: 'slow', command: ['sleep', '30'], ready: LogReady(pattern: 'never', timeout: _ms300));
+      const x = ItemRef(projectId: 'demo', serviceId: 'slow');
+      final o = orchestrator(demo(tempProject(), extra: const [slow]));
+      expect((await o.start(x)).outcome, ItemOutcome.failed);
+      expect(await o.stillUp(), [x]);
+      expect(await o.stopEverything(), isEmpty);
+      expect(o.liveProcesses, isEmpty);
+    });
+
+    test('시작하는 중이면 뒤늦게 뜬 것까지 정리된 뒤에 끝난다', () async {
+      late _SlowStartLauncher launcher;
+      final o = orchestrator(demo(tempProject()), launcher: (repo) => launcher = _SlowStartLauncher(repo));
+      unawaited(o.start(db));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(await o.stillUp(), [db]);
+      expect(await o.stopEverything(), isEmpty);
+      expect(launcher.calls.last, 'stop');
+      expect(launcher.calls, contains('start'));
+    });
+
+    test('실행 기록을 파일에서 지운 뒤에 끝난다', () async {
+      final dir = Directory.systemTemp.createTempSync('popoling_exit_');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/runtime.json');
+      final store = RuntimeStore(() async => file);
+      final o = orchestrator(demo(tempProject()), store: store);
+      await o.start(api);
+      for (var i = 0; i < 50 && !file.existsSync(); i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(file.readAsStringSync(), contains('"api"'));
+      expect(await o.stopEverything(), isEmpty);
+      expect(file.readAsStringSync(), isNot(contains('"api"'))); // 바로 앱이 꺼져도 남지 않는다
+    });
+
+    test('이미 멈추는 중인 항목은 끝나길 기다린다', () async {
+      final o = orchestrator(demo(tempProject()));
+      await o.start(api);
+      final stop = o.stop(api);
+      expect(await o.stopEverything(), isEmpty);
+      expect((await stop).outcome, ItemOutcome.ok);
+    });
+
+    test('멈추지 못한 항목을 이유와 함께 돌려준다', () async {
+      final o = orchestrator(demo(tempProject()), launcher: _BrokenStopLauncher.new);
+      await o.start(db);
+      final failed = await o.stopEverything();
+      expect(failed.single.item, db);
+      expect(failed.single.reason, contains('docker 응답 없음'));
+    });
+
+    test('확인 불가 항목은 묻지도 멈추지도 않는다', () async {
+      const x = ItemRef(projectId: 'demo', serviceId: 'x');
+      final store = tempStore();
+      await store.putProcess(ProcessRecord(
+          item: x, pid: 4242, pgid: 4242, command: const ['sleep'], startedAt: DateTime(2026, 11, 22), appRunId: 'old'));
+      final o = orchestrator(demo(tempProject()), store: store, processes: _AttachOnly(const Unverified()));
+      await o.recover();
+      expect(o.stateOf(x), ItemState.unknown);
+      expect(await o.stillUp(), isEmpty);
+      expect(await o.stopEverything(), isEmpty);
+    });
+  });
+
+  group('실행 전 pull (FR-19)', () {
+    const ok = PullResult(outcome: ItemOutcome.ok, message: 'origin/main에서 받을 새 커밋이 없어요.');
+    const skipped = PullResult(outcome: ItemOutcome.skipped, message: '오프라인');
+
+    Project project({bool pull = true}) => Project(
+          id: 'demo',
+          name: 'demo',
+          folderPath: tempProject(),
+          registeredAt: DateTime(2026, 11, 23),
+          config: ProjectConfig(
+            git: GitConfig(pullBeforeRun: pull),
+            services: const [ProcessService(id: 'x', command: ['sleep', '30'])],
+          ),
+        );
+
+    test('항목을 띄우기 전에 받고 결과를 요약에 남긴다', () async {
+      late RunnerOrchestrator o;
+      final git = _FakeGit(ok, () => expect(o.liveProcesses, isEmpty));
+      o = orchestrator(project(), git: git);
+      addTearDown(() => o.stopAll('demo'));
+      final s = await o.runAll('demo');
+      expect(git.calls, 1);
+      expect(s.pull, ok);
+      expect((await o.lastRun('demo'))!.pull, ok);
+    });
+
+    test('받지 못해도 실행은 계속하고 성공으로 친다', () async {
+      final o = orchestrator(project(), git: _FakeGit(skipped));
+      addTearDown(() => o.stopAll('demo'));
+      final s = await o.runAll('demo');
+      expect(s.pull, skipped);
+      expect(s.succeeded, isTrue);
+    });
+
+    test('설정에서 끄면 받지 않는다', () async {
+      final git = _FakeGit(ok);
+      final o = orchestrator(project(pull: false), git: git);
+      addTearDown(() => o.stopAll('demo'));
+      expect((await o.runAll('demo')).pull, isNull);
+      expect(git.calls, 0);
+    });
+
+    test('받는 사이 전체 종료를 누르면 아무것도 띄우지 않는다', () async {
+      late RunnerOrchestrator o;
+      o = orchestrator(project(), git: _FakeGit(ok, () => unawaited(o.stopAll('demo'))));
+      final s = await o.runAll('demo');
+      expect(s.items.single.outcome, ItemOutcome.skipped);
+      expect(s.pull!.message, contains('전체 종료'));
+      expect(o.liveProcesses, isEmpty);
+    });
+
+    test('실행 중인 항목이 있으면 코드를 바꾸지 않는다', () async {
+      final o = orchestrator(project(), git: _FakeGit(ok));
+      addTearDown(() => o.stopAll('demo'));
+      await o.start(const ItemRef(projectId: 'demo', serviceId: 'x'));
+      final s = await o.runAll('demo');
+      expect(s.pull!.outcome, ItemOutcome.skipped);
+      expect(s.pull!.message, contains('실행 중인 항목'));
+    });
+  });
+}
+
+/// pull 결과만 정해 준다.
+class _FakeGit extends GitAdapter {
+  _FakeGit(this.result, [this.onPull]);
+
+  final PullResult result;
+  final void Function()? onPull;
+  var calls = 0;
+
+  @override
+  Future<PullResult?> pull(String folder, {String? Function()? veto}) async {
+    calls++;
+    onPull?.call();
+    return switch (veto?.call()) {
+      final reason? => PullResult(outcome: ItemOutcome.skipped, message: reason),
+      null => result,
+    };
+  }
 }
 
 /// [attach] 결과만 정해 주는 실행기. 띄우지는 않는다.

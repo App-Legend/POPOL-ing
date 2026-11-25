@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:popoling_core/contracts.dart';
 
+import '../git/git_adapter.dart';
 import '../log/log_store.dart';
 import '../process/process_launcher.dart';
 import '../ready/readiness.dart';
@@ -30,6 +31,7 @@ class RunnerOrchestrator implements Orchestrator {
     required this.processes,
     required this.logs,
     required this.store,
+    this.git,
   });
 
   final ProjectRepository Function() projects;
@@ -40,6 +42,9 @@ class RunnerOrchestrator implements Orchestrator {
   final ProcessLauncher processes;
   final LogStore logs;
   final RuntimeStore store;
+
+  /// 전체 실행 전에 최신 코드를 받는다. 없으면 받지 않는다.
+  final GitAdapter? git;
 
   final _events = StreamController<RunEvent>.broadcast();
   final _states = <ItemRef, ItemState>{};
@@ -59,6 +64,11 @@ class RunnerOrchestrator implements Orchestrator {
   /// 띄울 때 쓴 설정. 설정 파일이 깨지거나 항목이 빠져도 띄운 것은 멈출 수 있어야 한다.
   final _launched = <ItemRef, ServiceConfig>{};
   final _runAlls = <String, Future<RunSummary>>{};
+
+  Future<void>? _recovery;
+
+  /// 아직 정리가 끝나지 않은 시작. 멈춰서 [_ups] 에서 빠진 것도 들어 있다.
+  final _inFlight = <Future<void>>{};
 
   /// 프로젝트별 전체 종료 횟수. 전체 실행은 시작 때 값과 달라지면 남은 항목을 띄우지 않는다.
   final _stopAlls = <String, int>{};
@@ -81,7 +91,9 @@ class RunnerOrchestrator implements Orchestrator {
   ///
   /// 내가 띄운 중계라고 증명된 프로세스만 되살린다. 살아 있지만 증명할 수 없으면 확인 불가로 두고 멈추지 않는다.
   /// 예외를 던지지 않는다.
-  Future<void> recover() async {
+  Future<void> recover() => _recovery ??= _recover();
+
+  Future<void> _recover() async {
     for (final r in await store.processes()) {
       if (r.appRunId == store.appRunId) continue;
       switch (await processes.attach(pid: r.pid, startedAt: r.startedAt, jobName: r.jobName)) {
@@ -164,6 +176,7 @@ class RunnerOrchestrator implements Orchestrator {
     final stopAlls = _stopAlls[projectId] ?? 0; // 첫 await 전에 읽어야 그 사이 누른 전체 종료를 놓치지 않는다
     final project = await _project(projectId);
     final startedAt = DateTime.now();
+    final pull = project.config?.git.pullBeforeRun ?? false ? await git?.pull(project.folderPath, veto: () => _noPull(projectId, stopAlls)) : null;
     final results = <String, ItemResult>{};
     // shortcut: 의존이 없는 항목도 차례로 띄운다(§6: MVP 는 순차 허용). 느리면 병렬로 바꾼다.
     for (final s in inStartOrder(_services(project))) {
@@ -175,11 +188,21 @@ class RunnerOrchestrator implements Orchestrator {
                   item: _ref(project, s), outcome: ItemOutcome.skipped, reason: '${failedDep.first} 항목이 실패해서 시작하지 않았어요.')
               : await _up(project, s);
     }
-    final summary =
-        RunSummary(projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values]);
+    final summary = RunSummary(
+        projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values], pull: pull);
     await store.saveRun(summary);
     if (summary.succeeded) _events.add(RunSucceeded(summary));
     return summary;
+  }
+
+  /// 지금 코드를 바꾸면 안 되는 이유. [stopAlls] 는 전체 실행을 시작할 때의 전체 종료 횟수.
+  String? _noPull(String projectId, int stopAlls) {
+    if ((_stopAlls[projectId] ?? 0) != stopAlls) return '전체 종료를 눌러서 최신 코드를 받지 않았어요.';
+    const up = {ItemState.starting, ItemState.running, ItemState.ready, ItemState.stopping};
+    final busy = _running.keys.any((i) => i.projectId == projectId) ||
+        _starting.keys.any((i) => i.projectId == projectId) ||
+        _launched.keys.any((i) => i.projectId == projectId && up.contains(stateOf(i)));
+    return busy ? '실행 중인 항목이 있어 최신 코드를 받지 않았어요. 전체 종료 뒤 다시 실행하면 받아요.' : null;
   }
 
   @override
@@ -235,6 +258,10 @@ class RunnerOrchestrator implements Orchestrator {
     up = _upOnce(project, service, item).whenComplete(() {
       if (identical(_ups[item], up)) _ups.remove(item);
     });
+    if (service is! RemoteService) {
+      _inFlight.add(up);
+      unawaited(up.whenComplete(() => _inFlight.remove(up)));
+    }
     return _ups[item] = up;
   }
 
@@ -497,6 +524,49 @@ class RunnerOrchestrator implements Orchestrator {
     } on Exception {
       return false;
     }
+  }
+
+  // ---- 앱 종료 (FR-12) ----
+
+  /// 지금 떠 있거나 시작하는 중인, 내가 멈출 수 있는 항목. 실패했지만 살아 있는 것도 들어 있다.
+  Future<List<ItemRef>> stillUp() async {
+    await _recovery?.timeout(const Duration(seconds: 3), onTimeout: () {}); // 앱을 켜자마자 닫을 때
+    final up = <ItemRef>[];
+    for (final MapEntry(key: item, value: service) in [..._launched.entries]) {
+      final alive = switch (stateOf(item)) {
+        ItemState.starting || ItemState.running || ItemState.ready || ItemState.stopping => true,
+        ItemState.failed when service is ComposeService =>
+          await _composeLeftUp(item.projectId, service).timeout(const Duration(seconds: 3), onTimeout: () => true),
+        _ => false,
+      };
+      if (alive || _running.containsKey(item) || _starting.containsKey(item)) up.add(item);
+    }
+    return up;
+  }
+
+  /// 떠 있는 항목이 있는 프로젝트를 모두 전체 종료하고, 멈추지 못한 항목만 돌려준다.
+  /// 시작하다 끊긴 것이 뒤늦게 뜨면 그 정리까지 기다린다. 먼저 앱이 꺼지면 기록 없는 프로세스가 남는다.
+  Future<List<ItemResult>> stopEverything() async {
+    while (_stopping.isNotEmpty) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    final failed = <ItemResult>[];
+    final up = await stillUp();
+    await Future.wait([
+      for (final id in {for (final i in up) i.projectId})
+        stopAll(id).then(
+          (s) => failed.addAll(s.items.where((r) => r.outcome == ItemOutcome.failed && stateOf(r.item) != ItemState.unknown)),
+          onError: (Object e) => failed.addAll([
+            for (final i in up)
+              if (i.projectId == id)
+                ItemResult(
+                    item: i, outcome: ItemOutcome.failed, reason: e is PopolingException ? e.message : '멈추지 못했어요: $e'),
+          ]),
+        ),
+    ]);
+    await Future.wait([..._inFlight]);
+    await store.flush(); // 지운 기록이 남으면 다음에 '확인 불가'로 보일 수 있다
+    return failed;
   }
 
   // ---- 도우미 ----

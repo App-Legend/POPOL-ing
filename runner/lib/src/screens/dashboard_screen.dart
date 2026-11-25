@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
+import '../git/git_adapter.dart';
+import '../log/log_store.dart';
 import 'item_status.dart';
+import 'log_preview.dart';
 
 /// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다.
 ///
 /// 전체 실행·종료(FR-04·05), 항목 시작·중지(FR-03), 포트 주인이 내 다른 항목이면 [그 항목 중지](AT-17).
-// Git 표시(FR-19)·환경 배너(EnvBanner)·최근 로그(LogPreview)는 4주차에 여기 더한다.
+// 환경 배너(EnvBanner)는 4주차에 여기 더한다.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -18,6 +21,8 @@ class DashboardScreen extends StatefulWidget {
     required this.runner,
     required this.ports,
     required this.runtime,
+    this.git,
+    this.logs,
   });
 
   final String projectId;
@@ -25,6 +30,10 @@ class DashboardScreen extends StatefulWidget {
   final Orchestrator runner;
   final PortProbe ports;
   final RuntimeQuery runtime;
+  final GitAdapter? git;
+
+  /// 최근 로그를 읽는 곳. 없으면 최근 로그를 숨긴다.
+  final LogStore? logs;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -34,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Project? _project;
   String? _loadError;
   RunSummary? _summary;
+  GitStatus? _git;
   final _reasons = <ItemRef, String?>{};
 
   /// 포트 사용 중인 항목 → 그 포트를 쓰는 내 다른 항목.
@@ -44,7 +54,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final StreamSubscription<List<Project>> _projectSub;
   late final StreamSubscription<RunEvent> _eventSub;
 
+  var _gitLoaded = false;
+
   String get _id => widget.projectId;
+
+  /// 지금 아는 상태를 먼저 보여 주고, [fetch] 면 원격을 확인한 뒤 다시 보여 준다.
+  Future<void> _loadGit(String folder, {bool fetch = false}) async {
+    Future<void> show() async {
+      final status = await widget.git?.status(folder);
+      if (mounted) setState(() => _git = status);
+    }
+
+    await show();
+    if (fetch && _git != null && await widget.git!.fetch(folder)) await show();
+  }
 
   @override
   void initState() {
@@ -55,6 +78,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _project = p;
         _loadError = p == null ? '목록에 없는 프로젝트예요: $_id' : null;
       });
+      if (p != null && !_gitLoaded) {
+        _gitLoaded = true;
+        unawaited(_loadGit(p.folderPath, fetch: true));
+      }
     }, onError: (Object e) => setState(() => _loadError = errorText(e)));
     _eventSub = widget.runner.events.listen((e) {
       if (e case ItemStateChanged(:final item, :final state, :final reason) when item.projectId == _id) {
@@ -79,6 +106,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   List<ServiceConfig> get _services => _project?.config?.services ?? const [];
 
+  /// 먼저 볼 실패한 항목. 지금 실패한 항목이 없으면 마지막 전체 실행에서 실패했고 아직 안 뜬 항목.
+  String? _failedOf(List<ServiceConfig> services) {
+    final lastFailed = {
+      for (final r in _summary?.items ?? const <ItemResult>[])
+        if (r.outcome == ItemOutcome.failed) r.item.serviceId,
+    };
+    bool failed(ServiceConfig s) => widget.runner.stateOf(_ref(s)) == ItemState.failed;
+    bool failedLast(ServiceConfig s) => lastFailed.contains(s.id) && !isUp(widget.runner.stateOf(_ref(s)));
+    return (services.where(failed).firstOrNull ?? services.where(failedLast).firstOrNull)?.id;
+  }
+
   ItemRef _ref(ServiceConfig s) => ItemRef(projectId: _id, serviceId: s.id);
 
   /// [key] 버튼을 막아 두고 [action] 을 한다. 예외는 화면 아래에 알린다.
@@ -95,10 +133,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _runAll() => _run('all', () async {
         final s = await widget.runner.runAll(_id);
+        if (!mounted) return;
         setState(() => _summary = s);
+        if (_project case final p?) unawaited(_loadGit(p.folderPath));
       });
 
-  Future<void> _stopAll() => _run('all', () async {
+  /// 전체 실행이 최신 코드를 기다리는 중에도 누를 수 있게 따로 막는다.
+  Future<void> _stopAll() => _run('stopAll', () async {
         final s = await widget.runner.stopAll(_id);
         final failed = s.items.where((r) => r.outcome == ItemOutcome.failed).toList();
         if (mounted && failed.isNotEmpty) toast(context, '${failed.first.item.serviceId}: ${failed.first.reason}');
@@ -150,7 +191,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (_loadError != null) Text(_loadError!, style: const TextStyle(color: C.muted)) else const LinearProgressIndicator(),
       ]);
     }
-    final allBusy = _busy.contains('all');
+    final allBusy = _busy.contains('all') || _busy.contains('stopAll');
+    final waitingPull = _busy.contains('all') &&
+        _git != null &&
+        (p.config?.git.pullBeforeRun ?? false) &&
+        !_services.any((s) => isUp(widget.runner.stateOf(_ref(s))));
+    final logged = [for (final s in _services) if (s is! RemoteService) s];
     return AppPage(
       crumbs: [('개발', '/home'), (p.name, null)],
       children: [
@@ -160,11 +206,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
               Text(p.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
               Text(p.folderPath, style: mono.copyWith(fontSize: 13, color: C.muted)),
+              if (_git case final git?) _gitLine(git),
+              if (waitingPull)
+                const Text('전체 실행을 준비하고 있어요. 최신 코드를 확인하느라 1분쯤 걸릴 수 있어요.', style: TextStyle(fontSize: 13, color: C.text2)),
             ]),
           ),
           Wrap(spacing: 8, runSpacing: 8, children: [
             Btn('전체 실행', primary: true, icon: Icons.play_arrow, onPressed: allBusy || _services.isEmpty ? null : _runAll),
-            Btn('전체 종료', icon: Icons.stop, onPressed: allBusy || _services.isEmpty ? null : _stopAll),
+            Btn('전체 종료', icon: Icons.stop, onPressed: _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll),
             Btn('헬스체크', onPressed: () => Navigator.pushNamed(context, '/qa', arguments: _id)),
             Btn('AI 검사', onPressed: () => Navigator.pushNamed(context, '/ai', arguments: _id)),
             Btn('설정', icon: Icons.settings_outlined, onPressed: () => Navigator.pushNamed(context, '/settings', arguments: _id)),
@@ -200,21 +249,48 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: _summary == null
               ? const Text('아직 전체 실행 기록이 없어요.', style: TextStyle(color: C.muted))
               : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
+                  if (_summary!.items.isNotEmpty) Text(_counts(_summary!), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                  if (_summary!.pull case final pull?) _resultRow(pull.outcome, 'Git pull — ${pull.message}'),
                   for (final r in _summary!.items)
-                    Row(spacing: 8, children: [
-                      SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(r.outcome))),
-                      Expanded(child: Text('${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}', style: const TextStyle(fontSize: 14))),
-                    ]),
+                    _resultRow(r.outcome, '${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}'),
                 ]),
         ),
+        if (widget.logs case final logs? when logged.isNotEmpty)
+          LogPreview(projectId: _id, services: logged, failed: _failedOf(logged), failedNow: {for (final s in logged) if (widget.runner.stateOf(_ref(s)) == ItemState.failed) s.id}, logs: logs),
       ],
     );
   }
 
+  /// `성공 2 · 실패 1` 처럼 있는 결과만. Git pull 은 항목이 아니라 세지 않는다.
+  static String _counts(RunSummary s) => [
+        for (final (outcome, label) in const [(ItemOutcome.ok, '성공'), (ItemOutcome.failed, '실패'), (ItemOutcome.skipped, '건너뜀')])
+          if (s.items.where((r) => r.outcome == outcome).length case final n when n > 0) '$label $n',
+      ].join(' · ');
+
+  static Widget _resultRow(ItemOutcome outcome, String text) => Row(spacing: 8, children: [
+        SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(outcome))),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+      ]);
+
+  static Widget _gitLine(GitStatus git) => Wrap(
+        spacing: 16,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+            const Icon(Icons.call_split, size: 14, color: C.text2, semanticLabel: 'Git 브랜치'),
+            const Text('브랜치', style: TextStyle(fontSize: 13, color: C.text2)),
+            Flexible(child: Text(git.branch ?? '없음', overflow: TextOverflow.ellipsis, style: mono.copyWith(fontSize: 13, fontWeight: FontWeight.w500))),
+          ]),
+          if (git.changed > 0) Text('커밋하지 않은 변경 ${git.changed}개', style: const TextStyle(fontSize: 13, color: C.text2)),
+          if (git.behind > 0) Text('원격보다 ${git.behind}커밋 뒤처짐', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: C.warn.$2)),
+        ],
+      );
+
   Widget _itemRow(ServiceConfig s) {
     final item = _ref(s);
     final state = widget.runner.stateOf(item);
-    final busy = _busy.contains(s.id) || _busy.contains('all');
+    final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
     final reason = _reasons[item];
     final owner = _owners[item];
     final Widget action = switch (s) {
