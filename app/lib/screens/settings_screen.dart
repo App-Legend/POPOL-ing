@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:popoling_core/contracts.dart';
@@ -67,7 +69,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
     final updated = _project!.copyWith(config: updatedConfig);
 
-    await widget.projectRepository.updateProject(updated);
+    try {
+      await widget.projectRepository.updateProject(updated);
+    } on PathAccessException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('저장하지 못했어요. 다른 프로그램이 popoling.yaml을 열고 있는지 확인해 주세요.'),
+        ),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() => _project = updated);
     ScaffoldMessenger.of(context).showSnackBar(

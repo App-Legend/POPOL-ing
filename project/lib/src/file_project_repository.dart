@@ -73,9 +73,11 @@ class FileProjectRepository implements ProjectRepository {
     final projects = await _projects();
     final i = _indexOf(projects, project.id);
     final updated = projects[i].copyWith(name: project.name, config: project.config);
+
+    // 설정 파일을 먼저 저장하고, 성공하면 목록 파일을 바꾼다. 설정 저장이 실패하면 목록은 바꾸지 않는다.
+    await _saveConfig(updated);
     final next = [...projects]..[i] = updated;
     await _save(next);
-    await _saveConfig(updated);
     projects[i] = updated;
     _notify(projects);
     return updated;
@@ -97,10 +99,8 @@ class FileProjectRepository implements ProjectRepository {
       _updateYamlEditor(doc, config.toMap());
       content = doc.toString();
     } else {
-      // 새 파일은 빈 맵으로 시작해야 키를 넣을 수 있다.
-      var doc = YamlEditor('{}');
-      _updateYamlEditor(doc, config.toMap());
-      content = doc.toString();
+      // 새 파일은 여러 줄 YAML 형식으로 만든다(사람이 고칠 파일이므로).
+      content = _toYamlMultipleLines(config.toMap());
     }
 
     final temp = File('${file.path}.tmp');
@@ -118,6 +118,31 @@ class FileProjectRepository implements ProjectRepository {
     for (final entry in map.entries) {
       doc.update([entry.key], entry.value);
     }
+  }
+
+  /// 여러 줄 YAML 형식으로 만든다(사람이 고칠 파일이므로).
+  String _toYamlMultipleLines(Map<String, Object?> map) {
+    final buf = StringBuffer();
+    for (final entry in map.entries) {
+      buf.write('${entry.key}: ${_yamlValue(entry.value)}\n');
+    }
+    return buf.toString();
+  }
+
+  String _yamlValue(Object? value) {
+    if (value == null) return 'null';
+    if (value is bool) return value.toString();
+    if (value is num) return value.toString();
+    if (value is String) return '"${value.replaceAll('"', '"')}"';
+    if (value is List) {
+      if (value.isEmpty) return '[]';
+      return '[\n${value.map((v) => '  - $_yamlValue(v)').join(',\n')}\n]';
+    }
+    if (value is Map) {
+      if (value.isEmpty) return '{}';
+      return '{\n${value.entries.map((e) => '  ${e.key}: ${_yamlValue(e.value)}').join(',\n')}\n}';
+    }
+    return value.toString();
   }
 
   @override
