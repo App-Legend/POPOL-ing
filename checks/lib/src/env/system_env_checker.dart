@@ -23,7 +23,7 @@ class SystemEnvChecker implements EnvChecker {
   SystemEnvChecker({RunProcess run = runProcess, ResolveCli? resolve, this.timeout = const Duration(seconds: 10)})
       // ignore: prefer_initializing_formals, 이름 있는 매개변수는 _ 로 시작할 수 없다
       : _run = run,
-        _resolve = resolve ?? _forPlatform;
+        _resolve = resolve ?? resolveCliForPlatform;
 
   final RunProcess _run;
   final ResolveCli _resolve;
@@ -119,18 +119,21 @@ class SystemEnvChecker implements EnvChecker {
     }
   }
 
-  static List<String>? _forPlatform(String cli, List<String> args) {
-    if (!Platform.isWindows) return [cli, ...args]; // macOS 는 Process.run 이 PATH 에서 찾고, 없으면 ProcessException
-    final env = Platform.environment;
-    return resolveWindowsCli(
-      cli,
-      args,
-      path: env['PATH'] ?? env['Path'] ?? '',
-      pathExt: env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD',
-      comSpec: env['ComSpec'] ?? env['COMSPEC'] ?? r'C:\Windows\System32\cmd.exe',
-      exists: (f) => File(f).existsSync(),
-    );
-  }
+}
+
+/// 이 OS 에서 [cli] 를 [args] 로 실행할 `[실행 파일, ...인자]`. 못 찾으면 null(미설치).
+/// Windows 에서 경로가 안전하지 않은 `.cmd`·`.bat` 이면 [FormatException].
+List<String>? resolveCliForPlatform(String cli, List<String> args) {
+  if (!Platform.isWindows) return [cli, ...args]; // macOS 는 Process.run 이 PATH 에서 찾고, 없으면 ProcessException
+  final env = Platform.environment;
+  return resolveWindowsCli(
+    cli,
+    args,
+    path: env['PATH'] ?? env['Path'] ?? '',
+    pathExt: env['PATHEXT'] ?? '.COM;.EXE;.BAT;.CMD',
+    comSpec: env['ComSpec'] ?? env['COMSPEC'] ?? r'C:\Windows\System32\cmd.exe',
+    exists: (f) => File(f).existsSync(),
+  );
 }
 
 sealed class _CallResult {
