@@ -28,14 +28,13 @@ String _oneLine(ServiceConfig s) {
 
 String _processOneLine(ProcessService s) {
   var cmd = s.command.map(_quoteArgument).join(' ');
-  final prefix = s.cwd == '.' ? '' : '${s.cwd}/';
   final cwdNote = s.cwd == '.' ? '' : ' (작업 폴더: ${s.cwd})';
   final envNote = s.env.isEmpty ? '' : ' (환경변수: ${s.env.keys.join(", ")})';
-  // 명령이 ./로 시작하면 작업 폴더와의 중복을 제거한다(./app/./app → ./app)
+  // 명령이 ./로 시작하면 앞에 ./를 제거해 중복을 피한다
   if (cmd.startsWith('./')) {
     cmd = cmd.substring(2);
   }
-  return '$prefix$cmd$cwdNote$envNote';
+  return '$cmd$cwdNote$envNote';
 }
 
 /// 인자 하나를 사람이 읽을 수 있게 따옴표로 감싼다.

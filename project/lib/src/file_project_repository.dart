@@ -97,15 +97,20 @@ class FileProjectRepository implements ProjectRepository {
       _updateYamlEditor(doc, config.toMap());
       content = doc.toString();
     } else {
-      // 새 파일을 만든다.
-      var doc = YamlEditor('');
+      // 새 파일은 빈 맵으로 시작해야 키를 넣을 수 있다.
+      var doc = YamlEditor('{}');
       _updateYamlEditor(doc, config.toMap());
       content = doc.toString();
     }
 
     final temp = File('${file.path}.tmp');
-    await temp.writeAsString(content, flush: true);
-    await temp.rename(file.path);
+    try {
+      await temp.writeAsString(content, flush: true);
+      await temp.rename(file.path);
+    } on PathAccessException {
+      await temp.delete();
+      rethrow;
+    }
   }
 
   /// YamlEditor 에 맵을 재귀적으로 반영한다.

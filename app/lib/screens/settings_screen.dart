@@ -106,7 +106,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 field('한 줄 설명', _project!.about.summary ?? ''),
                 field('기술 스택 (쉼표로 구분)', _project!.about.stack.join(', '), isMono: true),
                 field('저장소 링크', _project!.about.links['repo'] ?? '', isMono: true),
-                field('메모', _memoController.text, lines: 3),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 6,
+                  children: [
+                    const Text('메모', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    TextFormField(
+                      controller: _memoController,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: _inputDeco,
+                    ),
+                  ],
+                ),
                 Text('처음 등록할 때 README 첫 문단과 Git 원격 주소로 채워졌어요.',
                     style: const TextStyle(fontSize: 12, color: C.muted)),
               ]),
