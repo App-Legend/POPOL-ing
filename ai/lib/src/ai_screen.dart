@@ -4,13 +4,14 @@ import 'package:popoling_core/ui.dart';
 
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
+import 'failure_analysis.dart' show failureReasonText;
+import 'failure_analysis_panel.dart';
 import 'qa_summary_panel.dart';
 
 /// 화면에 보여 줄 키. 끝 4자리만 남긴다. 8자 이하로 짧으면 4자리도 많이 드러나서 모두 가린다.
 String maskedApiKey(String key) => key.length <= 8 ? '••••••••' : '••••••••${key.substring(key.length - 4)}';
 
-/// 8. AI 검사. 머리(API 키 상태와 [키 입력]·[키 바꾸기])와 헬스체크 결과 요약(AI-03) 카드.
-// 실행 실패 원인 분석(AI-02) 카드는 다음에 붙인다.
+/// 8. AI 검사. 머리(API 키 상태와 [키 입력]·[키 바꾸기]), 실행 실패 원인 분석(AI-02) 카드, 헬스체크 결과 요약(AI-03) 카드.
 class AiScreen extends StatefulWidget {
   const AiScreen({
     super.key,
@@ -20,6 +21,9 @@ class AiScreen extends StatefulWidget {
     this.projectId,
     this.qa,
     this.orchestrator,
+    this.projects,
+    this.logs,
+    this.envDiff,
     this.clock = DateTime.now,
   });
 
@@ -35,6 +39,12 @@ class AiScreen extends StatefulWidget {
   final String? projectId;
   final QaRunner? qa;
   final Orchestrator? orchestrator;
+
+  /// 실행 실패 원인 분석 카드. [projectId]·[orchestrator]·[projects] 가 있으면 그린다.
+  /// [logs]·[envDiff] 는 아직 앱에 없을 수 있다(그 칸은 "못 읽음"으로 보낸다).
+  final ProjectRepository? projects;
+  final LogExcerpt? logs;
+  final EnvDiff? envDiff;
 
   /// 카드 머리의 "오늘" 판단에 쓴다.
   final DateTime Function() clock;
@@ -58,12 +68,37 @@ class _AiScreenState extends State<AiScreen> {
 
   bool get _hasCard => widget.projectId != null && widget.qa != null && widget.orchestrator != null;
 
+  /// 원인 분석할 마지막 전체 실행. [_runLoaded] 가 true 인데 null 이면 기록이 없다(또는 못 읽었다).
+  RunSummary? _lastRun;
+  bool _runLoaded = false;
+
+  bool get _hasRunCard => widget.projectId != null && widget.orchestrator != null && widget.projects != null;
+
   @override
   void initState() {
     super.initState();
     _load();
     if (_hasCard) {
       _loadQa();
+    }
+    if (_hasRunCard) {
+      _loadRun();
+    }
+  }
+
+  /// 화면을 열 때 한 번 읽는다. 못 읽으면 기록이 없는 것으로 보여준다.
+  Future<void> _loadRun() async {
+    RunSummary? run;
+    try {
+      run = await widget.orchestrator!.lastRun(widget.projectId!);
+    } on Exception {
+      run = null;
+    }
+    if (mounted) {
+      setState(() {
+        _lastRun = run;
+        _runLoaded = true;
+      });
     }
   }
 
@@ -103,6 +138,47 @@ class _AiScreenState extends State<AiScreen> {
     final hm = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     final today = t.year == now.year && t.month == now.month && t.day == now.day;
     return today ? '오늘 $hm' : '${t.month}/${t.day} $hm';
+  }
+
+  Widget _runCard() {
+    const body = TextStyle(fontSize: 14, height: 1.6);
+    final run = _lastRun;
+    final shown = [for (final r in run?.items ?? const <ItemResult>[]) if (r.outcome != ItemOutcome.ok) r];
+    final failed = shown.any((r) => r.outcome == ItemOutcome.failed);
+    return Panel(
+      title: '실행 실패 원인 분석',
+      titleAction: run == null || !failed ? null : Text('${_when(run.finishedAt)} 전체 실행 기준', style: const TextStyle(fontSize: 13, color: C.muted)),
+      child: !_runLoaded
+          ? const SizedBox.shrink()
+          : run == null || !failed
+              ? const Text('실패한 실행이 없어요. 실행이 실패하면 여기서 원인을 찾아 드려요.', style: body)
+              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 12, children: [
+                  const Text(failureAnalysisDescription, style: TextStyle(fontSize: 13, color: C.muted, height: 1.6)),
+                  for (final r in shown)
+                    if (r.outcome == ItemOutcome.failed)
+                      Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
+                        Text('${r.item.serviceId} · 실패 · ${failureReasonText(r)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                        FailureAnalysisPanel(
+                          // 키 상태가 바뀌면 패널을 새로 그린다(키를 넣은 뒤 "API 키 필요"가 남지 않게).
+                          key: ValueKey('${r.item.serviceId}-$_status'),
+                          item: r,
+                          run: run,
+                          client: widget.client,
+                          keys: widget.keys,
+                          projects: widget.projects!,
+                          logs: widget.logs,
+                          envDiff: widget.envDiff,
+                          checkKey: widget.checkKey,
+                          onKeysChanged: _load,
+                        ),
+                      ])
+                    else
+                      Text(
+                        r.reason == null ? '${r.item.serviceId} · 건너뜀' : '${r.item.serviceId} · 건너뜀 · ${r.reason}',
+                        style: const TextStyle(fontSize: 14, color: C.text2),
+                      ),
+                ]),
+    );
   }
 
   Widget _qaCard() {
@@ -217,11 +293,13 @@ class _AiScreenState extends State<AiScreen> {
               style: body,
             ),
           ),
+        if (_hasRunCard) _runCard(),
         if (_hasCard) _qaCard(),
-        Text(
-          _hasCard ? '실행 실패 원인 분석은 준비 중이에요.' : '실행 실패 원인 분석과 헬스체크 결과 요약은 준비 중이에요.',
-          style: const TextStyle(fontSize: 13, color: C.muted),
-        ),
+        if (widget.projectId == null)
+          const Text(
+            '프로젝트 대시보드에서 [AI 검사]를 누르면 그 프로젝트의 실행 실패 원인 분석과 헬스체크 결과 요약을 볼 수 있어요.',
+            style: TextStyle(fontSize: 13, color: C.muted),
+          ),
       ],
     );
   }

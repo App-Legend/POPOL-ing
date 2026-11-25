@@ -15,6 +15,7 @@ import 'src/gemini_client.dart';
 export 'src/ai_sender.dart' show AiSender;
 export 'src/api_key_dialog.dart' show ApiKeyChange, ApiKeyCheck, ApiKeyDialog, showApiKeyDialog;
 export 'src/api_key_store.dart' show ApiKeyStore, MemoryApiKeyStore, SecureApiKeyStore;
+export 'src/failure_analysis_panel.dart' show FailureAnalysisPanel, failureAnalysisDescription, failureAnalysisRequestName;
 export 'src/gemini_client.dart' show GeminiFetch, GeminiHttpResponse, GeminiLlmClient, GeminiTransport;
 export 'src/messages.dart' show LlmErrorText, llmErrorText;
 export 'src/qa_summary_panel.dart' show QaSummaryPanel, qaSummaryRequestName;
@@ -24,8 +25,8 @@ export 'src/send_confirm_dialog.dart' show SendConfirmDialog;
 ///
 /// API 키는 사용자가 앱에서 넣고 이 컴퓨터의 보안 저장소에만 둔다. 앱 빌드에는 키를 넣지 않는다.
 /// AI 검사(8, `/ai`) 화면은 Gemini 연결과 같은 저장소의 키를 보여 주고 바꾼다.
-/// 대시보드가 프로젝트 ID 를 넘기면(`arguments`) 그 프로젝트의 헬스체크 결과 요약(AI-03) 카드를 그린다.
-// AI-02 실행 실패 원인 분석은 다음에 더한다.
+/// 대시보드가 프로젝트 ID 를 넘기면(`arguments`) 그 프로젝트의 실행 실패 원인 분석(AI-02)·헬스체크 결과 요약(AI-03)
+/// 카드를 그린다.
 void register(AppRegistry app) {
   final keys = SecureApiKeyStore();
   final gemini = GeminiLlmClient(keys: keys);
@@ -42,6 +43,19 @@ void register(AppRegistry app) {
       // 프로젝트가 있을 때만 꺼낸다. 프로젝트 없이 여는 /ai 는 QA 쪽 등록에 기대지 않는다.
       qa: projectId == null ? null : app.read<QaRunner>(),
       orchestrator: projectId == null ? null : app.read<Orchestrator>(),
+      // 아래는 아직 앱에 등록되지 않았을 수 있다(예: EnvDiff 는 C 가 붙이기 전). 없으면 그 칸 없이 분석한다.
+      projects: projectId == null ? null : _tryRead<ProjectRepository>(app),
+      logs: projectId == null ? null : _tryRead<LogExcerpt>(app),
+      envDiff: projectId == null ? null : _tryRead<EnvDiff>(app),
     );
   });
+}
+
+/// 등록된 구현을 꺼낸다. 아직 없으면 null.
+T? _tryRead<T extends Object>(AppRegistry app) {
+  try {
+    return app.read<T>();
+  } on StateError {
+    return null;
+  }
 }

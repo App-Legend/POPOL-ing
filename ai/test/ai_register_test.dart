@@ -18,7 +18,13 @@ class TestRegistry implements AppRegistry {
   void provide<T extends Object>(T service) => _services[T] = service;
 
   @override
-  T read<T extends Object>() => _services[T]! as T;
+  T read<T extends Object>() {
+    final service = _services[T];
+    if (service == null) {
+      throw StateError('$T 구현이 등록되지 않았습니다.'); // app/ 의 Registry 와 같게
+    }
+    return service as T;
+  }
 }
 
 Future<void> openAi(WidgetTester tester, TestRegistry app) async {
@@ -79,5 +85,35 @@ void main() {
 
     expect(find.text('헬스체크 결과 요약'), findsOneWidget);
     expect(find.text('AI 요약'), findsOneWidget);
+  });
+
+  testWidgets('/ai 에 프로젝트를 넘기면 EnvDiff·LogExcerpt 가 등록되지 않아도 원인 분석을 연다', (tester) async {
+    FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
+    final projects = FakeProjectRepository.withSamples();
+    final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: 'my-team-project', serviceId: 'api')});
+    await runner.runAll('my-team-project');
+    final app = TestRegistry()
+      ..provide<ProjectRepository>(projects)
+      ..provide<QaRunner>(FakeQaRunner(projects))
+      ..provide<Orchestrator>(runner);
+    ai.register(app);
+    tester.view.physicalSize = const Size(1280, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      routes: app.routes,
+      home: Builder(builder: (c) => Btn('열기', onPressed: () => Navigator.pushNamed(c, '/ai', arguments: 'my-team-project'))),
+    ));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('원인 분석'));
+    await tester.pumpAndSettle();
+    final preview = tester.widget<SelectableText>(find.byKey(const Key('send-preview'))).data!;
+    expect(preview, contains('[환경 차이] 환경 비교를 아직 쓸 수 없어요.'));
+    expect(preview, contains('[로그] 로그를 읽지 못했어요.'));
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
   });
 }
