@@ -96,7 +96,7 @@ Future<void> analyze(WidgetTester tester, {String start = '원인 분석'}) asyn
 }
 
 void main() {
-  testWidgets('AT-21: [보내기] 전과 [취소] 뒤 요청 0건, 보낸 내용에 환경변수·호스트·키가 없다', (tester) async {
+  testWidgets('AT-21: [보내기] 전과 [취소] 뒤 요청 0건, 실행 설정에 환경변수·주소 호스트가 없고 키가 없다', (tester) async {
     final ai = FakeLlmClient(reply: goodReply);
     await open(tester, client: ai);
     await tester.tap(btn('원인 분석'));
@@ -149,6 +149,15 @@ void main() {
     await tester.tap(btn('보내기'));
     await tester.pumpAndSettle();
     expect(ai.sent.single, isNot(contains('hunter2')));
+  });
+
+  testWidgets('근거 로그 줄도 화면에서는 비밀값을 가린다', (tester) async {
+    final ai = FakeLlmClient(reply: '{"candidates":[{"cause":"x","logs":[2]}]}');
+    await open(tester, client: ai, logs: ChangingLogs(['Starting backend', 'DB_PASSWORD=hunter2']));
+    await analyze(tester);
+    expect(find.text('근거 로그 · api 마지막 실행'), findsOneWidget);
+    expect(find.text('DB_PASSWORD=••••••'), findsOneWidget);
+    expect(find.textContaining('hunter2'), findsNothing);
   });
 
   testWidgets('Review 5: [다시 분석]은 새 로그로 다시 보낸다', (tester) async {

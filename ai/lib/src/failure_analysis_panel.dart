@@ -6,6 +6,7 @@ import 'ai_request.dart';
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
 import 'failure_analysis.dart';
+import 'redact.dart';
 
 /// 보내기 전 확인 창에 쓰는 분석 이름.
 const failureAnalysisRequestName = '실행 실패 원인 분석';
@@ -104,7 +105,8 @@ class _FailureAnalysisPanelState extends State<FailureAnalysisPanel> {
           Text(c.cause, style: body),
           if (c.logLines.isNotEmpty) ...[
             Text('근거 로그 · ${widget.item.item.serviceId} 마지막 실행', style: label),
-            for (final line in c.logLines) Text(line, style: evidence),
+            // 보낸 글은 AiSender 가 가렸다. 화면의 근거 줄도 같이 가린다(.env 값을 화면에 평문으로 두지 않는다).
+            for (final line in c.logLines) Text(redactSecrets(line).text, style: evidence),
           ],
           for (final e in c.envChanges) Text('환경 차이 · ${envChangeLabel(e)}', style: label),
           if (c.reason) Text('실패 이유 · ${failureReasonText(widget.item)}', style: label),

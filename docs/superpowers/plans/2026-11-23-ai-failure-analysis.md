@@ -15,7 +15,7 @@
 - `ai/` 안에서만 코드를 고친다. `core/`·`app/`·다른 기능 폴더는 고치지 않고 import도 `core/`만. 문서는 이 계획·설계와 기획서 §2 AI-02 줄만 고친다.
 - 새 패키지 추가 금지.
 - Gemini 호출은 `AiSender.send(...)` 한 길로만. [보내기] 전 요청 0건.
-- 보낼 글에 환경변수(`env`)의 이름·값, `.env` 내용, API 키, 호스트(`localhost`, `storage.my-team.dev` 등)가 없다.
+- 보낼 글에 `.env` 내용과 API 키가 없다. 실행 설정 칸에는 환경변수(`env`)의 이름·값과 주소의 호스트(`localhost`, `storage.my-team.dev` 등)가 없다. 로그 줄·명령 인자는 근거라 그대로 보낸다(리뷰 뒤 결정).
 - 상태·후보는 색만으로 나누지 않고 글 라벨을 함께(`StatusChip(label, tone)`).
 - AI-03 동작은 바뀌지 않는다. `ai/test/qa_summary_panel_test.dart`·`ai/test/qa_summary_test.dart`는 고치지 않는다.
 - 화면 문구(그대로 쓴다):
