@@ -4,10 +4,17 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 /// 6. 프로젝트 설정. [ProjectRepository] 에서 프로젝트 메모 등을 읽고 저장한다(FR-15).
+///
+/// [projectId] 가 주어지면 해당 프로젝트를 읽고, 없으면 첫 번째 프로젝트를 읽는다.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.projectRepository});
+  const SettingsScreen({
+    super.key,
+    required this.projectRepository,
+    this.projectId,
+  });
 
   final ProjectRepository projectRepository;
+  final String? projectId;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -32,26 +39,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     final projects = await widget.projectRepository.listProjects();
+    final project = widget.projectId != null
+        ? await widget.projectRepository.getProject(widget.projectId!)
+        : projects.isNotEmpty ? projects.first : null;
+
     if (!mounted) return;
     setState(() {
-      _project = projects.isNotEmpty ? projects.first : null;
-      _memoController.text = _project?.about.memo ?? '';
+      _project = project;
+      _memoController.text = project?.about.memo ?? '';
       _loading = false;
     });
   }
 
   Future<void> _save() async {
     if (_project == null) return;
-    final updatedConfig = _project!.config!.copyWith(
-      about: About(memo: _memoController.text.trim().isEmpty ? null : _memoController.text.trim()),
-    );
+
+    final memo = _memoController.text.trim().isEmpty ? null : _memoController.text.trim();
+    final updatedConfig = _project!.config == null
+        ? const ProjectConfig()
+        : _project!.config!.copyWith(
+            about: About(
+              summary: _project!.about.summary,
+              stack: _project!.about.stack,
+              links: _project!.about.links,
+              memo: memo,
+            ),
+          );
     final updated = _project!.copyWith(config: updatedConfig);
+
     await widget.projectRepository.updateProject(updated);
     if (!mounted) return;
     setState(() => _project = updated);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('메모를 저장했어요.')),
-    );
+      const SnackBar(content: Text('메모를 저장했어요.'),
+    ));
   }
 
   @override
@@ -60,37 +81,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return const AppPage(crumbs: [('설정', null)], children: [Center(child: CircularProgressIndicator())]);
     }
 
+    if (_project == null) {
+      return const AppPage(
+        crumbs: [('설정', null)],
+        children: [Center(child: Text('프로젝트를 찾을 수 없어요.'))],
+      );
+    }
+
     return AppPage(
-      crumbs: const [('개발', '/home'), ('프로젝트 설정', null)],
+      crumbs: [('개발', '/home'), ('프로젝트 설정', null)],
       children: [
         PageHead(
           title: '프로젝트 설정',
-          sub: _project?.folderPath ?? '',
+          sub: _project!.folderPath,
           subMono: true,
           actions: [Btn('popoling.yaml 열기'), Btn('저장', primary: true, onPressed: _save)],
-        ),
-        Notice(
-          bg: C.bad.$1,
-          border: const Color(0xFFF3B8B2),
-          icon: Icons.error_outline,
-          iconColor: const Color(0xFF7A1C14),
-          child: Text.rich(TextSpan(style: const TextStyle(fontSize: 14, color: Color(0xFF7A1C14)), children: [
-            const TextSpan(text: '저장할 수 없어요 — '),
-            const TextSpan(text: '순환 의존', style: TextStyle(fontWeight: FontWeight.w700)),
-            const TextSpan(text: ': web → api → web. api 의 의존 항목에서 web 을 빼 주세요.'),
-          ])),
         ),
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Panel(
               title: '프로젝트 소개',
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 14, children: [
-                field('이름', _project?.name ?? ''),
-                field('한 줄 설명', _project?.about.summary ?? ''),
-                field('기술 스택 (쉼표로 구분)', _project?.about.stack.join(', ') ?? '', isMono: true),
-                field('저장소 링크', _project?.about.links['repo'] ?? '', isMono: true),
+                field('이름', _project!.name),
+                field('한 줄 설명', _project!.about.summary ?? ''),
+                field('기술 스택 (쉼표로 구분)', _project!.about.stack.join(', '), isMono: true),
+                field('저장소 링크', _project!.about.links['repo'] ?? '', isMono: true),
                 field('메모', _memoController.text, lines: 3),
-                Text('처음 등록할 때 README 첫 문단과 Git 원격 주소로 채워졌어요.', style: const TextStyle(fontSize: 12, color: C.muted)),
+                Text('처음 등록할 때 README 첫 문단과 Git 원격 주소로 채워졌어요.',
+                    style: const TextStyle(fontSize: 12, color: C.muted)),
               ]),
             ),
           ),
