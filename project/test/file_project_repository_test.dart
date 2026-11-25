@@ -100,4 +100,31 @@ services:
     expect(project.id, 'project');
     expect(project.name, '내프로젝트');
   });
+
+  test('수정한 이름과 설정을 popoling.yaml 에 저장한다', () async {
+    final dir = await folder('edit-me');
+    await File('${dir.path}/popoling.yaml').writeAsString('version: 1\nname: 최초\n');
+    final r = repo();
+    final project = await r.addProject(dir.path, name: '첫 이름');
+
+    final changed = project.copyWith(name: '바뀐 이름');
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isTrue);
+    final content = await yaml.readAsString();
+    expect(content, contains('name: "최초"')); // 설정 값(수정 전)은 그대로 남고
+  });
+
+  test('설정이 없는 프로젝트는 popoling.yaml 을 만들지 않는다', () async {
+    final dir = await folder('no-config');
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final changed = project.copyWith(name: '바뀐 이름');
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isFalse);
+  });
 }

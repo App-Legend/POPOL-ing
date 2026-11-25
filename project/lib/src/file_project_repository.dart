@@ -71,13 +71,57 @@ class FileProjectRepository implements ProjectRepository {
   Future<Project> updateProject(Project project) async {
     final projects = await _projects();
     final i = _indexOf(projects, project.id);
-    // shortcut: 설정은 메모리에만 바꾸고 popoling.yaml 에는 아직 쓰지 않는다. core 1.0 의 toMap() 이 dev 에 들어오면 yaml_edit 로 저장한다.
     final updated = projects[i].copyWith(name: project.name, config: project.config);
     final next = [...projects]..[i] = updated;
     await _save(next);
+    await _saveConfig(updated);
     projects[i] = updated;
     _notify(projects);
     return updated;
+  }
+
+  /// 수정한 설정을 그 폴더의 popoling.yaml 에 저장한다. 설정이 없으면何も 쓰지 않는다.
+  Future<void> _saveConfig(Project project) async {
+    final config = project.config;
+    if (config == null) return;
+    final file = File('${project.folderPath}${Platform.pathSeparator}$configFileName');
+    await file.writeAsString(_toYaml(config.toMap()));
+  }
+
+  /// [map] 을 YAML 텍스트로 바꾼다. package:yaml 에 인코더가 없어 직접 구현했다.
+  /// shortcut: 중첩 깊이·특수문자(콜론·큰따옴표 등)는 간단하게만 처리한다. 표시 문제가 생기면 yaml_edit 로 교체한다.
+  String _toYaml(Map<String, Object?> map, {int indent = 0}) {
+    final buf = StringBuffer();
+    final space = ' ' * indent;
+    for (final entry in map.entries) {
+      buf.write('$space${entry.key}: ${_yamlValue(entry.value, indent + 2)}\n');
+    }
+    return buf.toString();
+  }
+
+  String _yamlValue(Object? value, int indent) {
+    final space = ' ' * indent;
+    if (value == null) return 'null';
+    if (value is bool) return value.toString();
+    if (value is num) return value.toString();
+    if (value is String) return '"${value.replaceAll('"', '"')}"';
+    if (value is List) {
+      if (value.isEmpty) return '[]';
+      final lines = <String>[];
+      for (final item in value) {
+        lines.add('$space- ${_yamlValue(item, indent + 2)}');
+      }
+      return lines.join('\n');
+    }
+    if (value is Map) {
+      if (value.isEmpty) return '{}';
+      final lines = <String>[];
+      value.forEach((k, v) {
+        lines.add('$space$k: ${_yamlValue(v, indent + 2)}');
+      });
+      return lines.join('\n');
+    }
+    return value.toString();
   }
 
   @override
