@@ -2,7 +2,7 @@ import 'package:popoling_core/models.dart';
 
 /// 실행할 명령 목록을 사람이 읽을 수 있는 문자열로 요약한다.
 ///
-/// 사용자가 처음 열 때 '어떤 명령이 실행될지' 확인받기 위해 쓴다(FR-13).
+/// 사용자가 처음 열 때 '어떤 명령이 실행될지' 확인받기 위해 쓴다(받은 설정 파일 실행 전 확인).
 String summarizeCommands(List<ServiceConfig> services) {
   if (services.isEmpty) return '실행할 항목이 없어요.';
   final lines = <String>[];
@@ -17,7 +17,8 @@ String _oneLine(ServiceConfig s) {
     return _processOneLine(s);
   }
   if (s is ComposeService) {
-    return 'Docker Compose 시작${s.services.isNotEmpty ? ' (${s.services.join(", ")})' : ''}';
+    final serviceList = s.services.isNotEmpty ? ' (${s.services.join(", ")})' : '';
+    return 'Docker Compose 시작$serviceList (${s.file})';
   }
   if (s is RemoteService) {
     return '원격 연결 확인';
@@ -26,8 +27,21 @@ String _oneLine(ServiceConfig s) {
 }
 
 String _processOneLine(ProcessService s) {
-  final cmd = s.command.join(' ');
+  var cmd = s.command.map(_quoteArgument).join(' ');
   final prefix = s.cwd == '.' ? '' : '${s.cwd}/';
   final cwdNote = s.cwd == '.' ? '' : ' (작업 폴더: ${s.cwd})';
-  return '$prefix$cmd$cwdNote';
+  final envNote = s.env.isEmpty ? '' : ' (환경변수: ${s.env.keys.join(", ")})';
+  // 명령이 ./로 시작하면 작업 폴더와의 중복을 제거한다(./app/./app → ./app)
+  if (cmd.startsWith('./')) {
+    cmd = cmd.substring(2);
+  }
+  return '$prefix$cmd$cwdNote$envNote';
+}
+
+/// 인자 하나를 사람이 읽을 수 있게 따옴표로 감싼다.
+String _quoteArgument(String arg) {
+  if (arg.contains(RegExp(r'[ "&;<>|()]')) || arg.contains(RegExp(r'[\\]'))) {
+    return '"${arg.replaceAll('"', '"')}"';
+  }
+  return arg;
 }

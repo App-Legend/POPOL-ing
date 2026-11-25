@@ -16,13 +16,13 @@ void main() {
       );
       expect(
         summarizeCommands([s]),
-        'api: ./backend/./gradlew bootRun (작업 폴더: ./backend)',
+        'api: ./backend/gradlew bootRun (작업 폴더: ./backend)',
       );
     });
 
     test('docker compose 서비스를 요약한다', () {
       final s = ComposeService(id: 'db', file: './docker-compose.yml');
-      expect(summarizeCommands([s]), 'db: Docker Compose 시작');
+      expect(summarizeCommands([s]), 'db: Docker Compose 시작 (./docker-compose.yml)');
     });
 
     test('원격 서비스를 요약한다', () {
