@@ -41,6 +41,7 @@ Registry buildRegistry({bool features = true}) {
     catalog.register(app);
     ai.register(app);
   }
+  _registerMockups(app);
   return app;
 }
 
@@ -63,7 +64,7 @@ void _registerMockups(AppRegistry app) {
   app.route('/detail', (_) => const DetailScreen());
   app.route('/env', (_) => const EnvCheckScreen());
   app.route('/qa', (_) => const QaScreen());
-  app.route('/settings', (_) => const SettingsScreen());
+  app.route('/settings', (_) => SettingsScreen(projectRepository: app.read<ProjectRepository>()));
   app.route('/dialogs', (_) => const DialogsScreen());
   app.route('/ai', (_) => const AiScreen());
 }
