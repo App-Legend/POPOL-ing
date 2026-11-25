@@ -15,6 +15,7 @@ import 'src/gemini_client.dart';
 export 'src/ai_sender.dart' show AiSender;
 export 'src/api_key_dialog.dart' show ApiKeyChange, ApiKeyCheck, ApiKeyDialog, showApiKeyDialog;
 export 'src/api_key_store.dart' show ApiKeyStore, MemoryApiKeyStore, SecureApiKeyStore;
+export 'src/failure_analysis_panel.dart' show FailureAnalysisPanel, failureAnalysisDescription, failureAnalysisRequestName;
 export 'src/gemini_client.dart' show GeminiFetch, GeminiHttpResponse, GeminiLlmClient, GeminiTransport;
 export 'src/messages.dart' show LlmErrorText, llmErrorText;
 export 'src/qa_summary_panel.dart' show QaSummaryPanel, qaSummaryRequestName;
