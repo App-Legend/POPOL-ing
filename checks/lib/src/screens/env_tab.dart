@@ -84,6 +84,8 @@ class _EnvTabState extends State<EnvTab> {
   }
 
   Future<void> _stop(ItemRef owner) async {
+    if (!await confirmStopOther(context, project: owner.projectId, service: owner.serviceId)) return;
+    if (!mounted) return;
     setState(() => _stopping.add(owner));
     try {
       await widget.runner.stop(owner);

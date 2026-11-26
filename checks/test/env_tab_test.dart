@@ -7,6 +7,16 @@ import 'package:popoling_core/fakes.dart';
 const _id = 'my-team-project';
 const _shopWeb = ItemRef(projectId: 'shop-clone', serviceId: 'web');
 
+class _RecordingRunner extends FakeOrchestrator {
+  _RecordingRunner(super.projects);
+  final stopped = <ItemRef>[];
+  @override
+  Future<ItemResult> stop(ItemRef item) {
+    stopped.add(item);
+    return super.stop(item);
+  }
+}
+
 class _BrokenChecker implements EnvChecker {
   @override
   Future<List<EnvCheckResult>> check(List<Requirement> requires) async => throw StateError('boom');
@@ -57,7 +67,7 @@ void main() {
   });
 
   testWidgets('my other project shows stop', (tester) async {
-    final runner = FakeOrchestrator(projects);
+    final runner = _RecordingRunner(projects);
     await pump(
       tester,
       tab(
@@ -68,6 +78,11 @@ void main() {
     );
     expect(find.text('shop-clone / web 중지'), findsOneWidget);
     expect(find.textContaining('내 다른 프로젝트'), findsOneWidget);
+    await tester.tap(find.text('shop-clone / web 중지'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+    expect(runner.stopped, isEmpty, reason: '취소하면 멈추지 않는다');
   });
 
   testWidgets('no history', (tester) async {

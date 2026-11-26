@@ -406,3 +406,25 @@ class AutoGrid extends StatelessWidget {
         return Wrap(spacing: gap, runSpacing: gap, children: [for (final c in children) SizedBox(width: w, child: c)]);
       });
 }
+
+/// 다른 프로젝트 항목을 멈추기 전 확인(FR-06, 목업 v2 3c). [중지]면 true.
+///
+/// 포트를 내 다른 프로젝트 항목이 쓸 때만 쓴다. 외부 프로그램은 멈추지 않으므로 이 창도 없다.
+Future<bool> confirmStopOther(BuildContext context, {required String project, required String service}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (c) => Dialog(
+        child: DialogBody('다른 프로젝트의 $project / $service을 중지할까요?', [
+          Text(
+            '지금 보고 있는 프로젝트가 아니라 $project의 $service 항목이에요. 포폴링이 시작한 항목이라 중지할 수 있어요. '
+            '$project의 다른 항목은 그대로 둬요.',
+            style: const TextStyle(fontSize: 14, color: C.text2, height: 1.6),
+          ),
+          Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
+            Btn('취소', onPressed: () => closeDialog(c, false)),
+            FilledButton(autofocus: true, onPressed: () => closeDialog(c, true), child: const Text('중지')),
+          ]),
+        ]),
+      ),
+    ) ??
+    false;

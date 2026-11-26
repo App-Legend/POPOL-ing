@@ -112,6 +112,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('confirmStopOther: 취소면 false, 중지면 true', (tester) async {
+    bool? result;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(body: Builder(builder: (c) => Btn('열기', onPressed: () async => result = await confirmStopOther(c, project: 'shop-clone', service: 'web')))),
+    ));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('다른 프로젝트의 shop-clone / web을 중지할까요?'), findsOneWidget);
+    expect(find.textContaining('포폴링이 시작한 항목이라 중지할 수 있어요'), findsOneWidget);
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+    expect(result, isFalse);
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '중지'));
+    await tester.pumpAndSettle();
+    expect(result, isTrue);
+  });
+
   testWidgets('PageHead: 제목·설명·버튼이 보이고, 눌 수 없는 버튼은 비활성이다', (tester) async {
     await tester.pumpWidget(_host(const PageHead(title: '제목', sub: '설명', actions: [Btn('저장', onPressed: null)])));
     expect(find.text('제목'), findsOneWidget);

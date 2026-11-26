@@ -21,6 +21,25 @@ void desktop(WidgetTester tester) {
 }
 
 void main() {
+  testWidgets('api key dialog copy', (tester) async {
+    desktop(tester);
+    await tester.pumpWidget(host((c) => showApiKeyDialog(c, MemoryApiKeyStore())));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI 기능을 쓰려면 Gemini API 키가 필요해요'), findsOneWidget);
+    expect(find.textContaining('키가 없어도 실행·종료·헬스체크는 그대로 쓸 수 있어요.'), findsOneWidget);
+    expect(find.textContaining('화면과 로그에는 끝 4자리만 보여줘요'), findsOneWidget);
+    expect(find.textContaining('팀원도 각자 자기 키를 넣어 주세요'), findsOneWidget);
+  });
+
+  testWidgets('send confirm lists not sent', (tester) async {
+    desktop(tester);
+    await tester.pumpWidget(host((c) => AiSender(FakeLlmClient()).send(c, requestName: '실행 실패 원인 분석', content: 'web 로그')));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('보내지 않는 것: .env 값, API 키, 소스 코드'), findsOneWidget);
+  });
+
   group('보내기 전 확인 (AT-21)', () {
     const log = 'web 종료 코드 1\nVITE_API_KEY=abc123\nDB_PASSWORD=pw-from-env-file\nError: Cannot find module';
 
@@ -118,7 +137,7 @@ void main() {
 
       await tester.tap(find.text('열기'));
       await tester.pumpAndSettle();
-      expect(find.text('Gemini API 키 입력'), findsOneWidget);
+      expect(find.text('AI 기능을 쓰려면 Gemini API 키가 필요해요'), findsOneWidget);
       expect(find.text('https://aistudio.google.com/apikey'), findsOneWidget, reason: '키 만드는 주소');
       expect(btn('키 지우기'), findsNothing);
       expect(btn('연결 확인'), findsNothing, reason: '확인할 방법을 주지 않으면 버튼이 없다');
@@ -174,7 +193,7 @@ void main() {
       await tester.tap(btn('키 지우기'));
       await tester.pumpAndSettle();
       expect(find.text('키를 지우지 못했어요. 이 컴퓨터의 보안 저장소를 쓸 수 없어요.'), findsOneWidget);
-      expect(find.text('Gemini API 키 입력'), findsOneWidget, reason: '창은 닫히지 않는다');
+      expect(find.text('Gemini API 키 바꾸기'), findsOneWidget, reason: '창은 닫히지 않는다');
     });
 
     group('[연결 확인]', () {
@@ -204,7 +223,7 @@ void main() {
         expect(checked, ['AQ.typed-key']);
         expect(find.text('연결됐어요. [저장]을 누르면 이 키를 써요.'), findsOneWidget);
         expect(await keys.read(), isNull);
-        expect(find.text('Gemini API 키 입력'), findsOneWidget, reason: '창은 그대로');
+        expect(find.text('AI 기능을 쓰려면 Gemini API 키가 필요해요'), findsOneWidget, reason: '창은 그대로');
       });
 
       testWidgets('키가 맞지 않으면 키 오류 안내를 보여 준다', (tester) async {

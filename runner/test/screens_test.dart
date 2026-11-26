@@ -264,6 +264,10 @@ void main() {
 
       await tester.tap(find.text('shop-clone / web 중지'));
       await tester.pumpAndSettle();
+      expect(find.text('다른 프로젝트의 shop-clone / web을 중지할까요?'), findsOneWidget);
+      expect(runner.stopped, isEmpty, reason: '확인하기 전에는 멈추지 않는다');
+      await tester.tap(find.widgetWithText(FilledButton, '중지'));
+      await tester.pumpAndSettle();
       expect(runner.stopped, [_shopWeb]);
       expect(find.text('shop-clone / web 중지'), findsNothing);
     });

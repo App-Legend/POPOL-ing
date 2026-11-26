@@ -35,6 +35,7 @@ class SendConfirmDialog extends StatelessWidget {
           ),
         ),
       ),
+      const Text('보내지 않는 것: .env 값, API 키, 소스 코드', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.text2)),
       Text(
         [...notes, '$hidden.env 값과 API 키는 보내지 않아요.', '무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요.'].join(' '),
         style: const TextStyle(fontSize: 12.5, color: C.muted, height: 1.5),

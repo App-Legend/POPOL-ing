@@ -7,7 +7,7 @@ import 'package:popoling_core/ui.dart';
 
 import 'item_status.dart';
 
-/// 앱을 닫을 때 실행 중인 항목이 있으면 어떻게 할지 묻는다(FR-12).
+/// 앱을 닫을 때 실행 중인 항목이 있으면 [취소]·[모두 종료하고 닫기]를 묻는다(FR-12, 기획서 v1.4).
 class ExitGuard extends StatefulWidget {
   const ExitGuard({
     super.key,
@@ -134,20 +134,20 @@ class _ExitDialogState extends State<_ExitDialog> {
       _title('실행 중인 항목이 있어요'),
       const Text('포폴링을 닫기 전에 어떻게 할까요?', style: TextStyle(fontSize: 14, color: C.text2)),
       _list([for (final MapEntry(:key, :value) in byProject.entries) '$key — ${value.join(', ')}']),
-      // Btn 은 자동 포커스를 받지 못한다. Enter 가 기본값이 되려면 포커스가 있어야 한다.
-      FilledButton(
-        autofocus: true,
-        onPressed: _stopAndExit,
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 44),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+      Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
+        Btn('취소', onPressed: () => _close(false)),
+        // Btn 은 자동 포커스를 받지 못한다. Enter 가 기본값이 되려면 포커스가 있어야 한다.
+        FilledButton(
+          autofocus: true,
+          onPressed: _stopAndExit,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 44),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          child: const Text('모두 종료하고 닫기'),
         ),
-        child: const Text('모두 종료하고 닫기'),
-      ),
-      Btn('그대로 두고 닫기', onPressed: () => _close(true)),
-      Btn('취소', ghost: true, onPressed: () => _close(false)),
-      const Text('그대로 두면 다음에 앱을 열 때 실행 기록을 확인해 다시 연결해요.', style: TextStyle(fontSize: 12, color: C.muted)),
+      ]),
     ];
   }
 

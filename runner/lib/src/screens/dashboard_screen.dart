@@ -190,7 +190,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
 
   /// 포트를 쓰는 내 다른 항목을 멈춘다(AT-17). 멈추면 바로 이 항목을 시작할 수 있다.
-  Future<void> _stopOwner(ItemRef item, ItemRef owner) => _run(item.serviceId, () async {
+  Future<void> _stopOwner(ItemRef item, ItemRef owner) async {
+    if (owner.projectId != _id && !await confirmStopOther(context, project: owner.projectId, service: owner.serviceId)) return;
+    return _stopOwnerConfirmed(item, owner);
+  }
+
+  Future<void> _stopOwnerConfirmed(ItemRef item, ItemRef owner) => _run(item.serviceId, () async {
         final r = await widget.runner.stop(owner);
         if (r.outcome != ItemOutcome.ok) throw StateError(r.reason ?? '멈추지 못했어요.');
         setState(() {

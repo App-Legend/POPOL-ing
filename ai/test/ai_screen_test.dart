@@ -110,7 +110,7 @@ void main() {
     expect(find.text(noKeyNotice), findsOneWidget);
     await tester.tap(btn('키 입력'));
     await tester.pumpAndSettle();
-    expect(find.text('Gemini API 키 입력'), findsNothing);
+    expect(find.text('AI 기능을 쓰려면 Gemini API 키가 필요해요'), findsNothing);
     expect(find.text('보안 저장소를 쓰지 못해 키 입력 창을 열지 못했어요.'), findsOneWidget);
   });
 
