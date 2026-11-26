@@ -17,6 +17,18 @@ class _RecordingRunner extends FakeOrchestrator {
   }
 }
 
+class _BrokenPorts implements PortProbe {
+  @override
+  Future<PortUsage> whoUses(int port) async => throw StateError('boom');
+  @override
+  Future<ProbeResult> connect(int port, {String? host, Duration timeout = const Duration(seconds: 1)}) async => throw StateError('boom');
+}
+
+class _BrokenDiff implements EnvDiff {
+  @override
+  Future<List<EnvChange>?> sinceLastSuccess(String projectId) async => throw StateError('boom');
+}
+
 class _BrokenChecker implements EnvChecker {
   @override
   Future<List<EnvCheckResult>> check(List<Requirement> requires) async => throw StateError('boom');
@@ -94,6 +106,19 @@ void main() {
     await pump(tester, tab(diff: FakeEnvDiff(projects, changes: {_id: [const EnvChange(name: 'node', before: '20.11.1', after: '22.3.0')]})));
     expect(find.text('1가지'), findsOneWidget);
     expect(find.text('20.11.1'), findsOneWidget);
+  });
+
+  testWidgets('port probe throws shows unknown, not free', (tester) async {
+    await pump(tester, tab(ports: _BrokenPorts()));
+    expect(find.text('비어 있음'), findsNothing);
+    expect(find.text('확인하지 못함'), findsWidgets);
+    expect(find.text('모두 비어 있어요'), findsNothing);
+  });
+
+  testWidgets('diff throws shows could not check', (tester) async {
+    await pump(tester, tab(diff: _BrokenDiff()));
+    expect(find.text('아직 성공한 실행 기록이 없어요.'), findsNothing);
+    expect(find.text('마지막 성공 환경과 비교하지 못했어요'), findsOneWidget);
   });
 
   testWidgets('checker throws', (tester) async {

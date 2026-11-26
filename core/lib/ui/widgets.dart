@@ -102,7 +102,7 @@ class _SideMenu extends StatelessWidget {
             ),
           ),
         // "지금 상태" 제목은 목록이 직접 그린다(보여 줄 프로젝트가 없으면 제목도 숨긴다).
-        if (status != null) ...[const SizedBox(height: 22), status],
+        if (status != null) ...[const SizedBox(height: 22), Expanded(child: SingleChildScrollView(child: status))],
       ]),
     );
   }
@@ -414,8 +414,9 @@ Future<bool> confirmStopOther(BuildContext context, {required String project, re
             style: const TextStyle(fontSize: 14, color: C.text2, height: 1.6),
           ),
           Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
-            Btn('취소', onPressed: () => closeDialog(c, false)),
-            FilledButton(autofocus: true, onPressed: () => closeDialog(c, true), child: const Text('중지')),
+            // 기본(Enter) 포커스는 [취소]. 다른 프로젝트 항목을 실수로 멈추지 않게 한다.
+            OutlinedButton(autofocus: true, onPressed: () => closeDialog(c, false), child: const Text('취소')),
+            FilledButton(onPressed: () => closeDialog(c, true), child: const Text('중지')),
           ]),
         ]),
       ),

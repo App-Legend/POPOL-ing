@@ -44,6 +44,12 @@ void main() {
     expect(list.map((r) => r.title), ['3', '2', '1']);
   });
 
+  test('concurrent adds keep both', () async {
+    final h = AnalysisHistory(() async => file);
+    await Future.wait([h.add(rec('a', DateTime(2026, 11, 27, 1))), h.add(rec('b', DateTime(2026, 11, 27, 2)))]);
+    expect((await h.list()).map((r) => r.title).toSet(), {'a', 'b'});
+  });
+
   test('missing file is empty', () async {
     expect(await AnalysisHistory(() async => file).list(), isEmpty);
   });

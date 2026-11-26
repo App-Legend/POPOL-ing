@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popoling_core/ui.dart';
 
@@ -101,6 +102,11 @@ void main() {
     expect(find.text('X'), findsOneWidget);
   });
 
+  testWidgets('long status list scrolls instead of overflowing', (tester) async {
+    await pumpShell(tester, status: Column(children: [for (var i = 0; i < 40; i++) SizedBox(height: 48, child: Text('항목 $i'))]));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('long crumb ellipsis', (tester) async {
     await pumpShell(tester, crumb: '2025-2학기-캡스톤-동아리-행사-예약-웹서비스-최종-진짜최종' * 4);
     expect(tester.takeException(), isNull);
@@ -116,9 +122,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('다른 프로젝트의 shop-clone / web을 중지할까요?'), findsOneWidget);
     expect(find.textContaining('포폴링이 시작한 항목이라 중지할 수 있어요'), findsOneWidget);
-    await tester.tap(find.text('취소'));
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(result, isFalse);
+    expect(result, isFalse, reason: 'Enter 기본값은 취소');
     await tester.tap(find.text('열기'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '중지'));

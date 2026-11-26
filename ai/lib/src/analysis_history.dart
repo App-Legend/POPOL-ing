@@ -81,6 +81,9 @@ class AnalysisHistory {
   final int max;
   final _changes = StreamController<void>.broadcast();
 
+  /// 쓰기를 한 번에 하나씩 한다. 동시에 쓰면 같은 목록을 읽어 기록 하나가 사라진다.
+  Future<void> _writing = Future.value();
+
   /// 기록이 더해질 때마다 알린다.
   Stream<void> get changes => _changes.stream;
 
@@ -97,7 +100,13 @@ class AnalysisHistory {
   }
 
   /// 맨 앞에 더한다. 임시 파일에 쓴 뒤 바꿔 끼워, 쓰다 멈춰도 기존 기록이 깨지지 않게 한다.
-  Future<void> add(AnalysisRecord record) async {
+  Future<void> add(AnalysisRecord record) {
+    final done = _writing.then((_) => _add(record));
+    _writing = done.catchError((Object _) {}); // 한 번 실패해도 다음 쓰기는 한다
+    return done;
+  }
+
+  Future<void> _add(AnalysisRecord record) async {
     final next = [record, ...await list()].take(max).toList();
     final file = await _file();
     await file.parent.create(recursive: true);

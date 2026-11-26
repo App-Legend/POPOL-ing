@@ -41,6 +41,8 @@ class _EnvTabState extends State<EnvTab> {
   String? _toolsError;
   List<_PortRow> _ports = const [];
   List<EnvChange>? _changes;
+  var _diffError = false;
+  String? _loadError;
   var _loading = true;
   final _stopping = <ItemRef>{};
 
@@ -56,7 +58,12 @@ class _EnvTabState extends State<EnvTab> {
     try {
       config = (await widget.projects.getProject(widget.projectId)).config;
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = '프로젝트 설정을 읽지 못해 환경을 확인하지 못했어요';
+        });
+      }
       return;
     }
     List<EnvCheckResult>? tools;
@@ -68,10 +75,11 @@ class _EnvTabState extends State<EnvTab> {
     }
     final ports = await _portRows(widget.ports, widget.runtime, config);
     List<EnvChange>? changes;
+    var diffError = false;
     try {
       changes = await widget.diff?.sinceLastSuccess(widget.projectId);
     } catch (_) {
-      changes = null;
+      diffError = true;
     }
     if (!mounted) return;
     setState(() {
@@ -79,6 +87,8 @@ class _EnvTabState extends State<EnvTab> {
       _toolsError = toolsError;
       _ports = ports;
       _changes = changes;
+      _diffError = diffError;
+      _loadError = null;
       _loading = false;
     });
   }
@@ -97,6 +107,7 @@ class _EnvTabState extends State<EnvTab> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadError != null) return Text(_loadError!, style: TextStyle(fontSize: 14, color: C.bad.$2));
     if (_loading && _tools == null && _toolsError == null) return const LinearProgressIndicator();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
       Row(children: [
@@ -113,9 +124,14 @@ class _EnvTabState extends State<EnvTab> {
 
   Widget _portPanel() {
     final busy = _ports.where(_foreign).length;
+    final unknown = _ports.where((r) => r.usage == null).length;
     return Panel(
       title: '포트',
-      titleAction: busy > 0 ? StatusChip('사용 중 $busy', C.port) : const StatusChip('모두 비어 있어요', C.ok),
+      titleAction: busy > 0
+          ? StatusChip('사용 중 $busy', C.port)
+          : unknown > 0
+              ? StatusChip('확인하지 못함 $unknown', C.idle)
+              : const StatusChip('모두 비어 있어요', C.ok),
       child: _ports.isEmpty
           ? const Text('확인할 포트가 없어요.', style: TextStyle(fontSize: 14))
           : SimpleTable(
@@ -124,7 +140,11 @@ class _EnvTabState extends State<EnvTab> {
               rows: [
                 for (final r in _ports)
                   [
-                    _foreign(r) ? const StatusChip('사용 중', C.port) : const StatusChip('정상', C.ok),
+                    r.usage == null
+                        ? const StatusChip('확인하지 못함', C.idle)
+                        : _foreign(r)
+                            ? const StatusChip('사용 중', C.port)
+                            : const StatusChip('정상', C.ok),
                     Text('${r.port}', style: mono),
                     Text(r.service),
                     Text(_whereText(r)),
@@ -139,7 +159,8 @@ class _EnvTabState extends State<EnvTab> {
   }
 
   String _whereText(_PortRow r) => switch (r.usage) {
-        PortFree() || null => '비어 있음',
+        null => '확인하지 못했어요',
+        PortFree() => '비어 있음',
         PortInUse() when r.owner?.projectId == widget.projectId => '이 프로젝트의 ${r.owner!.serviceId}',
         PortInUse() when r.owner != null => '${r.owner} · 내 다른 프로젝트',
         PortInUse(:final processName, :final pid) => [processName ?? '알 수 없는 프로그램', if (pid != null) '(PID $pid)'].join(' '),
@@ -194,7 +215,9 @@ class _EnvTabState extends State<EnvTab> {
     return Panel(
       title: '마지막 성공 때와 달라진 것',
       titleAction: changes == null || changes.isEmpty ? null : StatusChip('${changes.length}가지', C.warn, dot: false),
-      child: changes == null
+      child: _diffError
+          ? Text('마지막 성공 환경과 비교하지 못했어요', style: TextStyle(fontSize: 14, color: C.bad.$2))
+          : changes == null
           ? const Text('아직 성공한 실행 기록이 없어요.', style: TextStyle(fontSize: 14))
           : changes.isEmpty
               ? const Text('마지막으로 성공했을 때와 같아요.', style: TextStyle(fontSize: 14))

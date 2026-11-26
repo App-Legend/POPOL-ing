@@ -12,6 +12,6 @@ import 'package:popoling_core/ui.dart';
     return (label: '일부 실패 · $k/$n', tone: C.bad);
   }
   if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return (label: '시작 중 · $k/$n', tone: C.warn);
-  if (k == n) return (label: '실행 중 · $n/$n', tone: C.ok);
+  if (k > 0) return (label: '실행 중 · $k/$n', tone: C.ok);
   return (label: '중지', tone: C.idle);
 }
