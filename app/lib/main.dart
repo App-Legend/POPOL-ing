@@ -11,15 +11,8 @@ import 'package:popoling_runner/runner.dart' as runner;
 
 import 'ai_slots.dart';
 import 'registry.dart';
-import 'screens/ai_screen.dart';
 import 'screens/category_screen.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/detail_screen.dart';
 import 'screens/dialogs_screen.dart';
-import 'screens/env_check_screen.dart';
-import 'screens/home_screen.dart';
-import 'screens/qa_screen.dart';
-import 'screens/settings_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,14 +53,7 @@ void _registerFakes(AppRegistry app) {
 
 void _registerMockups(AppRegistry app) {
   app.route('/', (_) => const CategoryScreen());
-  app.route('/home', (_) => const HomeScreen());
-  app.route('/dashboard', (_) => const DashboardScreen());
-  app.route('/detail', (_) => const DetailScreen());
-  app.route('/env', (_) => const EnvCheckScreen());
-  app.route('/qa', (_) => const QaScreen());
-  app.route('/settings', (_) => const SettingsScreen());
   app.route('/dialogs', (_) => const DialogsScreen());
-  app.route('/ai', (_) => const AiScreen());
 }
 
 class PopolingApp extends StatelessWidget {

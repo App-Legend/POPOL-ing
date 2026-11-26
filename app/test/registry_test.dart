@@ -30,12 +30,12 @@ void main() {
     expect(() => Registry().read<QaRunner>(), throwsStateError);
   });
 
-  test('가짜 조립에는 가짜 구현과 목업 화면 9개가 들어 있다', () {
+  test('가짜 조립에는 가짜 구현과 목업 화면이 들어 있다', () {
     final app = buildRegistry(features: false);
     expect(app.read<ProjectRepository>(), isA<FakeProjectRepository>());
     expect(app.read<QaRunner>(), isA<FakeQaRunner>());
     expect(app.read<HttpProbe>(), isA<FakeHttpProbe>());
-    expect(app.routes.keys, containsAll(['/', '/home', '/dashboard', '/qa']));
+    expect(app.routes.keys, containsAll(['/', '/dialogs']));
   });
 
   test('기본 조립은 기능 패키지의 진짜 구현으로 바꿔 끼운다', () {
