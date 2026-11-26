@@ -93,21 +93,16 @@ class FileProjectRepository implements ProjectRepository {
     await file.parent.create(recursive: true);
 
     String content;
-    if (await file.exists()) {
-      // 기존 파일에서 주석을 보존하면서 값만 바꾼다.
-      var doc = YamlEditor(await file.readAsString());
-      _updateYamlEditor(doc, config.toMap());
-      content = doc.toString();
-    } else {
-      // 새 파일은 여러 줄 YAML 형식으로 만든다(사람이 고칠 파일이므로).
-      content = _toYamlMultipleLines(config.toMap());
-    }
+    final doc = YamlEditor(await file.exists() ? await file.readAsString() : '{}');
+    // 기존 파일은 주석을 보존하면서 값만 바꾸고, 새 파일은 {} 로 시작해 여러 줄 YAML 로 만든다.
+    _updateYamlEditor(doc, config.toMap());
+    content = doc.toString();
 
     final temp = File('${file.path}.tmp');
     try {
       await temp.writeAsString(content, flush: true);
       await temp.rename(file.path);
-    } on PathAccessException {
+    } on FileSystemException {
       await temp.delete();
       rethrow;
     }
@@ -118,34 +113,6 @@ class FileProjectRepository implements ProjectRepository {
     for (final entry in map.entries) {
       doc.update([entry.key], entry.value);
     }
-  }
-
-  /// 여러 줄 YAML 형식으로 만든다(사람이 고칠 파일이므로).
-  String _toYamlMultipleLines(Map<String, Object?> map) {
-    final buf = StringBuffer();
-    for (final entry in map.entries) {
-      buf.write('${entry.key}: ${_yamlValue(entry.value)}\n');
-    }
-    return buf.toString();
-  }
-
-  String _yamlValue(Object? value) {
-    if (value == null) return 'null';
-    if (value is bool) return value.toString();
-    if (value is num) return value.toString();
-    if (value is String) {
-      final escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
-      return '"$escaped"';
-    }
-    if (value is List) {
-      if (value.isEmpty) return '[]';
-      return '[\n${value.map((v) => '  - ${_yamlValue(v)}').join(',\n')}\n]';
-    }
-    if (value is Map) {
-      if (value.isEmpty) return '{}';
-      return '{\n${value.entries.map((e) => '  ${e.key}: ${_yamlValue(e.value)}').join(',\n')}\n}';
-    }
-    return value.toString();
   }
 
   @override

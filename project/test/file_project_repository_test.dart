@@ -128,6 +128,39 @@ services:
     expect(await yaml.exists(), isFalse);
   });
 
+  test('새 파일로 저장하고 다시 읽으면 같다 (stack·services·따옴표·역슬래시·여러 줄 메모)', () async {
+    final dir = await folder('new-file');
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final changed = project.copyWith(
+      config: ProjectConfig(
+        about: const About(
+          summary: '새 파일 테스트',
+          stack: ['Dart', 'Flutter'],
+          links: {'repo': 'https://example.com/r'},
+          memo: '첫 줄\n둘째 줄',
+        ),
+        services: const [
+          ProcessService(id: 'api', command: ['./gradlew', 'bootRun'], cwd: './backend'),
+        ],
+      ),
+    );
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isTrue);
+    final content = await yaml.readAsString();
+    expect(content, contains('stack:'));
+    expect(content, contains('services:'));
+
+    final reread = await r.getProject(project.id);
+    expect(reread.about.summary, '새 파일 테스트');
+    expect(reread.about.memo, '첫 줄\n둘째 줄');
+    expect(reread.about.stack, ['Dart', 'Flutter']);
+    expect(reread.config!.services.single.id, 'api');
+  });
+
   test('설정을 저장하고 다시 읽으면 같다 (about·services·따옴표·역슬래시)', () async {
     final dir = await folder('roundtrip');
     final r = repo();

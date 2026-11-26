@@ -71,7 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await widget.projectRepository.updateProject(updated);
-    } on PathAccessException {
+    } on FileSystemException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
