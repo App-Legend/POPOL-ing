@@ -100,7 +100,7 @@ void main() {
     setUp(() => projects = FakeProjectRepository.withSamples());
 
     DashboardScreen dashboard(Orchestrator runner,
-            {PortProbe? ports, RuntimeQuery? runtime, GitAdapter? git, LogStore? logs, List<ProjectTab> tabs = const [], ProjectPanels panels = const ProjectPanels(), String id = 'my-team-project'}) =>
+            {PortProbe? ports, RuntimeQuery? runtime, GitAdapter? git, LogStore? logs, List<ProjectTab> tabs = const [], ProjectPanels panels = const ProjectPanels(), String id = 'my-team-project', QaRunner? qa}) =>
         DashboardScreen(
           projectId: id,
           projects: projects,
@@ -112,6 +112,7 @@ void main() {
           launcher: FakeItemLauncher(projects),
           tabs: tabs,
           panels: panels,
+          qa: qa,
         );
 
     testWidgets('머리에 프로젝트 요약 상태를 보여 주고, 전체 실행하면 실행 흐름 카드 상태가 바뀐다', (tester) async {
@@ -201,6 +202,11 @@ void main() {
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
       expect(find.textContaining('원인 자리'), findsNothing);
+    });
+
+    testWidgets('log tab shows health section', (tester) async {
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), qa: FakeQaRunner(projects)));
+      expect(find.text('헬스체크'), findsOneWidget);
     });
 
     testWidgets('no services', (tester) async {

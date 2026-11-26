@@ -19,6 +19,7 @@ import 'src/runtime/runner_runtime_query.dart';
 import 'src/runtime/runtime_store.dart';
 import 'src/screens/dashboard_screen.dart';
 import 'src/screens/exit_guard.dart';
+import 'src/screens/git_tab.dart';
 
 /// 실행 제어의 화면(프로젝트 화면 `/dashboard`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt])을 앱에 등록한다.
 ///
@@ -60,7 +61,14 @@ void register(AppRegistry app) {
             launcher: app.read<ItemLauncher>(),
             tabs: app.tabs,
             panels: _tryRead<ProjectPanels>(app) ?? const ProjectPanels(),
+            qa: _tryRead<QaRunner>(app),
           ));
+  app.tab(ProjectTab(
+    id: 'git',
+    label: 'Git',
+    order: 20,
+    build: (_, projectId) => GitTab(projectId: projectId, projects: app.read<ProjectRepository>(), git: git),
+  ));
 }
 
 /// [child] 를 감싸, 앱을 닫을 때 실행 중인 항목이 있으면 묻는다(FR-12). 가짜 구현이면 그대로 둔다.

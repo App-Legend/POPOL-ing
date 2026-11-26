@@ -6,6 +6,7 @@ import 'package:popoling_core/ui.dart';
 
 import '../git/git_adapter.dart';
 import '../log/log_store.dart';
+import 'health_section.dart';
 import 'item_log_view.dart';
 import 'item_status.dart';
 import 'project_summary.dart';
@@ -27,6 +28,7 @@ class DashboardScreen extends StatefulWidget {
     this.launcher,
     this.tabs = const [],
     this.panels = const ProjectPanels(),
+    this.qa,
   });
 
   final String projectId;
@@ -47,6 +49,9 @@ class DashboardScreen extends StatefulWidget {
 
   /// 실패 안내 자리 등 다른 기능이 채우는 자리.
   final ProjectPanels panels;
+
+  /// 로그 탭 아래 헬스체크. 없으면 숨긴다.
+  final QaRunner? qa;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -393,11 +398,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _logTab() {
     final s = _selectedService;
     final logs = widget.logs;
+    final qa = widget.qa;
+    final health = qa == null ? null : HealthSection(projectId: _id, qa: qa, summary: widget.panels.qaSummary);
     if (s == null || logs == null) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 8),
-        child: Text('로그가 있는 실행 항목이 없어요.', style: TextStyle(color: C.muted)),
-      );
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
+        const Text('로그가 있는 실행 항목이 없어요.', style: TextStyle(color: C.muted)),
+        ?health,
+      ]);
     }
     final item = _ref(s);
     final result = _summary?.items.where((r) => r.item == item && r.outcome == ItemOutcome.failed).firstOrNull;
@@ -405,6 +412,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
       if (failure != null && result != null && _summary != null && !isUp(widget.runner.stateOf(item))) failure(context, result, _summary!),
       ItemLogView(key: ValueKey(item), item: item, service: s, runner: widget.runner, logs: logs, launcher: widget.launcher),
+      ?health,
     ]);
   }
 
