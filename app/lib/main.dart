@@ -73,6 +73,7 @@ class PopolingApp extends StatelessWidget {
 
   final Registry registry;
   final _navigator = GlobalKey<NavigatorState>();
+  late final Widget _status = catalog.statusList(registry);
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -80,7 +81,7 @@ class PopolingApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
         navigatorKey: _navigator,
-        builder: (_, child) => runner.exitGuard(registry, _navigator, child!),
+        builder: (_, child) => ShellScope(status: _status, child: runner.exitGuard(registry, _navigator, child!)),
         routes: registry.routes,
       );
 }

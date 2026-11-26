@@ -2,12 +2,14 @@
 /// `import 'package:popoling_catalog/catalog.dart' as catalog;`
 library;
 
+import 'package:flutter/widgets.dart';
 import 'package:popoling_core/contracts.dart';
 
 import 'src/catalog_screen.dart';
 import 'src/category_screen.dart';
 import 'src/orchestrator_run_info.dart';
 import 'src/run_info.dart';
+import 'src/status_list.dart';
 
 /// 카테고리 선택(1, `/`)과 개발 홈 카탈로그(2, `/home`)를 등록한다.
 ///
@@ -20,3 +22,12 @@ void register(AppRegistry app) {
   app.route('/', (_) => CategoryScreen(projects: app.read<ProjectRepository>(), runs: runInfo()));
   app.route('/home', (_) => CatalogScreen(projects: app.read<ProjectRepository>(), runs: runInfo(), runner: app.read<Orchestrator>()));
 }
+
+/// 왼쪽 메뉴 "지금 상태" 목록(실패·오래된 프로젝트). `app/` 이 앱 맨 위 [ShellScope] 에 넣는다.
+/// 구현은 그릴 때 꺼낸다(등록이 다 끝난 뒤).
+Widget statusList(AppRegistry app) => Builder(
+      builder: (_) => StatusList(
+        projects: app.read<ProjectRepository>(),
+        runs: OrchestratorRunInfoSource(app.read<Orchestrator>(), app.read<ProjectRepository>()),
+      ),
+    );
