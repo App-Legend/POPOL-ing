@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'shell.dart';
 import 'theme.dart';
 
-/// 상단 바(로고 + 경로) + 가운데 정렬된 본문. 모든 내부 화면이 공유한다.
+/// 왼쪽 메뉴 + 본문 틀. 모든 내부 화면이 공유한다(목업 v2).
+///
+/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 "지금 상태"([ShellScope]).
 class AppPage extends StatelessWidget {
   const AppPage({super.key, required this.crumbs, required this.children, this.trailing});
 
-  /// 경로. 마지막 항목은 현재 화면, 나머지는 (이름, 라우트).
+  /// 경로. 마지막 항목은 현재 화면, 나머지는 (이름, 라우트). 본문 맨 위에 작게 보인다.
   final List<(String, String?)> crumbs;
   final List<Widget> children;
   final Widget? trailing;
@@ -14,40 +17,99 @@ class AppPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(children: [
-        Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.border))),
-          child: Row(children: [
-            InkWell(
-              onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
-              child: const Row(children: [Logo(size: 28), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17))]),
-            ),
-            const SizedBox(width: 16),
-            for (final (i, (label, route)) in crumbs.indexed) ...[
-              const Text(' / ', style: TextStyle(color: C.muted, fontSize: 14)),
-              i == crumbs.length - 1
-                  ? Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))
-                  : LinkText(label, onTap: () => go(context, route!)),
-            ],
-            const Spacer(),
-            ?trailing,
-          ]),
-        ),
+      body: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _SideMenu(),
         Expanded(
           child: SingleChildScrollView(
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1200),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 20, children: children),
+                  padding: const EdgeInsets.fromLTRB(28, 20, 28, 40),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 20, children: [
+                    Row(children: [
+                      Expanded(
+                        child: Row(children: [
+                          for (final (i, (label, route)) in crumbs.indexed) ...[
+                            if (i > 0) const Text(' / ', style: TextStyle(color: C.muted, fontSize: 13)),
+                            i == crumbs.length - 1
+                                ? Flexible(child: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 13, color: C.text2)))
+                                : LinkText(label, size: 13, onTap: () => go(context, route!)),
+                          ],
+                        ]),
+                      ),
+                      ?trailing,
+                    ]),
+                    ...children,
+                  ]),
                 ),
               ),
             ),
           ),
         ),
+      ]),
+    );
+  }
+}
+
+class _SideMenu extends StatelessWidget {
+  const _SideMenu();
+
+  static const _items = [('내 프로젝트', '/home', Icons.folder_outlined), ('AI 검사', '/ai', Icons.auto_awesome_outlined)];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ModalRoute.of(context)?.settings.name;
+    final active = current == '/dashboard' ? '/home' : current;
+    final status = ShellScope.statusOf(context);
+    return Container(
+      width: 232,
+      decoration: const BoxDecoration(color: C.surface, border: Border(right: BorderSide(color: C.border))),
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 6),
+            child: Row(children: [Logo(size: 26), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: LinkText('카테고리 · 개발', size: 12, color: C.muted, onTap: () => go(context, '/')),
+        ),
+        const SizedBox(height: 16),
+        for (final (label, route, icon) in _items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Material(
+              color: active == route ? C.primarySoft : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                key: ValueKey('menu-$route'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => go(context, route),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                  child: Row(children: [
+                    Icon(icon, size: 18, color: active == route ? C.primary : C.text2),
+                    const SizedBox(width: 10),
+                    Text(label, style: TextStyle(fontSize: 14, fontWeight: active == route ? FontWeight.w600 : FontWeight.w400, color: active == route ? C.primary : C.text)),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        if (status != null) ...[
+          const SizedBox(height: 22),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Text('지금 상태', style: TextStyle(fontSize: 12, color: C.muted, fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 6),
+          status,
+        ],
       ]),
     );
   }

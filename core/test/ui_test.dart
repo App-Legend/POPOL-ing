@@ -62,6 +62,56 @@ void main() {
     expect(find.text('본문'), findsNothing);
   });
 
+  Future<NavigatorState> pumpShell(WidgetTester tester, {Widget? status, String crumb = '현재 화면'}) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      builder: (_, child) => ShellScope(status: status, child: child!),
+      home: const Text('첫 화면'),
+      routes: {
+        '/second': (_) => AppPage(crumbs: [('내 프로젝트', '/home'), (crumb, null)], children: const [Text('본문')]),
+        '/home': (_) => const Text('홈 화면'),
+      },
+    ));
+    final nav = tester.state<NavigatorState>(find.byType(Navigator));
+    nav.pushNamed('/second');
+    await tester.pumpAndSettle();
+    return nav;
+  }
+
+  testWidgets('AppPage shows side menu', (tester) async {
+    await pumpShell(tester);
+    expect(find.text('카테고리 · 개발'), findsOneWidget);
+    expect(find.text('내 프로젝트'), findsWidgets);
+    expect(find.text('AI 검사'), findsOneWidget);
+    expect(find.text('앱 설정'), findsNothing);
+  });
+
+  testWidgets('menu navigates', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const ValueKey('menu-/home')));
+    await tester.pumpAndSettle();
+    expect(find.text('홈 화면'), findsOneWidget);
+  });
+
+  testWidgets('status slot', (tester) async {
+    await pumpShell(tester, status: const Text('X'));
+    expect(find.text('지금 상태'), findsOneWidget);
+    expect(find.text('X'), findsOneWidget);
+  });
+
+  testWidgets('status slot hidden when null', (tester) async {
+    await pumpShell(tester);
+    expect(find.text('지금 상태'), findsNothing);
+  });
+
+  testWidgets('long crumb ellipsis', (tester) async {
+    await pumpShell(tester, crumb: '2025-2학기-캡스톤-동아리-행사-예약-웹서비스-최종-진짜최종' * 4);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('PageHead: 제목·설명·버튼이 보이고, 눌 수 없는 버튼은 비활성이다', (tester) async {
     await tester.pumpWidget(_host(const PageHead(title: '제목', sub: '설명', actions: [Btn('저장', onPressed: null)])));
     expect(find.text('제목'), findsOneWidget);

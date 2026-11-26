@@ -2,5 +2,6 @@
 library;
 
 export 'ui/fields.dart';
+export 'ui/shell.dart';
 export 'ui/theme.dart';
 export 'ui/widgets.dart';
