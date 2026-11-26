@@ -80,6 +80,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// 0 은 로그 탭, 그 뒤는 [DashboardScreen.tabs] 순서.
   var _tab = 0;
 
+  /// 탭 배지. 그릴 때마다 다시 점검하지 않게 한 번만 만든다.
+  late final Map<String, Stream<int>> _badges = {
+    for (final t in widget.tabs)
+      if (t.badge case final badge?) t.id: badge(_id),
+  };
+
   String get _id => widget.projectId;
 
   /// 지금 아는 상태를 먼저 보여 주고, [fetch] 면 원격을 확인한 뒤 다시 보여 준다.
@@ -370,6 +376,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _tabBar() {
     final labels = ['로그', for (final t in widget.tabs) t.label];
+    Widget badge(int i) {
+      final stream = i == 0 ? null : _badges[widget.tabs[i - 1].id];
+      if (stream == null) return const SizedBox.shrink();
+      return StreamBuilder<int>(
+        stream: stream,
+        builder: (_, snap) => (snap.data ?? 0) > 0
+            ? Padding(padding: const EdgeInsets.only(left: 6), child: StatusChip('${snap.data}', C.bad, dot: false))
+            : const SizedBox.shrink(),
+      );
+    }
+
     return Container(
       key: const ValueKey('project-tabs'),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.border))),
@@ -380,7 +397,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tab == i ? C.primary : Colors.transparent, width: 2))),
-              child: Text(label, style: TextStyle(fontSize: 14, fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400, color: _tab == i ? C.primary : C.text2)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Text(label, key: const ValueKey('tab-label'), style: TextStyle(fontSize: 14, fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400, color: _tab == i ? C.primary : C.text2)),
+                badge(i),
+              ]),
             ),
           ),
       ]),

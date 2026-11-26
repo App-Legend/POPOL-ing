@@ -163,12 +163,21 @@ void main() {
           ProjectTab(id: 'git', label: 'Git', order: 20, build: (_, _) => tab('Git')),
         ]),
       );
-      final labels = tester.widgetList<Text>(find.descendant(of: find.byKey(const ValueKey('project-tabs')), matching: find.byType(Text))).map((t) => t.data).toList();
+      final labels = tester.widgetList<Text>(find.descendant(of: find.byKey(const ValueKey('project-tabs')), matching: find.byKey(const ValueKey('tab-label')))).map((t) => t.data).toList();
       expect(labels, ['로그', '환경 점검', 'Git']);
       await tester.tap(find.text('환경 점검'));
       await tester.pumpAndSettle();
       expect(find.text('환경 내용'), findsOneWidget);
       expect(built.last, 'my-team-project');
+    });
+
+    testWidgets('tab badge shows problem count', (tester) async {
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), tabs: [
+        ProjectTab(id: 'env', label: '환경 점검', order: 10, build: (_, _) => const SizedBox(), badge: (_) => Stream.value(3)),
+        ProjectTab(id: 'git', label: 'Git', order: 20, build: (_, _) => const SizedBox(), badge: (_) => Stream.value(0)),
+      ]));
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('0'), findsNothing);
     });
 
     testWidgets('flow card selects log', (tester) async {
