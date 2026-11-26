@@ -58,7 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final memo = _memoController.text.trim().isEmpty ? null : _memoController.text.trim();
     final updatedConfig = _project!.config == null
-        ? const ProjectConfig()
+        ? ProjectConfig(about: About(memo: memo))
         : _project!.config!.copyWith(
             about: About(
               summary: _project!.about.summary,

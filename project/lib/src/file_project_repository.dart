@@ -133,10 +133,13 @@ class FileProjectRepository implements ProjectRepository {
     if (value == null) return 'null';
     if (value is bool) return value.toString();
     if (value is num) return value.toString();
-    if (value is String) return '"${value.replaceAll('"', '"')}"';
+    if (value is String) {
+      final escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
+      return '"$escaped"';
+    }
     if (value is List) {
       if (value.isEmpty) return '[]';
-      return '[\n${value.map((v) => '  - $_yamlValue(v)').join(',\n')}\n]';
+      return '[\n${value.map((v) => '  - ${_yamlValue(v)}').join(',\n')}\n]';
     }
     if (value is Map) {
       if (value.isEmpty) return '{}';

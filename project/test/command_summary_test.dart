@@ -16,7 +16,7 @@ void main() {
       );
       expect(
         summarizeCommands([s]),
-        'api: ./backend/gradlew bootRun (작업 폴더: ./backend)',
+        'api: ./gradlew bootRun (작업 폴더: ./backend)',
       );
     });
 
