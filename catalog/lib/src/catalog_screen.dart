@@ -9,8 +9,8 @@ import 'run_info.dart';
 
 /// 2. 개발 홈 — 프로젝트 카탈로그(FR-14). 등록한 프로젝트를 카드로 보여 주고 검색·필터·정렬한다.
 ///
-/// 다른 화면으로는 경로 이름으로만 넘어간다: [열기] `/dashboard`, [실행 방법 설정하기] `/settings`
-/// (둘 다 `arguments` 로 프로젝트 ID), [프로젝트 추가] `/add-project`.
+/// 다른 화면으로는 경로 이름으로만 넘어간다: [열기]·[원인 보기] `/dashboard`(`arguments` 로 프로젝트 ID),
+/// [프로젝트 추가] `/add-project`. 목업 v2 개발 홈.
 /// 카드의 [전체 실행]·[전체 종료]는 [runner] 에 맡기고, 실패하면 카드에 한 줄로 남긴다.
 class CatalogScreen extends StatefulWidget {
   const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.clock});
@@ -42,6 +42,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   /// 마지막 전체 실행·종료에서 생긴 문제(프로젝트 ID → 한 줄). 그 카드에서 다시 누르면 지운다.
   final Map<String, String> _problems = {};
+
+  /// 요청 자체가 예외로 끝난 프로젝트. 원인 볼 실행 결과가 없으니 다시 실행할 수 있게 둔다.
+  final Set<String> _requestFailed = {};
 
   @override
   void initState() {
@@ -77,6 +80,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     setState(() {
       _busy[p.id] = stop;
       _problems.remove(p.id);
+      _requestFailed.remove(p.id);
     });
     String? problem;
     try {
@@ -85,6 +89,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     } catch (e) {
       final what = stop ? '멈추지' : '실행하지';
       problem = e is PopolingException ? '$what 못했어요. ${e.message}' : '$what 못했어요.';
+      _requestFailed.add(p.id);
     }
     if (!mounted) return;
     setState(() {
@@ -100,7 +105,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget build(BuildContext context) {
     final projects = _projects;
     return AppPage(
-      crumbs: const [('개발', null)],
+      crumbs: const [('내 프로젝트', null)],
       children: [
         PageHead(
           title: projects == null ? '내 프로젝트' : '내 프로젝트  ${projects.length}',
@@ -132,7 +137,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
             key: const Key('catalog-search'),
             onChanged: (v) => setState(() => _query = v),
             decoration: const InputDecoration(
-              hintText: '이름, 설명, 기술 스택으로 검색',
+              hintText: '이름·설명·기술로 찾기',
               prefixIcon: Icon(Icons.search, size: 18),
               isDense: true,
               filled: true,
@@ -172,10 +177,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
   }
 
   Widget _noProjects() => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48),
-        child: Column(spacing: 16, children: [
-          const Text('아직 등록한 프로젝트가 없어요. 프로젝트 폴더를 추가하면 여기에 모여요.', style: TextStyle(fontSize: 14, color: C.muted)),
-          Btn('프로젝트 추가', icon: Icons.add, onPressed: _addProject),
+        padding: const EdgeInsets.symmetric(vertical: 64),
+        child: Column(spacing: 14, children: [
+          const Logo(size: 44),
+          const Text('첫 프로젝트를 등록해 주세요', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          const Text('프로젝트 폴더를 고르면 실행 방법(popoling.yaml)을 찾아 불러와요. 없으면 실행 방법을 함께 적어요.',
+              textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: C.text2)),
+          Btn('프로젝트 폴더 고르기', primary: true, icon: Icons.add, onPressed: _addProject),
+          const Text('명령은 처음 실행할 때 목록을 보여주고 확인받은 뒤에만 실행해요.', style: TextStyle(fontSize: 13, color: C.muted)),
         ]),
       );
 
@@ -197,6 +206,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       CardState.never => StatusChip(label, C.idle, dot: false),
     };
     final hasServices = p.config?.services.isNotEmpty ?? false;
+    final shownChip = hasServices ? chip : const StatusChip('실행 방법 없음', C.idle, dot: false);
     final last = lastRunText(e.run, now);
     final succeeded = e.run.lastSucceeded;
     final problem = _problems[p.id];
@@ -214,11 +224,11 @@ class _CatalogScreenState extends State<CatalogScreen> {
         Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 12, children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
-              Text(p.name, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-              Text(p.about.summary ?? '설명이 없어요. README에서 가져오거나 직접 적어 주세요.', style: const TextStyle(fontSize: 14, color: C.muted)),
+              Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(p.about.summary ?? '설명이 아직 없어요. README에서 가져오거나 직접 적어 주세요.', style: const TextStyle(fontSize: 14, color: C.muted)),
             ]),
           ),
-          Flexible(child: chip),
+          Flexible(child: shownChip),
         ]),
         if (p.about.stack.isNotEmpty) Wrap(spacing: 6, runSpacing: 6, children: [for (final s in p.about.stack) Tag(s)]),
         if (!hasServices)
@@ -235,14 +245,13 @@ class _CatalogScreenState extends State<CatalogScreen> {
           ]),
         const SizedBox(height: 4),
         Row(spacing: 8, children: [
-          if (!hasServices)
-            Expanded(child: Btn('실행 방법 설정하기', onPressed: () => _open('/settings', p.id)))
-          else ...[
+          Expanded(child: Btn('열기', primary: e.isRunning, onPressed: () => _open('/dashboard', p.id))),
+          if (hasServices)
             Expanded(
-              child: Btn(problem == null ? '열기' : '대시보드에서 보기', primary: e.isRunning && problem == null, onPressed: () => _open('/dashboard', p.id)),
+              child: !e.isRunning && _busy[p.id] == null && !_requestFailed.contains(p.id) && (problem != null || succeeded == false)
+                  ? Btn('원인 보기', onPressed: () => _open('/dashboard', p.id))
+                  : _runButton(p, running: e.isRunning),
             ),
-            Expanded(child: _runButton(p, running: e.isRunning)),
-          ],
         ]),
       ]),
     );
