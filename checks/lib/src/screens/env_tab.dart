@@ -127,6 +127,7 @@ class _EnvTabState extends State<EnvTab> {
     final unknown = _ports.where((r) => r.usage == null).length;
     return Panel(
       title: '포트',
+      subtitle: '시작하기 전에 비어 있는지 확인해요',
       titleAction: busy > 0
           ? StatusChip('사용 중 $busy', C.port)
           : unknown > 0
@@ -171,6 +172,7 @@ class _EnvTabState extends State<EnvTab> {
     final bad = tools?.where((t) => t.status != EnvStatus.passed).length ?? 0;
     return Panel(
       title: '버전 확인',
+      subtitle: '필요한 도구 버전과 이 컴퓨터에 설치된 버전을 비교해요',
       titleAction: tools == null
           ? null
           : bad > 0
@@ -186,7 +188,7 @@ class _EnvTabState extends State<EnvTab> {
                   rows: [
                     for (final t in tools)
                       [
-                        Text(switch (t.requirement) { CliRequirement(:final cli) => cli, DockerRequirement() => 'Docker' }, style: mono),
+                        Text(switch (t.requirement) { CliRequirement(:final cli) => cli, DockerRequirement() => 'Docker' }, style: const TextStyle(fontWeight: FontWeight.w600)),
                         Text(switch (t.requirement) {
                           CliRequirement(:final version) => version ?? '설치돼 있으면 돼요',
                           DockerRequirement() => '켜져 있어야 해요',
@@ -214,7 +216,8 @@ class _EnvTabState extends State<EnvTab> {
     final changes = _changes;
     return Panel(
       title: '마지막 성공 때와 달라진 것',
-      titleAction: changes == null || changes.isEmpty ? null : StatusChip('${changes.length}가지', C.warn, dot: false),
+      subtitle: changes == null || changes.isEmpty ? null : '실행이 실패하면 여기부터 보세요',
+      titleAction: changes == null || changes.isEmpty ? null : StatusChip('${changes.length}가지', C.warn),
       child: _diffError
           ? Text('마지막 성공 환경과 비교하지 못했어요', style: TextStyle(fontSize: 14, color: C.bad.$2))
           : changes == null
@@ -222,7 +225,6 @@ class _EnvTabState extends State<EnvTab> {
           : changes.isEmpty
               ? const Text('마지막으로 성공했을 때와 같아요.', style: TextStyle(fontSize: 14))
               : Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
-                  const Text('실행이 실패하면 여기부터 보세요.', style: TextStyle(fontSize: 13, color: C.muted)),
                   SimpleTable(
                     minWidth: 480,
                     columns: const ['항목', '지금', '마지막 성공 때'],

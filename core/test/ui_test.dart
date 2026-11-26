@@ -36,7 +36,7 @@ void main() {
     expect(result, 'ok');
   });
 
-  testWidgets('AppPage: 경로를 보여주고, 로고를 누르면 첫 화면으로 간다', (tester) async {
+  testWidgets('AppPage: 상위 화면 링크를 보여주고, 로고를 누르면 첫 화면으로 간다', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -53,8 +53,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('포폴링'), findsOneWidget);
-    expect(find.text('개발'), findsOneWidget);
-    expect(find.text('현재 화면'), findsOneWidget);
+    expect(find.text('개발'), findsOneWidget, reason: '상위 화면으로 돌아가는 링크');
+    expect(find.text('현재 화면'), findsNothing, reason: '현재 화면 이름은 본문 제목이 보여 준다');
     expect(find.text('본문'), findsOneWidget);
 
     await tester.tap(find.text('포폴링'));

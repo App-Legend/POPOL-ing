@@ -55,16 +55,13 @@ class _HealthSectionState extends State<HealthSection> {
     final failed = run?.results.where((r) => r.status == QaStatus.failed).length ?? 0;
     return Panel(
       title: '헬스체크',
-      titleAction: Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+      titleAction: run == null ? null : (failed > 0 ? StatusChip('실패 $failed', C.bad) : const StatusChip('모두 통과', C.ok)),
+      subtitle: run == null ? '적어 둔 주소가 지금 응답하는지 확인해요' : '적어 둔 주소가 지금 응답하는지 확인해요 · ${_time(run.startedAt)}',
+      actions: [
         if (widget.qa is FakeQaRunner) const StatusChip('샘플 · 진짜 검사 기능이 아직 없어요', C.idle, dot: false),
-        if (run != null) failed > 0 ? StatusChip('실패 $failed', C.bad) : const StatusChip('모두 통과', C.ok),
         Btn('다시 검사', small: true, onPressed: _busy ? null : _check),
-      ]),
+      ],
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 12, children: [
-        Text(
-          run == null ? '적어 둔 주소가 지금 응답하는지 확인해요.' : '적어 둔 주소가 지금 응답하는지 확인해요 · ${_time(run.startedAt)}',
-          style: const TextStyle(fontSize: 13, color: C.muted),
-        ),
         if (_error != null) Text(_error!, style: TextStyle(fontSize: 14, color: C.bad.$2)),
         if (run == null)
           const Text('아직 헬스체크 결과가 없어요.', style: TextStyle(fontSize: 14))

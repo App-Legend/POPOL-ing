@@ -15,10 +15,12 @@ class LogTab extends StatelessWidget {
         child: TextButton(
           onPressed: onPressed,
           style: TextButton.styleFrom(
-            minimumSize: const Size(0, 36),
+            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             backgroundColor: selected ? C.darkLine : null,
-            foregroundColor: selected ? Colors.white : const Color(0xFF9AA1AD),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            foregroundColor: selected ? Colors.white : const Color(0xFFC9CDD4),
+            textStyle: const TextStyle(fontFamily: bodyFont, fontSize: 13, fontWeight: FontWeight.w500),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6), side: const BorderSide(color: Color(0xFF3A3E48))),
           ),
           child: Text(label),
         ),

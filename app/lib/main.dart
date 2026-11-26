@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/fakes.dart';
@@ -23,7 +25,7 @@ Future<void> main() async {
 /// 가짜 구현과 목업 화면을 먼저 깔고, 기능의 `register()` 로 덮어쓴다.
 /// 진짜 기능이 생기면 아래 목록에 `<기능>.register(app);` 한 줄을 더한다.
 /// [features] 가 false 면 가짜와 목업만 깐다(목업 화면 테스트용. 진짜 구현은 파일·OS 보안 저장소를 쓴다).
-Registry buildRegistry({bool features = true}) {
+Registry buildRegistry({bool features = true, bool demo = _demo}) {
   final app = Registry();
   _registerFakes(app);
   _registerMockups(app);
@@ -35,8 +37,33 @@ Registry buildRegistry({bool features = true}) {
     catalog.register(app);
     ai.register(app);
     app.provide<ProjectPanels>(projectPanels(app));
+    if (demo) _registerDemo(app);
   }
   return app;
+}
+
+/// `flutter run --dart-define=POPOLING_DEMO=true`: 진짜 화면에 샘플 데이터를 넣어 본다(화면 확인·발표 연습용).
+/// 사용자 앱 데이터(등록 목록·실행 기록)는 읽지도 쓰지도 않는다.
+const _demo = bool.fromEnvironment('POPOLING_DEMO');
+
+void _registerDemo(AppRegistry app) {
+  final projects = FakeProjectRepository.withSamples();
+  final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: 'shop-clone', serviceId: 'web')});
+  // 상태가 여러 가지로 보이게 몇 개를 미리 실행해 둔다(가짜 실행이라 실제 프로세스는 없다).
+  unawaited(runner.runAll('my-team-project'));
+  unawaited(runner.runAll('shop-clone'));
+  app
+    ..provide<ProjectRepository>(projects)
+    ..provide<Orchestrator>(runner)
+    ..provide<QaRunner>(FakeQaRunner(projects))
+    ..provide<EnvChecker>(FakeEnvChecker(installed: {'node': '22.3.0', 'java': '17.0.9'}))
+    ..provide<EnvDiff>(FakeEnvDiff(projects, changes: {
+      'my-team-project': const [EnvChange(name: 'node', before: '20.11.1', after: '22.3.0')],
+    }))
+    ..provide<PortProbe>(FakePortProbe())
+    ..provide<RuntimeQuery>(FakeRuntimeQuery())
+    ..provide<ItemLauncher>(FakeItemLauncher(projects))
+    ..provide<LogExcerpt>(FakeLogExcerpt(projects));
 }
 
 void _registerFakes(AppRegistry app) {

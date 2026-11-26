@@ -7,12 +7,18 @@ import 'theme.dart';
 ///
 /// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 [ShellScope] 자리(지금 상태 목록).
 class AppPage extends StatelessWidget {
-  const AppPage({super.key, required this.crumbs, required this.children, this.trailing});
+  const AppPage({super.key, required this.crumbs, required this.children, this.trailing, this.side, this.header});
 
   /// 경로. 마지막 항목은 현재 화면, 나머지는 (이름, 라우트). 본문 맨 위에 작게 보인다.
   final List<(String, String?)> crumbs;
   final List<Widget> children;
   final Widget? trailing;
+
+  /// 본문 오른쪽에 붙는 패널(예: 개발 홈의 운동장). 본문과 따로 스크롤된다.
+  final Widget? side;
+
+  /// 본문 위 흰 머리 영역(프로젝트 화면의 이름·탭). 화면 폭 전체에 붙고 아래 테두리가 있다.
+  final Widget? header;
 
   @override
   Widget build(BuildContext context) {
@@ -21,32 +27,42 @@ class AppPage extends StatelessWidget {
         const _SideMenu(),
         Expanded(
           child: SingleChildScrollView(
-            child: Center(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (header case final h?)
+                Container(
+                  decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.border))),
+                  child: Align(alignment: Alignment.topLeft, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1304), child: h)),
+                ),
+              Align(
+              alignment: Alignment.topLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
+                constraints: const BoxConstraints(maxWidth: 1240),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 20, 28, 40),
+                  padding: const EdgeInsets.fromLTRB(32, 20, 32, 40),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 20, children: [
-                    Row(children: [
-                      Expanded(
-                        child: Row(children: [
-                          for (final (i, (label, route)) in crumbs.indexed) ...[
-                            if (i > 0) const Text(' / ', style: TextStyle(color: C.muted, fontSize: 13)),
-                            i == crumbs.length - 1
-                                ? Flexible(child: Text(label, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 13, color: C.text2)))
-                                : LinkText(label, size: 13, onTap: () => go(context, route!)),
-                          ],
-                        ]),
-                      ),
-                      ?trailing,
-                    ]),
+                    // 목업 v2: 아래 단계 화면만 맨 위에 "‹ 상위 화면" 돌아가기 링크를 둔다.
+                    if (crumbs.length > 1 || trailing != null)
+                      Row(children: [
+                        if (crumbs.length > 1 && crumbs.first.$2 != null)
+                          InkWell(
+                            onTap: () => go(context, crumbs.first.$2!),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.chevron_left, size: 16, color: C.text2),
+                              Text(crumbs.first.$1, style: const TextStyle(fontSize: 13, color: C.text2)),
+                            ]),
+                          ),
+                        const Spacer(),
+                        ?trailing,
+                      ]),
                     ...children,
                   ]),
                 ),
               ),
-            ),
+              ),
+            ]),
           ),
         ),
+        ?side,
       ]),
     );
   }
@@ -63,46 +79,59 @@ class _SideMenu extends StatelessWidget {
     final active = current == '/dashboard' ? '/home' : current;
     final status = ShellScope.statusOf(context);
     return Container(
-      width: 232,
-      decoration: const BoxDecoration(color: C.surface, border: Border(right: BorderSide(color: C.border))),
-      padding: const EdgeInsets.fromLTRB(14, 18, 14, 18),
+      width: 224,
+      color: C.nav,
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
           onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
           child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 6),
-            child: Row(children: [Logo(size: 26), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16))]),
+            padding: EdgeInsets.fromLTRB(12, 2, 12, 10),
+            child: Row(children: [Logo(size: 18), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white))]),
           ),
         ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: LinkText('카테고리 · 개발', size: 12, color: C.muted, onTap: () => go(context, '/')),
+        InkWell(
+          onTap: () => go(context, '/'),
+          borderRadius: BorderRadius.circular(8),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(children: [
+              Icon(Icons.chevron_left, size: 16, color: C.navMuted),
+              SizedBox(width: 4),
+              Text('카테고리 · 개발', style: TextStyle(fontSize: 13, color: C.navMuted)),
+            ]),
+          ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 6),
         for (final (label, route, icon) in _items)
           Padding(
             padding: const EdgeInsets.only(bottom: 2),
             child: Material(
-              color: active == route ? C.primarySoft : Colors.transparent,
+              color: active == route ? C.navActive : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               child: InkWell(
                 key: ValueKey('menu-$route'),
                 borderRadius: BorderRadius.circular(8),
                 onTap: () => go(context, route),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                  child: Row(children: [
-                    Icon(icon, size: 18, color: active == route ? C.primary : C.text2),
-                    const SizedBox(width: 10),
-                    Text(label, style: TextStyle(fontSize: 14, fontWeight: active == route ? FontWeight.w600 : FontWeight.w400, color: active == route ? C.primary : C.text)),
-                  ]),
+                child: SizedBox(
+                  height: 42,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(children: [
+                      Icon(icon, size: 18, color: active == route ? Colors.white : C.navText),
+                      const SizedBox(width: 10),
+                      Text(label, style: TextStyle(fontSize: 14, fontWeight: active == route ? FontWeight.w600 : FontWeight.w400, color: active == route ? Colors.white : C.navText)),
+                    ]),
+                  ),
                 ),
               ),
             ),
           ),
         // "지금 상태" 제목은 목록이 직접 그린다(보여 줄 프로젝트가 없으면 제목도 숨긴다).
-        if (status != null) ...[const SizedBox(height: 22), Expanded(child: SingleChildScrollView(child: status))],
+        if (status != null) ...[
+          const Spacer(),
+          ConstrainedBox(constraints: const BoxConstraints(maxHeight: 360), child: SingleChildScrollView(child: status)),
+        ],
       ]),
     );
   }
@@ -119,18 +148,36 @@ void go(BuildContext context, String route) {
   if (!found) nav.pushNamed(route);
 }
 
+/// 포폴링 로고(주황 P). 목업 v2 의 SVG 경로를 그대로 그린다.
 class Logo extends StatelessWidget {
   const Logo({super.key, this.size = 28});
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: C.primary, borderRadius: BorderRadius.circular(size * 0.28)),
-        child: Text('P', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: size * 0.48)),
-      );
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: const _LogoPainter());
+}
+
+class _LogoPainter extends CustomPainter {
+  const _LogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 256);
+    // M53 210V100A75 75 0 1 1 128 175A19 19 0 0 1 128 137A37 37 0 1 0 91 100V210A19 19 0 0 1 53 210Z
+    final path = Path()
+      ..moveTo(53, 210)
+      ..lineTo(53, 100)
+      ..arcToPoint(const Offset(128, 175), radius: const Radius.circular(75), largeArc: true)
+      ..arcToPoint(const Offset(128, 137), radius: const Radius.circular(19))
+      ..arcToPoint(const Offset(91, 100), radius: const Radius.circular(37), largeArc: true, clockwise: false)
+      ..lineTo(91, 210)
+      ..arcToPoint(const Offset(53, 210), radius: const Radius.circular(19))
+      ..close();
+    canvas.drawPath(path, Paint()..color = C.logo);
+  }
+
+  @override
+  bool shouldRepaint(_LogoPainter oldDelegate) => false;
 }
 
 class LinkText extends StatelessWidget {
@@ -182,17 +229,18 @@ class StatusChip extends StatelessWidget {
   final bool dot;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(color: tone.$1, borderRadius: BorderRadius.circular(999)),
+  Widget build(BuildContext context) => Align(alignment: Alignment.centerLeft, widthFactor: 1, heightFactor: 1, child: Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        decoration: BoxDecoration(color: tone.$1, borderRadius: BorderRadius.circular(12)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (dot) ...[
             Container(width: 7, height: 7, decoration: BoxDecoration(color: tone.$2, shape: BoxShape.circle)),
             const SizedBox(width: 6),
           ],
-          Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: tone.$2, fontSize: 12, fontWeight: FontWeight.w500))),
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: tone.$2, fontSize: 12.5, fontWeight: FontWeight.w600))),
         ]),
-      );
+      ));
 }
 
 /// 기술 스택·유형 태그.
@@ -203,21 +251,30 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: tone?.$1 ?? C.surface,
-          border: Border.all(color: tone == null ? C.borderStrong : const Color(0xFFB9C8F5)),
+          color: tone?.$1 ?? C.headBg,
+          border: Border.all(color: tone == null ? C.border : const Color(0xFFB9C8F5)),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, color: tone?.$2 ?? C.text2)),
+        child: Center(widthFactor: 1, child: Text(label, style: TextStyle(fontSize: 12, color: tone?.$2 ?? C.text2))),
       );
 }
 
 /// 흰 카드. [title]이 있으면 위에 제목.
 class Panel extends StatelessWidget {
-  const Panel({super.key, this.title, this.titleAction, required this.child, this.padding = const EdgeInsets.all(20)});
+  const Panel({super.key, this.title, this.titleAction, this.subtitle, this.actions = const [], required this.child, this.padding = const EdgeInsets.all(20)});
   final String? title;
+
+  /// 제목 바로 옆(예: 상태 칩).
   final Widget? titleAction;
+
+  /// 제목 줄의 짧은 설명(목업 v2: 칩 뒤에 회색 글자).
+  final String? subtitle;
+
+  /// 제목 줄 오른쪽 버튼들.
+  final List<Widget> actions;
   final Widget child;
   final EdgeInsets padding;
 
@@ -229,9 +286,11 @@ class Panel extends StatelessWidget {
           if (title != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(children: [
-                Expanded(child: Text(title!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+              child: Row(spacing: 10, children: [
+                Text(title!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ?titleAction,
+                Expanded(child: subtitle == null ? const SizedBox() : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: C.text2))),
+                ...actions,
               ]),
             ),
           Padding(padding: padding, child: child),
@@ -254,12 +313,13 @@ class Btn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = (primary ? FilledButton.styleFrom() : OutlinedButton.styleFrom()).copyWith(
-      minimumSize: WidgetStatePropertyAll(Size(0, small ? 36 : 44)),
+      minimumSize: WidgetStatePropertyAll(Size(0, small ? 32 : 38)),
       padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: small ? 12 : 16)),
       shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
       side: primary ? null : WidgetStatePropertyAll(BorderSide(color: ghost ? Colors.transparent : C.borderStrong)),
       foregroundColor: primary ? null : const WidgetStatePropertyAll(C.text),
-      textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: bodyFont, fontSize: small ? 13 : 14, fontWeight: primary ? FontWeight.w600 : FontWeight.w500)),
+      backgroundColor: primary ? null : WidgetStatePropertyAll(ghost ? Colors.transparent : C.surface),
     );
     final child = icon == null
         ? Text(label)
@@ -396,7 +456,15 @@ class AutoGrid extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
         final cols = ((box.maxWidth + gap) / (minItemWidth + gap)).floor().clamp(1, children.length);
         final w = (box.maxWidth - gap * (cols - 1)) / cols;
-        return Wrap(spacing: gap, runSpacing: gap, children: [for (final c in children) SizedBox(width: w, child: c)]);
+        // 한 줄의 카드 높이를 맞춘다(목업 v2 격자). 마지막 줄의 빈 칸은 비워 둔다.
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: gap, children: [
+          for (var i = 0; i < children.length; i += cols)
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: gap, children: [
+                for (final c in children.skip(i).take(cols)) SizedBox(width: w, child: c),
+              ]),
+            ),
+        ]);
       });
 }
 

@@ -121,58 +121,71 @@ class _ItemLogViewState extends State<ItemLogView> {
       _ when _lines.isEmpty => '아직 로그가 없어요. 항목을 시작하면 여기에 출력이 보여요.',
       _ => '검색 결과가 없어요.',
     };
+    Widget darkButton(String label, VoidCallback? onPressed, {bool on = false}) => OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            backgroundColor: on ? C.darkLine : Colors.transparent,
+            foregroundColor: const Color(0xFFE6E8EC),
+            side: const BorderSide(color: Color(0xFF3A3E48)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            textStyle: const TextStyle(fontFamily: bodyFont, fontSize: 13, fontWeight: FontWeight.w500),
+          ),
+          child: Text(label),
+        );
     return Container(
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: C.dark, borderRadius: BorderRadius.circular(12)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.darkLine))),
-          child: Wrap(spacing: 4, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: Text('${s.id} 로그', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFFE6E8EC))),
-            ),
+          child: Row(spacing: 6, children: [
+            Text.rich(TextSpan(children: [
+              TextSpan(text: '${s.id} 로그', style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.white)),
+              TextSpan(text: s is ProcessService ? '  · 실시간' : '', style: const TextStyle(color: Color(0xFF8A909C))),
+            ]), style: const TextStyle(fontSize: 13.5)),
+            const SizedBox(width: 10),
             tab('전체', 0),
             if (s is ProcessService) ...[tab('stdout', 1), tab('stderr', 2)],
-            const SizedBox(width: 16),
+            const Spacer(),
             SizedBox(
-              width: 170,
+              width: 200,
+              height: 32,
               child: TextField(
                 onChanged: (v) => setState(() => _query = v),
                 style: const TextStyle(color: Colors.white, fontSize: 13),
                 decoration: const InputDecoration(
-                  hintText: '검색',
-                  hintStyle: TextStyle(color: Color(0xFF9AA1AD)),
-                  prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF9AA1AD)),
+                  hintText: '로그에서 찾기',
+                  hintStyle: TextStyle(color: Color(0xFF8A909C), fontSize: 13),
+                  prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF8A909C)),
                   isDense: true,
-                  filled: true,
-                  fillColor: Color(0xFF22252C),
-                  border: OutlineInputBorder(borderSide: BorderSide.none),
+                  contentPadding: EdgeInsets.symmetric(vertical: 8),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF3A3E48)), borderRadius: BorderRadius.all(Radius.circular(6))),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: C.primary), borderRadius: BorderRadius.all(Radius.circular(6))),
                 ),
               ),
             ),
-            Checkbox(value: _autoScroll, onChanged: (v) => setState(() => _autoScroll = v!)),
-            const Text('자동 스크롤', style: TextStyle(fontSize: 13, color: C.logText)),
-            TextButton(
-              onPressed: visible.isEmpty
+            darkButton('자동 스크롤', () => setState(() => _autoScroll = !_autoScroll), on: _autoScroll),
+            darkButton(
+              '복사',
+              visible.isEmpty
                   ? null
                   : () {
                       Clipboard.setData(ClipboardData(text: visible.map((l) => '${l.time} ${l.text}').join('\n')));
                       toast(context, '보이는 로그 ${visible.length}줄을 복사했어요.');
                     },
-              style: TextButton.styleFrom(minimumSize: const Size(0, 36), foregroundColor: const Color(0xFF9AA1AD)),
-              child: const Text('복사'),
             ),
           ]),
         ),
         SizedBox(
-          height: 420,
+          height: 300,
           child: visible.isEmpty
               ? Center(child: Text(empty, style: const TextStyle(color: Color(0xFF8A909C))))
               : SingleChildScrollView(
                   controller: _scroll,
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   child: SelectableText.rich(
                     TextSpan(children: [
                       for (final l in visible) logLine(l.time, l.stream == 'out' ? '' : l.stream, l.text),
@@ -180,16 +193,6 @@ class _ItemLogViewState extends State<ItemLogView> {
                     style: mono.copyWith(fontSize: 12.5, height: 1.8, color: C.logText),
                   ),
                 ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.darkLine))),
-          child: Text(
-            s is ProcessService
-                ? '화면에는 최근 5,000줄까지 보여요. err 는 stderr 로 나온 줄이에요(오류라는 뜻은 아니에요). 전체 로그는 파일로 저장돼요 (10MB × 3개 회전).'
-                : '화면에는 최근 5,000줄까지 보여요.',
-            style: const TextStyle(fontSize: 12, color: Color(0xFF8A909C)),
-          ),
         ),
       ]),
     );

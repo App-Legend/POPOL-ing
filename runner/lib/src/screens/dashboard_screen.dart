@@ -238,52 +238,122 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final anyUp = states.any(isUp) || states.contains(ItemState.connected);
     final alerts = _alerts(p, waitingPull);
     return AppPage(
-      crumbs: [('내 프로젝트', '/home'), (p.name, null)],
+      crumbs: const [],
+      header: _head(p, states, anyUp, allBusy),
       children: [
-        _head(p, states, anyUp, allBusy),
         if (alerts.isNotEmpty) Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: alerts),
-        if (_services.isNotEmpty)
-          Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
-            const Text('실행 흐름', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            Wrap(spacing: 12, runSpacing: 12, children: [for (final s in _services) _flowCard(s)]),
-          ]),
-        _tabBar(),
-        if (_tab == 0) _logTab() else widget.tabs[_tab - 1].build(context, _id),
+        if (_tab == 0) ...[
+          if (_services.isNotEmpty) _flow(),
+          _logTab(),
+        ] else
+          widget.tabs[_tab - 1].build(context, _id),
       ],
     );
+  }
+
+  /// 머리 캐릭터: 프로젝트 요약 상태에 맞춘다(그림만으로 구분하지 않게 옆에 상태 글자가 있다).
+  MascotPose _pose(List<ItemState> states) {
+    if (states.isEmpty) return MascotPose.empty;
+    if (states.any((s) => s == ItemState.failed || s == ItemState.portBusy || s == ItemState.disconnected)) return MascotPose.fallen;
+    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return MascotPose.warmup;
+    final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
+    if (k == states.length) return MascotPose.running;
+    return k > 0 ? MascotPose.running2 : MascotPose.resting;
   }
 
   Widget _head(Project p, List<ItemState> states, bool anyUp, bool allBusy) {
     final summary = projectSummary(states);
     final about = p.config?.about;
     final repo = about?.links['repo'];
-    return Wrap(spacing: 20, runSpacing: 16, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.end, children: [
-      ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
-          Wrap(spacing: 10, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Text(p.name, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
-            ),
-            StatusChip(summary.label, summary.tone),
-            for (final t in about?.stack ?? const <String>[]) Tag(t),
-            if ((_git?.behind ?? 0) > 0) StatusChip('최신 코드가 있어요 · ${_git!.behind}커밋', C.warn, dot: false),
-          ]),
-          Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            if (about?.summary case final summary?) Text(summary, style: const TextStyle(fontSize: 14, color: C.text2)),
-            if (repo != null) ...[const Text('·', style: TextStyle(color: C.muted)), Text('저장소', style: const TextStyle(fontSize: 14, color: C.primary))],
-            if (about?.memo != null) ...[const Text('·', style: TextStyle(color: C.muted)), const Text('메모 1', style: TextStyle(fontSize: 14, color: C.text2))],
-          ]),
-          Text(_sentence(states), style: const TextStyle(fontSize: 13, color: C.text2)),
-          if (_summary case final s? when s.items.isNotEmpty) Text(_counts(s), style: const TextStyle(fontSize: 13, color: C.muted)),
+    final sentence = _sentence(states);
+    final sentenceColor = switch (summary.tone) {
+      final t when t == C.ok => C.ok.$2,
+      final t when t == C.bad => C.bad.$2,
+      final t when t == C.warn => C.primary,
+      _ => C.text,
+    };
+    const muted = TextStyle(fontSize: 13, color: C.text2);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 16, 32, 0),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 14, children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            onTap: () => go(context, '/home'),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.chevron_left, size: 16, color: C.text2),
+              Text('내 프로젝트', style: TextStyle(fontSize: 13, color: C.text2)),
+            ]),
+          ),
+        ),
+        Row(crossAxisAlignment: CrossAxisAlignment.center, spacing: 18, children: [
+          Mascot(_pose(states), size: 72),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+              Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Text(p.name, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                ),
+                StatusChip(summary.label, summary.tone),
+                for (final t in about?.stack ?? const <String>[]) Tag(t),
+              ]),
+              if ((_git?.behind ?? 0) > 0)
+                Container(
+                  height: 26,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECF1FF),
+                    border: Border.all(color: const Color(0xFFD9E2FF)),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
+                    const Icon(Icons.call_split, size: 14, color: Color(0xFF1F44C4)),
+                    Text('최신 코드가 있어요 · ${_git!.behind}커밋', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF1F44C4))),
+                  ]),
+                ),
+              Text(sentence, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: sentenceColor)),
+              Wrap(spacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                if (about?.summary case final summary?) Text(summary, style: muted),
+                if (repo != null) ...[const Text('·', style: muted), const Text('저장소', style: TextStyle(fontSize: 13, color: C.primary))],
+                if (about?.memo != null) ...[const Text('·', style: muted), const Text('메모 1', style: TextStyle(fontSize: 13, color: C.primary))],
+                if (_summary case final s? when s.items.isNotEmpty) ...[const Text('·', style: muted), Text(_counts(s), style: muted)],
+              ]),
+            ]),
+          ),
+          if (!anyUp || allBusy) _bigButton('전체 실행', Icons.play_arrow, allBusy || _services.isEmpty ? null : _runAll),
+          // 실패가 있으면 알림 줄의 조치 버튼이 먼저 보이게 [전체 종료]는 테두리형으로(목업 v2 3b).
+          if (anyUp || allBusy)
+            _bigButton('전체 종료', Icons.stop, _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll, quiet: summary.tone == C.bad),
         ]),
-      ),
-      Wrap(spacing: 8, children: [
-        if (!anyUp || allBusy) Btn('전체 실행', primary: true, icon: Icons.play_arrow, onPressed: allBusy || _services.isEmpty ? null : _runAll),
-        if (anyUp || allBusy) Btn('전체 종료', icon: Icons.stop, onPressed: _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll),
+        _tabBar(),
       ]),
-    ]);
+    );
+  }
+
+  static Widget _bigButton(String label, IconData icon, VoidCallback? onPressed, {bool quiet = false}) {
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(8));
+    const text = TextStyle(fontFamily: bodyFont, fontSize: 15, fontWeight: FontWeight.w600);
+    return quiet
+        ? OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 16),
+            label: Text(label),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(0, 46),
+              padding: const EdgeInsets.symmetric(horizontal: 22),
+              shape: shape,
+              foregroundColor: C.text,
+              side: const BorderSide(color: C.borderStrong),
+              textStyle: text,
+            ),
+          )
+        : FilledButton.icon(
+            onPressed: onPressed,
+            icon: Icon(icon, size: 18),
+            label: Text(label),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 46), padding: const EdgeInsets.symmetric(horizontal: 22), shape: shape, textStyle: text),
+          );
   }
 
   /// 머리 요약 문장. 예: `4개 중 3개 준비 완료 · web 항목을 시작하지 못했어요`
@@ -292,14 +362,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final n = states.length;
     final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
     final failed = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.failed || states[i] == ItemState.portBusy) s.id];
-    if (states.any((s) => isUp(s) || s == ItemState.connected || s == ItemState.failed || s == ItemState.portBusy)) {
-      return [
-        '$n개 중 $k개 준비 완료',
-        if (failed.isNotEmpty) '${failed.join(', ')} 항목을 시작하지 못했어요',
-      ].join(' · ');
+    // 목업 v2 문구. 항목 이름 뒤 조사는 영문 이름이 많아 '항목을'로 받는다.
+    if (failed.isNotEmpty) return '일부만 실행 중이에요 · $n개 중 $k개 준비 완료, ${failed.join(', ')} 항목을 시작하지 못했어요';
+    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return '시작하는 중 · $n개 중 $k개 준비 완료';
+    if (k == n) return '실행 중 · $n개 항목이 모두 준비됐어요';
+    if (k > 0) return '실행 중 · $n개 중 $k개 준비 완료';
+    if (_summary case final s?) {
+      final ok = s.items.every((r) => r.outcome == ItemOutcome.ok);
+      return '중지 · ${_time(s.finishedAt)}에 마지막으로 실행했고 ${ok ? '성공했어요' : '일부 실패했어요'}';
     }
-    if (_summary case final s?) return '마지막 전체 실행 ${_time(s.finishedAt)}';
-    return '아직 전체 실행 기록이 없어요.';
+    return '중지 · 아직 전체 실행 기록이 없어요';
   }
 
   List<Widget> _alerts(Project p, bool waitingPull) => [
@@ -332,6 +404,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return null;
   }
 
+  /// 실행 흐름: 의존 순서대로 카드를 잇는다. 좁으면 줄을 바꾼다.
+  Widget _flow() => Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 10, children: [
+        const Row(children: [
+          Expanded(child: Text('실행 흐름', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
+          Text('누르면 그 항목의 로그를 보여줘요', style: TextStyle(fontSize: 13, color: C.muted)),
+        ]),
+        LayoutBuilder(builder: (context, box) {
+          const gap = 18.0;
+          final n = _services.length;
+          final wide = (box.maxWidth - gap * (n - 1)) / n >= 190;
+          if (!wide) return Wrap(spacing: 12, runSpacing: 12, children: [for (final s in _services) SizedBox(width: 220, child: _flowCard(s))]);
+          return IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final (i, s) in _services.indexed) ...[
+                if (i > 0) const SizedBox(width: gap, child: Center(child: Divider(color: C.borderStrong, thickness: 1.5))),
+                Expanded(child: _flowCard(s)),
+              ],
+            ]),
+          );
+        }),
+      ]);
+
   Widget _flowCard(ServiceConfig s) {
     final item = _ref(s);
     final state = widget.runner.stateOf(item);
@@ -344,40 +438,50 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final port = s is ProcessService && s.ports.isNotEmpty ? ' · ${s.ports.join(', ')}' : '';
     final Widget action = switch (s) {
       RemoteService() => Btn('다시 확인', small: true, onPressed: busy ? null : () => _start(s)),
-      _ when state == ItemState.stopping => const IconButton(onPressed: null, tooltip: '중지', icon: Icon(Icons.stop, size: 18)),
-      _ when isUp(state) => IconButton(tooltip: '중지', onPressed: busy ? null : () => _stop(s), icon: const Icon(Icons.stop, size: 18)),
-      _ => IconButton(tooltip: '시작', onPressed: busy ? null : () => _start(s), icon: const Icon(Icons.play_arrow, size: 18)),
-    };
-    return SizedBox(
-      width: 220,
-      child: Material(
-        color: C.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: selected ? C.primary : C.border, width: selected ? 1.5 : 1),
+      _ => _Toggle(
+          on: isUp(state) || state == ItemState.stopping,
+          onChanged: busy || state == ItemState.stopping ? null : (on) => on ? _start(s) : _stop(s),
         ),
-        child: InkWell(
-          key: ValueKey('flow-${s.id}'),
-          borderRadius: BorderRadius.circular(10),
-          onTap: s is RemoteService ? null : () => setState(() {
-            _picked = s.id;
-            _tab = 0;
-          }),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 6, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
-              Row(children: [
-                Expanded(child: Text(s.id, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                action,
-              ]),
-              Text('$kind$port', style: const TextStyle(fontSize: 12, color: C.muted)),
-              skipped ? const StatusChip('건너뜀', C.idle) : stateChip(state),
+    };
+    final failed = state == ItemState.failed || state == ItemState.portBusy || state == ItemState.disconnected;
+    return Material(
+      color: failed ? const Color(0xFFFEF6F5) : C.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: failed ? const Color(0xFFF2B8B5) : (selected ? C.primary : C.border),
+          width: selected || failed ? 1.5 : 1,
+        ),
+      ),
+      child: InkWell(
+        key: ValueKey('flow-${s.id}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: s is RemoteService ? null : () => setState(() => _picked = s.id),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 12, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
+                  Text(s.id, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                  Text('$kind$port', style: const TextStyle(fontSize: 12.5, color: C.muted)),
+                ]),
+              ),
+              action,
             ]),
-          ),
+            const SizedBox(height: 2),
+            _dotLabel(skipped ? const StatusChip('건너뜀', C.idle) : stateChip(state)),
+          ]),
         ),
       ),
     );
   }
+
+  /// 목업 v2 카드 아래 상태: 배경 없이 점 + 굵은 글자.
+  static Widget _dotLabel(StatusChip chip) => Row(mainAxisSize: MainAxisSize.min, spacing: 7, children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: chip.tone.$2, shape: BoxShape.circle)),
+        Flexible(child: Text(chip.label, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: chip.tone.$2))),
+      ]);
 
   Widget _tabBar() {
     final labels = ['로그', for (final t in widget.tabs) t.label];
@@ -387,29 +491,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return StreamBuilder<int>(
         stream: stream,
         builder: (_, snap) => (snap.data ?? 0) > 0
-            ? Padding(padding: const EdgeInsets.only(left: 6), child: StatusChip('${snap.data}', C.bad, dot: false))
+            ? Container(
+                margin: const EdgeInsets.only(left: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: C.warn.$1, borderRadius: BorderRadius.circular(9)),
+                child: Text('${snap.data}', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: C.warn.$2)),
+              )
             : const SizedBox.shrink(),
       );
     }
 
-    return Container(
-      key: const ValueKey('project-tabs'),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.border))),
-      child: Wrap(children: [
-        for (final (i, label) in labels.indexed)
-          InkWell(
-            onTap: () => setState(() => _tab = i),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tab == i ? C.primary : Colors.transparent, width: 2))),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Text(label, key: const ValueKey('tab-label'), style: TextStyle(fontSize: 14, fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400, color: _tab == i ? C.primary : C.text2)),
-                badge(i),
-              ]),
-            ),
+    return Row(key: const ValueKey('project-tabs'), children: [
+      for (final (i, label) in labels.indexed)
+        InkWell(
+          onTap: () => setState(() => _tab = i),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tab == i ? C.primary : Colors.transparent, width: 2))),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(label, key: const ValueKey('tab-label'), style: TextStyle(fontSize: 14, fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400, color: _tab == i ? C.text : C.text2)),
+              badge(i),
+            ]),
           ),
-      ]),
-    );
+        ),
+    ]);
   }
 
   /// 로그 탭에 보일 항목: 고른 카드 → 실패한 항목 → 첫 프로세스.
@@ -460,5 +565,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           ...actions,
         ]),
+      );
+}
+
+/// 목업 v2 실행 흐름 카드의 켜기·끄기 스위치. 도움말(시작·중지)로 무엇을 하는지 알린다.
+class _Toggle extends StatelessWidget {
+  const _Toggle({required this.on, required this.onChanged});
+
+  final bool on;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: on ? '중지' : '시작',
+        child: Semantics(
+          toggled: on,
+          button: true,
+          child: GestureDetector(
+            onTap: onChanged == null ? null : () => onChanged!(!on),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 40,
+              height: 24,
+              padding: const EdgeInsets.all(3),
+              alignment: on ? Alignment.centerRight : Alignment.centerLeft,
+              decoration: BoxDecoration(
+                color: onChanged == null ? C.divider : (on ? C.primary : C.borderStrong),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 2, offset: Offset(0, 1))]),
+              ),
+            ),
+          ),
+        ),
       );
 }
