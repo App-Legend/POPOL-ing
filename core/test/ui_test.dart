@@ -98,13 +98,7 @@ void main() {
 
   testWidgets('status slot', (tester) async {
     await pumpShell(tester, status: const Text('X'));
-    expect(find.text('지금 상태'), findsOneWidget);
     expect(find.text('X'), findsOneWidget);
-  });
-
-  testWidgets('status slot hidden when null', (tester) async {
-    await pumpShell(tester);
-    expect(find.text('지금 상태'), findsNothing);
   });
 
   testWidgets('long crumb ellipsis', (tester) async {

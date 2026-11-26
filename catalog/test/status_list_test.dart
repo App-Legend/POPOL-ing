@@ -36,6 +36,19 @@ void main() {
     expect(find.text('my-team-project'), findsNothing);
   });
 
+  testWidgets('heading shown with rows', (tester) async {
+    await pump(tester);
+    expect(find.text('지금 상태'), findsOneWidget);
+  });
+
+  testWidgets('nothing to show hides heading', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(body: StatusList(projects: FakeProjectRepository(), runs: FakeRunInfoSource(), clock: () => now)),
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('지금 상태'), findsNothing);
+  });
+
   testWidgets('tapping failed opens dashboard with id', (tester) async {
     final opened = await pump(tester);
     await tester.tap(find.text('shop-clone'));

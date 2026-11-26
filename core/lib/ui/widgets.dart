@@ -5,7 +5,7 @@ import 'theme.dart';
 
 /// 왼쪽 메뉴 + 본문 틀. 모든 내부 화면이 공유한다(목업 v2).
 ///
-/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 "지금 상태"([ShellScope]).
+/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 [ShellScope] 자리(지금 상태 목록).
 class AppPage extends StatelessWidget {
   const AppPage({super.key, required this.crumbs, required this.children, this.trailing});
 
@@ -101,15 +101,8 @@ class _SideMenu extends StatelessWidget {
               ),
             ),
           ),
-        if (status != null) ...[
-          const SizedBox(height: 22),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Text('지금 상태', style: TextStyle(fontSize: 12, color: C.muted, fontWeight: FontWeight.w600)),
-          ),
-          const SizedBox(height: 6),
-          status,
-        ],
+        // "지금 상태" 제목은 목록이 직접 그린다(보여 줄 프로젝트가 없으면 제목도 숨긴다).
+        if (status != null) ...[const SizedBox(height: 22), status],
       ]),
     );
   }

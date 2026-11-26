@@ -54,6 +54,10 @@ class _StatusListState extends State<StatusList> {
     }
     if (rows.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Padding(
+        padding: EdgeInsets.fromLTRB(10, 0, 10, 6),
+        child: Text('지금 상태', style: TextStyle(fontSize: 12, color: C.muted, fontWeight: FontWeight.w600)),
+      ),
       for (final (p, label, tone) in rows)
         InkWell(
           borderRadius: BorderRadius.circular(8),
