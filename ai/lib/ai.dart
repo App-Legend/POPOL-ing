@@ -5,14 +5,18 @@
 /// 보낼 때는 [AiSender] 로 비밀값을 가리고 보내기 전 확인 창을 거친다.
 library;
 
-import 'package:flutter/widgets.dart';
+import 'dart:io';
+
+import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
 import 'src/ai_screen.dart';
+import 'src/analysis_history.dart';
 import 'src/api_key_store.dart';
 import 'src/gemini_client.dart';
 
 export 'src/ai_sender.dart' show AiSender;
+export 'src/analysis_history.dart' show AnalysisHistory, AnalysisHistoryCorrupt, AnalysisKind, AnalysisOutcome, AnalysisRecord;
 export 'src/api_key_dialog.dart' show ApiKeyChange, ApiKeyCheck, ApiKeyDialog, showApiKeyDialog;
 export 'src/api_key_store.dart' show ApiKeyStore, MemoryApiKeyStore, SecureApiKeyStore;
 export 'src/failure_analysis_panel.dart' show FailureAnalysisPanel, failureAnalysisDescription, failureAnalysisRequestName;
@@ -24,38 +28,14 @@ export 'src/send_confirm_dialog.dart' show SendConfirmDialog;
 /// AI 프로젝트 검사의 화면과 구현을 앱에 등록한다.
 ///
 /// API 키는 사용자가 앱에서 넣고 이 컴퓨터의 보안 저장소에만 둔다. 앱 빌드에는 키를 넣지 않는다.
-/// AI 검사(8, `/ai`) 화면은 Gemini 연결과 같은 저장소의 키를 보여 주고 바꾼다.
-/// 대시보드가 프로젝트 ID 를 넘기면(`arguments`) 그 프로젝트의 실행 실패 원인 분석(AI-02)·헬스체크 결과 요약(AI-03)
-/// 카드를 그린다.
+/// AI 검사(`/ai`) 화면은 키 상태와 분석 기록을 보여 준다. 분석 기록([AnalysisHistory])도 등록해,
+/// 프로젝트 화면의 패널이 결과를 남길 수 있게 한다(`app/` 이 패널의 `onRecord` 에 연결).
 void register(AppRegistry app) {
   final keys = SecureApiKeyStore();
   final gemini = GeminiLlmClient(keys: keys);
+  final history = AnalysisHistory(() async => File('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}ai-history.json'));
   app.provide<LlmClient>(gemini);
+  app.provide<AnalysisHistory>(history);
   // 키는 늘 Gemini 키라, 나중에 LlmClient 를 바꿔 끼워도 [연결 확인]은 Gemini 로 한다.
-  app.route('/ai', (context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    final projectId = args is String ? args : null;
-    return AiScreen(
-      keys: keys,
-      client: app.read<LlmClient>(),
-      checkKey: gemini.checkKey,
-      projectId: projectId,
-      // 프로젝트가 있을 때만 꺼낸다. 프로젝트 없이 여는 /ai 는 QA 쪽 등록에 기대지 않는다.
-      qa: projectId == null ? null : app.read<QaRunner>(),
-      orchestrator: projectId == null ? null : app.read<Orchestrator>(),
-      // 아래는 아직 앱에 등록되지 않았을 수 있다(예: EnvDiff 는 C 가 붙이기 전). 없으면 그 칸 없이 분석한다.
-      projects: projectId == null ? null : _tryRead<ProjectRepository>(app),
-      logs: projectId == null ? null : _tryRead<LogExcerpt>(app),
-      envDiff: projectId == null ? null : _tryRead<EnvDiff>(app),
-    );
-  });
-}
-
-/// 등록된 구현을 꺼낸다. 아직 없으면 null.
-T? _tryRead<T extends Object>(AppRegistry app) {
-  try {
-    return app.read<T>();
-  } on StateError {
-    return null;
-  }
+  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey, history: history));
 }

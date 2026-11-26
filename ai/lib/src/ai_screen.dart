@@ -1,31 +1,21 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
+import 'analysis_history.dart';
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
-import 'failure_analysis.dart' show failureReasonText;
-import 'failure_analysis_panel.dart';
-import 'qa_summary_panel.dart';
 
 /// 화면에 보여 줄 키. 끝 4자리만 남긴다. 8자 이하로 짧으면 4자리도 많이 드러나서 모두 가린다.
 String maskedApiKey(String key) => key.length <= 8 ? '••••••••' : '••••••••${key.substring(key.length - 4)}';
 
-/// 8. AI 검사. 머리(API 키 상태와 [키 입력]·[키 바꾸기]), 실행 실패 원인 분석(AI-02) 카드, 헬스체크 결과 요약(AI-03) 카드.
+/// 7. AI 검사(목업 v2): API 키 상태와 [키 입력]·[키 바꾸기], 받은 분석 기록 목록.
+///
+/// 분석은 프로젝트 화면(로그 탭의 [원인 분석], 헬스체크의 [AI 요약])에서 하고, 그 결과가 [history] 에 남는다.
 class AiScreen extends StatefulWidget {
-  const AiScreen({
-    super.key,
-    required this.keys,
-    required this.client,
-    this.checkKey,
-    this.projectId,
-    this.qa,
-    this.orchestrator,
-    this.projects,
-    this.logs,
-    this.envDiff,
-    this.clock = DateTime.now,
-  });
+  const AiScreen({super.key, required this.keys, required this.client, this.checkKey, this.history});
 
   final ApiKeyStore keys;
 
@@ -35,19 +25,8 @@ class AiScreen extends StatefulWidget {
   /// 키 입력 창의 [연결 확인]. null 이면 버튼이 없다.
   final ApiKeyCheck? checkKey;
 
-  /// 대시보드 [AI 검사]가 넘긴 프로젝트. [qa]·[orchestrator] 와 함께 있으면 헬스체크 결과 요약 카드를 그린다.
-  final String? projectId;
-  final QaRunner? qa;
-  final Orchestrator? orchestrator;
-
-  /// 실행 실패 원인 분석 카드. [projectId]·[orchestrator]·[projects] 가 있으면 그린다.
-  /// [logs]·[envDiff] 는 아직 앱에 없을 수 있다(그 칸은 "못 읽음"으로 보낸다).
-  final ProjectRepository? projects;
-  final LogExcerpt? logs;
-  final EnvDiff? envDiff;
-
-  /// 카드 머리의 "오늘" 판단에 쓴다.
-  final DateTime Function() clock;
+  /// 분석 기록. 없으면 목록 자리에 안내만.
+  final AnalysisHistory? history;
 
   @override
   State<AiScreen> createState() => _AiScreenState();
@@ -61,150 +40,35 @@ class _AiScreenState extends State<AiScreen> {
   /// 가린 키. 키 전체는 화면 상태에 두지 않는다.
   String? _masked;
 
-  /// 요약할 최근 헬스체크. [_qaLoaded] 가 true 인데 null 이면 아직 검사한 적이 없다.
-  QaRun? _latest;
-  bool _qaLoaded = false;
-  bool _checking = false;
-
-  bool get _hasCard => widget.projectId != null && widget.qa != null && widget.orchestrator != null;
-
-  /// 원인 분석할 마지막 전체 실행. [_runLoaded] 가 true 인데 null 이면 기록이 없다(또는 못 읽었다).
-  RunSummary? _lastRun;
-  bool _runLoaded = false;
-
-  bool get _hasRunCard => widget.projectId != null && widget.orchestrator != null && widget.projects != null;
+  List<AnalysisRecord>? _records;
+  var _corrupt = false;
+  int? _open;
+  StreamSubscription<void>? _changes;
 
   @override
   void initState() {
     super.initState();
     _load();
-    if (_hasCard) {
-      _loadQa();
-    }
-    if (_hasRunCard) {
-      _loadRun();
-    }
+    unawaited(_loadHistory());
+    _changes = widget.history?.changes.listen((_) => _loadHistory());
   }
 
-  /// 화면을 열 때 한 번 읽는다. 못 읽으면 기록이 없는 것으로 보여준다.
-  Future<void> _loadRun() async {
-    RunSummary? run;
+  @override
+  void dispose() {
+    _changes?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    final history = widget.history;
+    if (history == null) return;
     try {
-      run = await widget.orchestrator!.lastRun(widget.projectId!);
-    } on Exception {
-      run = null;
+      final records = await history.list();
+      if (mounted) setState(() => _records = records);
+    } catch (_) {
+      // 깨진 파일(AnalysisHistoryCorrupt)이든 폴더를 못 찾았든, 덮어쓰지 않고 알리기만 한다
+      if (mounted) setState(() => _corrupt = true);
     }
-    if (mounted) {
-      setState(() {
-        _lastRun = run;
-        _runLoaded = true;
-      });
-    }
-  }
-
-  Future<void> _loadQa() async {
-    QaRun? latest;
-    try {
-      latest = (await widget.qa!.history(widget.projectId!)).firstOrNull;
-    } on Exception {
-      latest = null;
-    }
-    if (mounted) {
-      setState(() {
-        _latest = latest;
-        _qaLoaded = true;
-      });
-    }
-  }
-
-  /// 카드의 [헬스체크]. 누를 때만 검사한다.
-  Future<void> _runCheck() async {
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _checking = true);
-    try {
-      await widget.qa!.runChecks(widget.projectId!);
-    } on Exception {
-      messenger.showSnackBar(const SnackBar(content: Text('헬스체크를 하지 못했어요.')));
-    }
-    await _loadQa();
-    if (mounted) {
-      setState(() => _checking = false);
-    }
-  }
-
-  /// "오늘 14:05" 또는 "11/22 14:05".
-  String _when(DateTime t) {
-    final now = widget.clock();
-    final hm = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-    final today = t.year == now.year && t.month == now.month && t.day == now.day;
-    return today ? '오늘 $hm' : '${t.month}/${t.day} $hm';
-  }
-
-  Widget _runCard() {
-    const body = TextStyle(fontSize: 14, height: 1.6);
-    final run = _lastRun;
-    final shown = [for (final r in run?.items ?? const <ItemResult>[]) if (r.outcome != ItemOutcome.ok) r];
-    final failed = shown.any((r) => r.outcome == ItemOutcome.failed);
-    return Panel(
-      title: '실행 실패 원인 분석',
-      titleAction: run == null || !failed ? null : Text('${_when(run.finishedAt)} 전체 실행 기준', style: const TextStyle(fontSize: 13, color: C.muted)),
-      child: !_runLoaded
-          ? const SizedBox.shrink()
-          : run == null || !failed
-              ? const Text('실패한 실행이 없어요. 실행이 실패하면 여기서 원인을 찾아 드려요.', style: body)
-              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 12, children: [
-                  const Text(failureAnalysisDescription, style: TextStyle(fontSize: 13, color: C.muted, height: 1.6)),
-                  for (final r in shown)
-                    if (r.outcome == ItemOutcome.failed)
-                      Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
-                        Text('${r.item.serviceId} · 실패 · ${failureReasonText(r)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                        FailureAnalysisPanel(
-                          // 키 상태가 바뀌면 패널을 새로 그린다(키를 넣은 뒤 "API 키 필요"가 남지 않게).
-                          key: ValueKey('${r.item.serviceId}-$_status'),
-                          item: r,
-                          run: run,
-                          client: widget.client,
-                          keys: widget.keys,
-                          projects: widget.projects!,
-                          logs: widget.logs,
-                          envDiff: widget.envDiff,
-                          checkKey: widget.checkKey,
-                          onKeysChanged: _load,
-                        ),
-                      ])
-                    else
-                      Text(
-                        r.reason == null ? '${r.item.serviceId} · 건너뜀' : '${r.item.serviceId} · 건너뜀 · ${r.reason}',
-                        style: const TextStyle(fontSize: 14, color: C.text2),
-                      ),
-                ]),
-    );
-  }
-
-  Widget _qaCard() {
-    final latest = _latest;
-    return Panel(
-      title: '헬스체크 결과 요약',
-      titleAction: latest == null ? null : Text('${_when(latest.startedAt)} 검사 기준', style: const TextStyle(fontSize: 13, color: C.muted)),
-      child: !_qaLoaded
-          ? const SizedBox.shrink()
-          : latest == null
-              ? Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: [
-                  const Text('아직 헬스체크 결과가 없어요.', style: TextStyle(fontSize: 14, height: 1.6)),
-                  Align(alignment: Alignment.centerRight, child: Btn('헬스체크', onPressed: _checking ? null : _runCheck)),
-                ])
-              : QaSummaryPanel(
-                  // 새 검사나 키 상태가 바뀌면 패널을 새로 그린다(키를 넣은 뒤 "API 키 필요"가 남지 않게).
-                  key: ValueKey('${latest.startedAt}-$_status'),
-                  run: latest,
-                  client: widget.client,
-                  keys: widget.keys,
-                  qa: widget.qa!,
-                  orchestrator: widget.orchestrator!,
-                  checkKey: widget.checkKey,
-                  onKeysChanged: _load, // 카드에서 키를 바꿔도 머리의 키 상태가 맞게
-                ),
-    );
   }
 
   Future<void> _load() async {
@@ -258,23 +122,22 @@ class _AiScreenState extends State<AiScreen> {
     const body = TextStyle(fontSize: 14, height: 1.6);
 
     return AppPage(
-      crumbs: const [('개발', '/home'), ('AI 검사', null)],
+      crumbs: const [('AI 검사', null)],
       children: [
-        Wrap(spacing: 16, runSpacing: 12, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.end, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, spacing: 8, children: [
-            const Text('AI 검사', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+        const Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+          Text('AI 검사', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+          Text('[원인 분석]·[AI 요약]으로 받은 답이 남아요.', style: TextStyle(fontSize: 14, color: C.text2)),
+        ]),
+        Panel(
+          child: Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
             Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
               StatusChip(label, tone),
               if (description.isNotEmpty)
                 Text(description, style: hasKey ? mono.copyWith(fontSize: 13, color: C.text2) : const TextStyle(fontSize: 13, color: C.text2)),
             ]),
+            Btn(hasKey ? '키 바꾸기' : '키 입력', primary: !hasKey, onPressed: _status == _KeyStatus.loading ? null : _openDialog),
           ]),
-          Btn(
-            hasKey ? '키 바꾸기' : '키 입력',
-            primary: !hasKey,
-            onPressed: _status == _KeyStatus.loading ? null : _openDialog,
-          ),
-        ]),
+        ),
         Notice(
           bg: C.remote.$1,
           border: const Color(0xFFB9C8F5),
@@ -293,14 +156,62 @@ class _AiScreenState extends State<AiScreen> {
               style: body,
             ),
           ),
-        if (_hasRunCard) _runCard(),
-        if (_hasCard) _qaCard(),
-        if (widget.projectId == null)
-          const Text(
-            '프로젝트 대시보드에서 [AI 검사]를 누르면 그 프로젝트의 실행 실패 원인 분석과 헬스체크 결과 요약을 볼 수 있어요.',
-            style: TextStyle(fontSize: 13, color: C.muted),
-          ),
+        _historyPanel(),
       ],
     );
   }
+
+  Widget _historyPanel() {
+    final records = _records;
+    if (_corrupt) return const Text('기록 파일을 읽지 못했어요', style: TextStyle(fontSize: 14));
+    if (widget.history != null && records == null) return const SizedBox.shrink(); // 읽는 동안은 비워 둔다(보통 바로 끝난다)
+    if (records == null || records.isEmpty) return const Text('아직 받은 답이 없어요.', style: TextStyle(fontSize: 14, color: C.muted));
+    return Panel(
+      title: '최근 · ${records.length}',
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        for (final (i, r) in records.indexed) _recordRow(i, r),
+      ]),
+    );
+  }
+
+  Widget _recordRow(int i, AnalysisRecord r) {
+    final open = _open == i;
+    final received = r.outcome == AnalysisOutcome.received;
+    final where = r.serviceId == null ? r.projectId : '${r.projectId} · ${r.serviceId}';
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.divider))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => setState(() => _open = open ? null : i),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(spacing: 12, children: [
+              SizedBox(width: 72, child: Text(r.kind == AnalysisKind.failure ? '원인 분석' : 'AI 요약', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
+                  Text(where, style: const TextStyle(fontSize: 12, color: C.muted)),
+                  Text(r.title, maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
+                ]),
+              ),
+              Text(_time(r.at), style: const TextStyle(fontSize: 12, color: C.muted)),
+              received ? const StatusChip('받음', C.ok) : const StatusChip('보내지 못함', C.bad),
+            ]),
+          ),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(104, 0, 20, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
+              if (r.body != null) Text(r.body!, style: const TextStyle(fontSize: 14, height: 1.6)),
+              Text('보낸 것: ${r.sentSummary}${r.model == null ? '' : ' · ${r.model}'}', style: const TextStyle(fontSize: 12, color: C.muted)),
+              if (received) const Text('AI 결과는 틀릴 수 있어요. 근거를 확인한 뒤 판단해 주세요.', style: TextStyle(fontSize: 12, color: C.muted)),
+              Btn('프로젝트 열기', small: true, onPressed: () => Navigator.pushNamed(context, '/dashboard', arguments: r.projectId)),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  static String _time(DateTime t) => '${t.month}/${t.day} ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 }

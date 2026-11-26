@@ -62,6 +62,7 @@ Future<void> open(
   ApiKeyStore? keys,
   LogExcerpt? logs,
   String? description,
+  void Function(AnalysisRecord)? onRecord,
 }) async {
   tester.view.physicalSize = const Size(1280, 1600);
   tester.view.devicePixelRatio = 1;
@@ -81,6 +82,7 @@ Future<void> open(
             'my-team-project': [const EnvChange(name: 'node', before: '20.11.0', after: '22.3.0')],
           }),
           description: description,
+          onRecord: onRecord,
         ),
       ),
     ),
@@ -96,6 +98,38 @@ Future<void> analyze(WidgetTester tester, {String start = '원인 분석'}) asyn
 }
 
 void main() {
+  testWidgets('records received result', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: FakeLlmClient(reply: goodReply, modelName: 'gemini-flash-latest'), onRecord: records.add);
+    await analyze(tester);
+    expect(records, hasLength(1));
+    final r = records.single;
+    expect(r.kind, AnalysisKind.failure);
+    expect(r.outcome, AnalysisOutcome.received);
+    expect(r.projectId, 'my-team-project');
+    expect(r.serviceId, 'api');
+    expect(r.title, '지어낸 줄: Error: fake');
+    expect(r.model, 'gemini-flash-latest');
+    expect(r.body, contains('npm install'));
+    expect(r.toJson().toString(), isNot(contains(storedKey)));
+  });
+
+  testWidgets('records failure', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: FakeLlmClient(failWith: LlmFailure.network), onRecord: records.add);
+    await analyze(tester);
+    expect(records.single.outcome, AnalysisOutcome.failed);
+  });
+
+  testWidgets('cancel not recorded', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: HeldLlmClient(), onRecord: records.add);
+    await analyze(tester);
+    await tester.tap(btn('취소'));
+    await tester.pumpAndSettle();
+    expect(records, isEmpty);
+  });
+
   testWidgets('AT-21: [보내기] 전과 [취소] 뒤 요청 0건, 실행 설정에 환경변수·주소 호스트가 없고 키가 없다', (tester) async {
     final ai = FakeLlmClient(reply: goodReply);
     await open(tester, client: ai);

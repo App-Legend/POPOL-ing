@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:popoling_ai/ai.dart' as ai;
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
@@ -16,6 +18,9 @@ ProjectPanels projectPanels(AppRegistry app) {
     }
   }
 
+  // 기록을 못 남겨도(파일 깨짐 등) 분석 화면은 그대로 둔다. 기록 화면이 따로 알린다.
+  void record(ai.AnalysisRecord r) => unawaited(tryRead<ai.AnalysisHistory>()?.add(r).catchError((Object _) {}));
+
   return ProjectPanels(
     failure: (_, item, run) => Panel(
       title: '${item.item.serviceId}이 실패한 이유',
@@ -28,6 +33,7 @@ ProjectPanels projectPanels(AppRegistry app) {
         logs: tryRead<LogExcerpt>(),
         envDiff: tryRead<EnvDiff>(),
         checkKey: checkKey,
+        onRecord: record,
       ),
     ),
     qaSummary: (_, run) => Panel(
@@ -39,6 +45,7 @@ ProjectPanels projectPanels(AppRegistry app) {
         qa: app.read<QaRunner>(),
         orchestrator: app.read<Orchestrator>(),
         checkKey: checkKey,
+        onRecord: record,
       ),
     ),
   );
