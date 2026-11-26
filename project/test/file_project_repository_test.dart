@@ -189,8 +189,8 @@ services:
     // 같은 설정으로 업데이트하면 저장된다
     await r.updateProject(project);
 
-    // 다시 읽어서 비교한다
-    final reread = await r.getProject(project.id);
+    // 다시 읽어서 비교한다 (새 저장소로 읽어 파일 내용을 검증한다)
+    final reread = await repo().getProject(project.id);
     expect(reread.about.summary, project.about.summary);
     expect(reread.about.memo, project.about.memo);
     expect(reread.config!.services.length, project.config!.services.length);

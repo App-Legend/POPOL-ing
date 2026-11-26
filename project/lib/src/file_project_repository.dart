@@ -93,8 +93,8 @@ class FileProjectRepository implements ProjectRepository {
     await file.parent.create(recursive: true);
 
     String content;
-    final doc = YamlEditor(await file.exists() ? await file.readAsString() : '{}');
-    // 기존 파일은 주석을 보존하면서 값만 바꾸고, 새 파일은 {} 로 시작해 여러 줄 YAML 로 만든다.
+    final doc = YamlEditor(await file.exists() ? await file.readAsString() : '');
+    // 기존 파일은 주석을 보존하면서 값만 바꾸고, 새 파일은 빈 문자열 로 시작해 여러 줄 YAML 로 만든다.
     _updateYamlEditor(doc, config.toMap());
     content = doc.toString();
 
@@ -108,11 +108,9 @@ class FileProjectRepository implements ProjectRepository {
     }
   }
 
-  /// YamlEditor 에 맵을 재귀적으로 반영한다.
+  /// YamlEditor 에 맵을 한 번에 반영한다. 빈 문서 에서 시작하면 여러 줄 YAML 형식이 된다.
   void _updateYamlEditor(YamlEditor doc, Map<String, Object?> map) {
-    for (final entry in map.entries) {
-      doc.update([entry.key], entry.value);
-    }
+    doc.update([], map);
   }
 
   @override
