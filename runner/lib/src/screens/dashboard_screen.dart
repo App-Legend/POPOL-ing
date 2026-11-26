@@ -6,13 +6,14 @@ import 'package:popoling_core/ui.dart';
 
 import '../git/git_adapter.dart';
 import '../log/log_store.dart';
+import 'item_log_view.dart';
 import 'item_status.dart';
-import 'log_preview.dart';
+import 'project_summary.dart';
 
-/// 3. 프로젝트 대시보드. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다.
+/// 3. 프로젝트 화면(목업 v2): 머리·알림 줄·실행 흐름·탭. 카탈로그의 [열기]가 `arguments` 로 프로젝트 ID 를 넘긴다.
 ///
 /// 전체 실행·종료(FR-04·05), 항목 시작·중지(FR-03), 포트 주인이 내 다른 항목이면 [그 항목 중지](AT-17).
-// 환경 배너(EnvBanner)는 4주차에 여기 더한다.
+/// 로그 탭은 내장이고, 다른 탭은 기능들이 [ProjectTab] 으로 등록한 것을 이어 붙인다.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
     super.key,
@@ -23,6 +24,9 @@ class DashboardScreen extends StatefulWidget {
     required this.runtime,
     this.git,
     this.logs,
+    this.launcher,
+    this.tabs = const [],
+    this.panels = const ProjectPanels(),
   });
 
   final String projectId;
@@ -32,8 +36,17 @@ class DashboardScreen extends StatefulWidget {
   final RuntimeQuery runtime;
   final GitAdapter? git;
 
-  /// 최근 로그를 읽는 곳. 없으면 최근 로그를 숨긴다.
+  /// 로그를 읽는 곳. 없으면 로그를 숨긴다.
   final LogStore? logs;
+
+  /// Compose 로그를 읽는 곳.
+  final ItemLauncher? launcher;
+
+  /// 로그 탭 뒤에 붙일 탭(order 순).
+  final List<ProjectTab> tabs;
+
+  /// 실패 안내 자리 등 다른 기능이 채우는 자리.
+  final ProjectPanels panels;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -55,6 +68,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late final StreamSubscription<RunEvent> _eventSub;
 
   var _gitLoaded = false;
+
+  /// 사용자가 고른 실행 흐름 카드(로그 탭에 보일 항목). 새로 실패한 항목이 생기면 그것으로 바뀐다.
+  String? _picked;
+
+  /// 0 은 로그 탭, 그 뒤는 [DashboardScreen.tabs] 순서.
+  var _tab = 0;
 
   String get _id => widget.projectId;
 
@@ -85,7 +104,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }, onError: (Object e) => setState(() => _loadError = errorText(e)));
     _eventSub = widget.runner.events.listen((e) {
       if (e case ItemStateChanged(:final item, :final state, :final reason) when item.projectId == _id) {
-        setState(() => _reasons[item] = reason);
+        setState(() {
+          _reasons[item] = reason;
+          if (state == ItemState.failed) _picked = item.serviceId;
+        });
         if (state == ItemState.portBusy) unawaited(_findOwner(item));
         if (state != ItemState.portBusy) _owners.remove(item);
       } else if (e case RunSucceeded(:final summary) when summary.projectId == _id) {
@@ -187,7 +209,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final p = _project;
     if (p == null) {
-      return AppPage(crumbs: [('개발', '/home'), (_id, null)], children: [
+      return AppPage(crumbs: [('내 프로젝트', '/home'), (_id, null)], children: [
         if (_loadError != null) Text(_loadError!, style: const TextStyle(color: C.muted)) else const LinearProgressIndicator(),
       ]);
     }
@@ -196,155 +218,206 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _git != null &&
         (p.config?.git.pullBeforeRun ?? false) &&
         !_services.any((s) => isUp(widget.runner.stateOf(_ref(s))));
-    final logged = [for (final s in _services) if (s is! RemoteService) s];
+    final states = [for (final s in _services) widget.runner.stateOf(_ref(s))];
+    final anyUp = states.any(isUp) || states.contains(ItemState.connected);
+    final alerts = _alerts(p, waitingPull);
     return AppPage(
-      crumbs: [('개발', '/home'), (p.name, null)],
+      crumbs: [('내 프로젝트', '/home'), (p.name, null)],
       children: [
-        Wrap(spacing: 20, runSpacing: 16, alignment: WrapAlignment.spaceBetween, children: [
-          ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 420, maxWidth: 640),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
-              Text(p.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-              Text(p.folderPath, style: mono.copyWith(fontSize: 13, color: C.muted)),
-              if (_git case final git?) _gitLine(git),
-              if (waitingPull)
-                const Text('전체 실행을 준비하고 있어요. 최신 코드를 확인하느라 1분쯤 걸릴 수 있어요.', style: TextStyle(fontSize: 13, color: C.text2)),
-            ]),
-          ),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            Btn('전체 실행', primary: true, icon: Icons.play_arrow, onPressed: allBusy || _services.isEmpty ? null : _runAll),
-            Btn('전체 종료', icon: Icons.stop, onPressed: _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll),
-            Btn('헬스체크', onPressed: () => Navigator.pushNamed(context, '/qa', arguments: _id)),
-            Btn('AI 검사', onPressed: () => Navigator.pushNamed(context, '/ai', arguments: _id)),
-            Btn('설정', icon: Icons.settings_outlined, onPressed: () => Navigator.pushNamed(context, '/settings', arguments: _id)),
+        _head(p, states, anyUp, allBusy),
+        if (alerts.isNotEmpty) Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 8, children: alerts),
+        if (_services.isNotEmpty)
+          Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
+            const Text('실행 흐름', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            Wrap(spacing: 12, runSpacing: 12, children: [for (final s in _services) _flowCard(s)]),
           ]),
+        _tabBar(),
+        if (_tab == 0) _logTab() else widget.tabs[_tab - 1].build(context, _id),
+      ],
+    );
+  }
+
+  Widget _head(Project p, List<ItemState> states, bool anyUp, bool allBusy) {
+    final summary = projectSummary(states);
+    final about = p.config?.about;
+    final repo = about?.links['repo'];
+    return Wrap(spacing: 20, runSpacing: 16, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.end, children: [
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
+          Wrap(spacing: 10, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Text(p.name, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+            ),
+            StatusChip(summary.label, summary.tone),
+            for (final t in about?.stack ?? const <String>[]) Tag(t),
+            if ((_git?.behind ?? 0) > 0) StatusChip('최신 코드가 있어요 · ${_git!.behind}커밋', C.warn, dot: false),
+          ]),
+          Wrap(spacing: 6, runSpacing: 4, crossAxisAlignment: WrapCrossAlignment.center, children: [
+            if (about?.summary case final summary?) Text(summary, style: const TextStyle(fontSize: 14, color: C.text2)),
+            if (repo != null) ...[const Text('·', style: TextStyle(color: C.muted)), Text('저장소', style: const TextStyle(fontSize: 14, color: C.primary))],
+            if (about?.memo != null) ...[const Text('·', style: TextStyle(color: C.muted)), const Text('메모 1', style: TextStyle(fontSize: 14, color: C.text2))],
+          ]),
+          Text(_sentence(states), style: const TextStyle(fontSize: 13, color: C.text2)),
+          if (_summary case final s? when s.items.isNotEmpty) Text(_counts(s), style: const TextStyle(fontSize: 13, color: C.muted)),
         ]),
+      ),
+      Wrap(spacing: 8, children: [
+        if (!anyUp || allBusy) Btn('전체 실행', primary: true, icon: Icons.play_arrow, onPressed: allBusy || _services.isEmpty ? null : _runAll),
+        if (anyUp || allBusy) Btn('전체 종료', icon: Icons.stop, onPressed: _busy.contains('stopAll') || _services.isEmpty ? null : _stopAll),
+      ]),
+    ]);
+  }
+
+  /// 머리 요약 문장. 예: `4개 중 3개 준비 완료 · web 항목을 시작하지 못했어요`
+  String _sentence(List<ItemState> states) {
+    if (_services.isEmpty) return '실행 항목이 아직 없어요. popoling.yaml 에 실행 방법을 적어 주세요.';
+    final n = states.length;
+    final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
+    final failed = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.failed || states[i] == ItemState.portBusy) s.id];
+    if (states.any((s) => isUp(s) || s == ItemState.connected || s == ItemState.failed || s == ItemState.portBusy)) {
+      return [
+        '$n개 중 $k개 준비 완료',
+        if (failed.isNotEmpty) '${failed.join(', ')} 항목을 시작하지 못했어요',
+      ].join(' · ');
+    }
+    if (_summary case final s?) return '마지막 전체 실행 ${_time(s.finishedAt)}';
+    return '아직 전체 실행 기록이 없어요.';
+  }
+
+  List<Widget> _alerts(Project p, bool waitingPull) => [
         if (p.configIssues.isNotEmpty)
           Notice(
             bg: C.bad.$1,
             border: C.bad.$1,
             icon: Icons.error_outline,
             iconColor: C.bad.$2,
-            trailing: [LinkText('설정 고치기', onTap: () => Navigator.pushNamed(context, '/settings', arguments: _id))],
-            child: Text('설정 파일에 문제가 있어 실행할 수 없어요: ${p.configIssues.first.message}',
-                style: TextStyle(fontSize: 14, color: C.bad.$2)),
+            child: Text('설정 파일에 문제가 있어 실행할 수 없어요: ${p.configIssues.first.message}', style: TextStyle(fontSize: 14, color: C.bad.$2)),
           ),
-        Panel(
-          title: '실행 항목',
-          titleAction: _services.isEmpty ? null : Text('실행 순서는 의존 항목 먼저', style: const TextStyle(fontSize: 13, color: C.muted)),
-          padding: const EdgeInsets.only(top: 16),
-          child: _services.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
-                  child: Text('아직 실행 항목이 없어요. [설정] 에서 실행 방법을 추가해 주세요.', style: TextStyle(color: C.muted)),
-                )
-              : Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  _row(const [Text('항목'), Text('포트'), Text('준비 조건'), Text('상태'), SizedBox()], head: true),
-                  for (final s in _services) _itemRow(s),
-                ]),
+        if (waitingPull) const Text('전체 실행을 준비하고 있어요. 최신 코드를 확인하느라 1분쯤 걸릴 수 있어요.', style: TextStyle(fontSize: 13, color: C.text2)),
+        for (final s in _services) ?_itemNotice(s),
+      ];
+
+  /// 항목 하나의 알림: 포트 주인이 내 다른 항목이면 [그 항목 중지], 아니면 실패 이유.
+  Widget? _itemNotice(ServiceConfig s) {
+    final item = _ref(s);
+    final state = widget.runner.stateOf(item);
+    final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
+    final reason = _reasons[item];
+    if (_owners[item] case final owner?) {
+      return _notice(C.port, '포트 ${owner.$1} 를 내 프로젝트 ${owner.$2} 항목이 쓰고 있어요.', [
+        if (owner.$2.projectId != _id)
+          Btn('${owner.$2.projectId} 로 이동', small: true, onPressed: () => Navigator.pushNamed(context, '/dashboard', arguments: owner.$2.projectId)),
+        Btn('${owner.$2} 중지', small: true, onPressed: busy ? null : () => _stopOwner(item, owner.$2)),
+      ]);
+    }
+    if (reason != null && !isUp(state)) return _notice(state == ItemState.portBusy ? C.port : C.bad, reason, const []);
+    return null;
+  }
+
+  Widget _flowCard(ServiceConfig s) {
+    final item = _ref(s);
+    final state = widget.runner.stateOf(item);
+    final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
+    final selected = s.id == _selectedService?.id;
+    final skipped = !isUp(state) &&
+        state != ItemState.failed &&
+        (_summary?.items.any((r) => r.item == item && r.outcome == ItemOutcome.skipped) ?? false);
+    final kind = s is RemoteService ? '원격 · 연결만 확인' : kindOf(s);
+    final port = s is ProcessService && s.ports.isNotEmpty ? ' · ${s.ports.join(', ')}' : '';
+    final Widget action = switch (s) {
+      RemoteService() => Btn('다시 확인', small: true, onPressed: busy ? null : () => _start(s)),
+      _ when state == ItemState.stopping => const IconButton(onPressed: null, tooltip: '중지', icon: Icon(Icons.stop, size: 18)),
+      _ when isUp(state) => IconButton(tooltip: '중지', onPressed: busy ? null : () => _stop(s), icon: const Icon(Icons.stop, size: 18)),
+      _ => IconButton(tooltip: '시작', onPressed: busy ? null : () => _start(s), icon: const Icon(Icons.play_arrow, size: 18)),
+    };
+    return SizedBox(
+      width: 220,
+      child: Material(
+        color: C.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: selected ? C.primary : C.border, width: selected ? 1.5 : 1),
         ),
-        Panel(
-          title: '마지막 전체 실행',
-          titleAction: _summary == null ? null : Text(_time(_summary!.finishedAt), style: const TextStyle(fontSize: 13, color: C.muted)),
-          child: _summary == null
-              ? const Text('아직 전체 실행 기록이 없어요.', style: TextStyle(color: C.muted))
-              : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 10, children: [
-                  if (_summary!.items.isNotEmpty) Text(_counts(_summary!), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                  if (_summary!.pull case final pull?) _resultRow(pull.outcome, 'Git pull — ${pull.message}'),
-                  for (final r in _summary!.items)
-                    _resultRow(r.outcome, '${r.item.serviceId}${r.reason == null ? '' : ' — ${r.reason}'}'),
-                ]),
+        child: InkWell(
+          key: ValueKey('flow-${s.id}'),
+          borderRadius: BorderRadius.circular(10),
+          onTap: s is RemoteService ? null : () => setState(() {
+            _picked = s.id;
+            _tab = 0;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+              Row(children: [
+                Expanded(child: Text(s.id, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+                action,
+              ]),
+              Text('$kind$port', style: const TextStyle(fontSize: 12, color: C.muted)),
+              skipped ? const StatusChip('건너뜀', C.idle) : stateChip(state),
+            ]),
+          ),
         ),
-        if (widget.logs case final logs? when logged.isNotEmpty)
-          LogPreview(projectId: _id, services: logged, failed: _failedOf(logged), failedNow: {for (final s in logged) if (widget.runner.stateOf(_ref(s)) == ItemState.failed) s.id}, logs: logs),
-      ],
+      ),
     );
   }
 
-  /// `성공 2 · 실패 1` 처럼 있는 결과만. Git pull 은 항목이 아니라 세지 않는다.
+  Widget _tabBar() {
+    final labels = ['로그', for (final t in widget.tabs) t.label];
+    return Container(
+      key: const ValueKey('project-tabs'),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: C.border))),
+      child: Wrap(children: [
+        for (final (i, label) in labels.indexed)
+          InkWell(
+            onTap: () => setState(() => _tab = i),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _tab == i ? C.primary : Colors.transparent, width: 2))),
+              child: Text(label, style: TextStyle(fontSize: 14, fontWeight: _tab == i ? FontWeight.w600 : FontWeight.w400, color: _tab == i ? C.primary : C.text2)),
+            ),
+          ),
+      ]),
+    );
+  }
+
+  /// 로그 탭에 보일 항목: 고른 카드 → 실패한 항목 → 첫 프로세스.
+  ServiceConfig? get _selectedService {
+    final logged = [for (final s in _services) if (s is! RemoteService) s];
+    if (logged.isEmpty) return null;
+    ServiceConfig? byId(String? id) => logged.where((s) => s.id == id).firstOrNull;
+    return byId(_picked) ?? byId(_failedOf(logged)) ?? logged.whereType<ProcessService>().firstOrNull ?? logged.first;
+  }
+
+  Widget _logTab() {
+    final s = _selectedService;
+    final logs = widget.logs;
+    if (s == null || logs == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Text('로그가 있는 실행 항목이 없어요.', style: TextStyle(color: C.muted)),
+      );
+    }
+    final item = _ref(s);
+    final result = _summary?.items.where((r) => r.item == item && r.outcome == ItemOutcome.failed).firstOrNull;
+    final failure = widget.panels.failure;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
+      if (failure != null && result != null && _summary != null && !isUp(widget.runner.stateOf(item))) failure(context, result, _summary!),
+      ItemLogView(key: ValueKey(item), item: item, service: s, runner: widget.runner, logs: logs, launcher: widget.launcher),
+    ]);
+  }
+
+  /// `성공 2 · 실패 1 · 건너뜀 1` 처럼 있는 결과만. Git pull 은 항목이 아니라 세지 않는다.
   static String _counts(RunSummary s) => [
         for (final (outcome, label) in const [(ItemOutcome.ok, '성공'), (ItemOutcome.failed, '실패'), (ItemOutcome.skipped, '건너뜀')])
           if (s.items.where((r) => r.outcome == outcome).length case final n when n > 0) '$label $n',
       ].join(' · ');
 
-  static Widget _resultRow(ItemOutcome outcome, String text) => Row(spacing: 8, children: [
-        SizedBox(width: 64, child: Align(alignment: Alignment.centerLeft, child: outcomeChip(outcome))),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
-      ]);
-
-  static Widget _gitLine(GitStatus git) => Wrap(
-        spacing: 16,
-        runSpacing: 6,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(mainAxisSize: MainAxisSize.min, spacing: 6, children: [
-            const Icon(Icons.call_split, size: 14, color: C.text2, semanticLabel: 'Git 브랜치'),
-            const Text('브랜치', style: TextStyle(fontSize: 13, color: C.text2)),
-            Flexible(child: Text(git.branch ?? '없음', overflow: TextOverflow.ellipsis, style: mono.copyWith(fontSize: 13, fontWeight: FontWeight.w500))),
-          ]),
-          if (git.changed > 0) Text('커밋하지 않은 변경 ${git.changed}개', style: const TextStyle(fontSize: 13, color: C.text2)),
-          if (git.behind > 0) Text('원격보다 ${git.behind}커밋 뒤처짐', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: C.warn.$2)),
-        ],
-      );
-
-  Widget _itemRow(ServiceConfig s) {
-    final item = _ref(s);
-    final state = widget.runner.stateOf(item);
-    final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
-    final reason = _reasons[item];
-    final owner = _owners[item];
-    final Widget action = switch (s) {
-      RemoteService() => Btn('다시 확인', small: true, onPressed: busy ? null : () => _start(s)),
-      _ when state == ItemState.stopping => const Btn('중지', small: true, onPressed: null),
-      _ when isUp(state) => Btn('중지', small: true, onPressed: busy ? null : () => _stop(s)),
-      _ => Btn('시작', small: true, onPressed: busy ? null : () => _start(s)),
-    };
-    return _row(
-      [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
-          Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            InkWell(
-              onTap: () => Navigator.pushNamed(context, '/detail', arguments: item),
-              child: Text(s.id, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: C.primary)),
-            ),
-            Tag(kindOf(s), tone: s is RemoteService ? C.remote : null),
-            if (s.dependsOn.isNotEmpty) Text('의존: ${s.dependsOn.join(', ')}', style: const TextStyle(fontSize: 12, color: C.muted)),
-          ]),
-          Text(_summaryOf(s), style: mono.copyWith(fontSize: 12, color: C.muted), overflow: TextOverflow.ellipsis),
-        ]),
-        Text(s is ProcessService && s.ports.isNotEmpty ? s.ports.join(', ') : '—', style: mono.copyWith(fontSize: 13)),
-        Text(readyText(s.ready)),
-        stateChip(state),
-        action,
-      ],
-      extra: owner != null
-          ? _notice(
-              C.port,
-              '포트 ${owner.$1} 를 내 프로젝트 ${owner.$2} 항목이 쓰고 있어요.',
-              [
-                if (owner.$2.projectId != _id)
-                  Btn('${owner.$2.projectId} 로 이동', small: true,
-                      onPressed: () => Navigator.pushNamed(context, '/dashboard', arguments: owner.$2.projectId)),
-                Btn('${owner.$2} 중지', small: true, onPressed: busy ? null : () => _stopOwner(item, owner.$2)),
-              ],
-            )
-          : reason != null && !isUp(state)
-              ? _notice(state == ItemState.portBusy ? C.port : C.bad, reason, const [])
-              : null,
-    );
-  }
-
-  static String _summaryOf(ServiceConfig s) => switch (s) {
-        ProcessService(:final cwd, :final command) => '$cwd · ${command.join(' ')}',
-        ComposeService(:final file, :final services) => '$file${services.isEmpty ? '' : ' · ${services.join(', ')}'}',
-        RemoteService(:final ready) => readyText(ready),
-      };
-
   static String _time(DateTime t) =>
       '${t.month}/${t.day} ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   static Widget _notice((Color, Color) tone, String text, List<Widget> actions) => Container(
-        margin: const EdgeInsets.only(top: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(color: tone.$1, borderRadius: BorderRadius.circular(8)),
         child: Wrap(spacing: 10, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
@@ -355,22 +428,4 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ...actions,
         ]),
       );
-
-  static Widget _row(List<Widget> cells, {bool head = false, Widget? extra}) {
-    const widths = [null, 90.0, null, 150.0, 96.0]; // null 칸(항목·준비 조건)이 남은 너비를 나눠 쓴다
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: head ? 8 : 16),
-      decoration: BoxDecoration(color: head ? C.headBg : null, border: const Border(top: BorderSide(color: C.divider))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        DefaultTextStyle.merge(
-          style: head ? const TextStyle(fontSize: 12, color: C.muted, fontWeight: FontWeight.w500) : const TextStyle(fontSize: 13, color: C.text2),
-          child: Row(spacing: 16, children: [
-            for (final (i, c) in cells.indexed)
-              widths[i] == null ? Expanded(child: c) : SizedBox(width: widths[i], child: Align(alignment: Alignment.centerLeft, child: c)),
-          ]),
-        ),
-        ?extra,
-      ]),
-    );
-  }
 }

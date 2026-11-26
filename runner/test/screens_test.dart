@@ -8,8 +8,7 @@ import 'package:popoling_core/fakes.dart';
 import 'package:popoling_runner/src/git/git_adapter.dart';
 import 'package:popoling_runner/src/log/log_store.dart';
 import 'package:popoling_runner/src/screens/dashboard_screen.dart';
-import 'package:popoling_runner/src/screens/detail_screen.dart';
-import 'package:popoling_runner/src/screens/log_preview.dart';
+import 'package:popoling_runner/src/screens/item_log_view.dart';
 
 const _web = ItemRef(projectId: 'my-team-project', serviceId: 'web');
 const _shopWeb = ItemRef(projectId: 'shop-clone', serviceId: 'web');
@@ -96,113 +95,127 @@ Future<void> pumpScreen(WidgetTester tester, Widget screen) async {
 }
 
 void main() {
-  group('대시보드', () {
+  group('프로젝트 화면', () {
     late FakeProjectRepository projects;
     setUp(() => projects = FakeProjectRepository.withSamples());
 
-    DashboardScreen dashboard(Orchestrator runner, {PortProbe? ports, RuntimeQuery? runtime, GitAdapter? git, LogStore? logs}) => DashboardScreen(
-          projectId: 'my-team-project',
+    DashboardScreen dashboard(Orchestrator runner,
+            {PortProbe? ports, RuntimeQuery? runtime, GitAdapter? git, LogStore? logs, List<ProjectTab> tabs = const [], ProjectPanels panels = const ProjectPanels(), String id = 'my-team-project'}) =>
+        DashboardScreen(
+          projectId: id,
           projects: projects,
           runner: runner,
           ports: ports ?? FakePortProbe(),
           runtime: runtime ?? FakeRuntimeQuery(),
           git: git,
-          logs: logs,
+          logs: logs ?? _FakeLogs({}),
+          launcher: FakeItemLauncher(projects),
+          tabs: tabs,
+          panels: panels,
         );
 
-    testWidgets('항목을 상태 라벨과 함께 보여 주고, 전체 실행하면 상태와 결과가 바뀐다', (tester) async {
+    testWidgets('머리에 프로젝트 요약 상태를 보여 주고, 전체 실행하면 실행 흐름 카드 상태가 바뀐다', (tester) async {
       await pumpScreen(tester, dashboard(FakeOrchestrator(projects)));
       for (final id in ['db', 'api', 'web', 'storage']) {
-        expect(find.text(id), findsOneWidget);
+        expect(find.byKey(ValueKey('flow-$id')), findsOneWidget);
       }
       expect(find.text('중지'), findsWidgets);
-      expect(find.text('아직 전체 실행 기록이 없어요.'), findsOneWidget);
+      expect(find.text('Spring Boot'), findsOneWidget);
+      expect(find.text('동아리 행사 예약 웹서비스 (2025 캡스톤)'), findsOneWidget);
 
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
+      expect(find.text('실행 중 · 4/4'), findsOneWidget);
       expect(find.text('준비 완료'), findsNWidgets(3));
       expect(find.text('연결됨'), findsOneWidget);
-      expect(find.text('성공'), findsNWidgets(4));
     });
 
-    testWidgets('Git 상태를 보여 주고 전체 실행 뒤 다시 읽는다 (AT-23)', (tester) async {
+    testWidgets('원격보다 뒤처지면 머리에 알리고 전체 실행 뒤 다시 읽는다 (AT-23)', (tester) async {
       final git = _FakeGit(const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev'),
           remote: const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev', behind: 3));
       await pumpScreen(tester, dashboard(FakeOrchestrator(projects), git: git));
-      expect(find.text('dev'), findsOneWidget);
-      expect(find.text('커밋하지 않은 변경 2개'), findsOneWidget);
-      expect(find.text('원격보다 3커밋 뒤처짐'), findsOneWidget);
+      expect(find.text('최신 코드가 있어요 · 3커밋'), findsOneWidget);
 
       git.current = const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev');
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('뒤처짐'), findsNothing);
+      expect(find.textContaining('최신 코드가 있어요'), findsNothing);
     });
 
-    testWidgets('Git 저장소가 아니면 표시를 숨긴다', (tester) async {
-      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), git: _FakeGit(null)));
-      expect(find.text('브랜치'), findsNothing);
-    });
-
-    testWidgets('의존 항목이 실패하면 결과에 건너뜀을 보여 준다 (AT-04)', (tester) async {
+    testWidgets('의존 항목이 실패하면 일부 실패와 건너뜀을 보여 준다 (AT-04)', (tester) async {
       final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: 'my-team-project', serviceId: 'api')});
       await pumpScreen(tester, dashboard(runner));
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
-      expect(find.text('건너뜀'), findsOneWidget);
+      expect(find.text('일부 실패 · 2/4'), findsOneWidget);
       expect(find.text('성공 2 · 실패 1 · 건너뜀 1'), findsOneWidget);
-      expect(find.text('실패'), findsWidgets);
+      expect(find.text('건너뜀'), findsOneWidget);
     });
 
-    testWidgets('최근 로그는 실패한 항목을 먼저 보여 주고 다른 항목을 고를 수 있다', (tester) async {
-      final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: 'my-team-project', serviceId: 'api')});
-      final logs = _FakeLogs({
-        'api': ['2026-11-24T10:00:01.000 err | Port 8080 already in use ${'x' * 400}'],
-        'web': ['2026-11-24T10:00:02.000 out | VITE ready'],
-      });
-      await pumpScreen(tester, dashboard(runner, logs: logs));
-      Finder tab(String id) => find.descendant(of: find.byType(LogPreview), matching: find.widgetWithText(TextButton, id));
-      expect(tab('storage'), findsNothing); // 원격은 로그가 없다
-
-      await tester.tap(tab('web'));
+    testWidgets('shows tabs in order', (tester) async {
+      final built = <String>[];
+      Widget tab(String label) => const SizedBox();
+      await pumpScreen(
+        tester,
+        dashboard(FakeOrchestrator(projects), tabs: [
+          ProjectTab(id: 'env', label: '환경 점검', order: 10, build: (_, id) { built.add(id); return const Text('환경 내용'); }),
+          ProjectTab(id: 'git', label: 'Git', order: 20, build: (_, _) => tab('Git')),
+        ]),
+      );
+      final labels = tester.widgetList<Text>(find.descendant(of: find.byKey(const ValueKey('project-tabs')), matching: find.byType(Text))).map((t) => t.data).toList();
+      expect(labels, ['로그', '환경 점검', 'Git']);
+      await tester.tap(find.text('환경 점검'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('VITE ready', findRichText: true), findsOneWidget);
+      expect(find.text('환경 내용'), findsOneWidget);
+      expect(built.last, 'my-team-project');
+    });
 
+    testWidgets('flow card selects log', (tester) async {
+      final logs = _FakeLogs({'web': ['2026-11-24T10:00:02.000 out | VITE ready'], 'api': ['2026-11-24T10:00:01.000 out | Started']});
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), logs: logs));
+      await tester.tap(find.byKey(const ValueKey('flow-web')));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump();
+      expect(find.text('web 로그'), findsOneWidget);
+    });
+
+    testWidgets('새로 실패한 항목의 로그를 먼저 보여 준다', (tester) async {
+      final runner = FakeOrchestrator(projects, failing: {_web});
+      await pumpScreen(tester, dashboard(runner));
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
-      expect(find.text('최근 로그 · api'), findsOneWidget); // 새로 실패해 고른 항목 대신 보인다
-      expect(find.textContaining('err  Port 8080 already in use', findRichText: true), findsOneWidget);
-      expect(find.textContaining('x' * 350, findRichText: true), findsNothing);
-
-      await tester.tap(tab('web'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('VITE ready', findRichText: true), findsOneWidget);
-      expect(find.textContaining('Port 8080', findRichText: true), findsNothing);
-
-      logs.byService['web'] = ['2026-11-24T10:00:03.000 out | 새 줄'];
-      await tester.pump(const Duration(seconds: 1)); // 1초마다 다시 읽는다
-      await tester.pump();
-      expect(find.textContaining('새 줄', findRichText: true), findsOneWidget);
-
-      await tester.tap(tab('db'));
-      await tester.pumpAndSettle();
-      expect(find.text('Compose 로그는 [전체 로그]에서 볼 수 있어요.'), findsOneWidget);
+      expect(find.text('web 로그'), findsOneWidget);
     });
 
-    testWidgets('새 실패가 아니면 고른 로그를 유지하고, 다른 항목이 새로 실패하면 그것을 보여 준다', (tester) async {
-      final projects = FakeProjectRepository.withSamples();
-      final services = (await projects.getProject('my-team-project')).config!.services.where((s) => s is! RemoteService).toList();
-      Future<void> show(String? failed, Set<String> now) => tester.pumpWidget(MaterialApp(
-          home: Scaffold(body: LogPreview(projectId: 'p', services: services, failed: failed, failedNow: now, logs: _FakeLogs({})))));
-      await show(null, {});
-      await tester.tap(find.widgetWithText(TextButton, 'web'));
-      await show('api', {}); // 지난 실행의 실패
-      await tester.pump();
-      expect(find.text('최근 로그 · web'), findsOneWidget);
-      await show('api', {'api'});
-      expect(find.text('최근 로그 · api'), findsOneWidget);
-      await show('api', {'api', 'db'});
-      expect(find.text('최근 로그 · db'), findsOneWidget);
+    testWidgets('failure panel slot', (tester) async {
+      final runner = FakeOrchestrator(projects, failing: {_web});
+      await pumpScreen(tester, dashboard(runner, panels: ProjectPanels(failure: (_, item, _) => Text('원인 자리 ${item.item.serviceId}'))));
+      await tester.tap(find.text('전체 실행'));
+      await tester.pumpAndSettle();
+      expect(find.text('원인 자리 web'), findsOneWidget);
+    });
+
+    testWidgets('failure panel hidden without slot', (tester) async {
+      final runner = FakeOrchestrator(projects, failing: {_web});
+      await pumpScreen(tester, dashboard(runner));
+      await tester.tap(find.text('전체 실행'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('원인 자리'), findsNothing);
+    });
+
+    testWidgets('no services', (tester) async {
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), id: 'algo-study'));
+      expect(find.textContaining('실행 항목이 아직 없어요'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('narrow window', (tester) async {
+      tester.view.physicalSize = const Size(1024, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(home: dashboard(FakeOrchestrator(projects))));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('최신 코드를 기다리는 동안 알리고 전체 종료를 누를 수 있다', (tester) async {
@@ -219,15 +232,6 @@ void main() {
       expect(find.textContaining('전체 실행을 준비하고'), findsNothing);
     });
 
-    testWidgets('고르지 않았으면 첫 항목이 아니라 실패한 항목의 로그를 보여 준다', (tester) async {
-      final runner = FakeOrchestrator(projects, failing: {_web});
-      await pumpScreen(tester, dashboard(runner, logs: _FakeLogs({})));
-      expect(find.text('최근 로그 · api'), findsOneWidget);
-      await tester.tap(find.text('전체 실행'));
-      await tester.pumpAndSettle();
-      expect(find.text('최근 로그 · web'), findsOneWidget);
-    });
-
     testWidgets('포트 주인이 내 다른 항목이면 그 항목 중지 버튼을 보여 준다 (AT-17)', (tester) async {
       final runner = _PortBusyOrchestrator(projects);
       await pumpScreen(
@@ -238,7 +242,7 @@ void main() {
           runtime: FakeRuntimeQuery(owned: [(port: 5173, pid: 4321, item: _shopWeb)]),
         ),
       );
-      await tester.tap(find.widgetWithText(OutlinedButton, '시작').at(2)); // db, api, web 순서
+      await tester.tap(find.descendant(of: find.byKey(const ValueKey('flow-web')), matching: find.byTooltip('시작')));
       await tester.pumpAndSettle();
       expect(find.text('포트 사용 중'), findsOneWidget);
       expect(find.text('포트 5173 를 내 프로젝트 shop-clone / web 항목이 쓰고 있어요.'), findsOneWidget);
@@ -252,28 +256,19 @@ void main() {
     testWidgets('외부 프로그램이 포트를 쓰면 중지 버튼 없이 이유만 보여 준다 (AT-03)', (tester) async {
       final runner = _PortBusyOrchestrator(projects);
       await pumpScreen(tester, dashboard(runner, ports: FakePortProbe(inUse: [const PortInUse(5173, pid: 99, processName: 'java')])));
-      await tester.tap(find.widgetWithText(OutlinedButton, '시작').at(2));
+      await tester.tap(find.descendant(of: find.byKey(const ValueKey('flow-web')), matching: find.byTooltip('시작')));
       await tester.pumpAndSettle();
       expect(find.textContaining('/ web 중지'), findsNothing);
       expect(find.text('포트 5173 를 shop-clone / web 항목이 쓰고 있어요.'), findsOneWidget);
     });
 
     testWidgets('없는 프로젝트면 안내만 보여 준다', (tester) async {
-      await pumpScreen(
-        tester,
-        DashboardScreen(
-          projectId: 'nope',
-          projects: projects,
-          runner: FakeOrchestrator(projects),
-          ports: FakePortProbe(),
-          runtime: FakeRuntimeQuery(),
-        ),
-      );
+      await pumpScreen(tester, dashboard(FakeOrchestrator(projects), id: 'nope'));
       expect(find.text('목록에 없는 프로젝트예요: nope'), findsOneWidget);
     });
   });
 
-  group('항목 상세', () {
+  group('항목 로그', () {
     late Directory tmp;
     setUp(() => tmp = Directory.systemTemp.createTempSync('popoling_detail_'));
     tearDown(() => tmp.deleteSync(recursive: true));
@@ -281,6 +276,7 @@ void main() {
     testWidgets('로그 파일을 보여 주고 stderr 만 골라 볼 수 있다', (tester) async {
       final projects = FakeProjectRepository.withSamples();
       final logs = LogStore(() async => tmp);
+      final web = (await tester.runAsync(() => projects.getProject('my-team-project')))!.config!.services.firstWhere((s) => s.id == 'web');
       await tester.runAsync(() async {
         final f = await logs.fileOf(_web);
         await f.parent.create(recursive: true);
@@ -292,23 +288,17 @@ void main() {
         tester.view.physicalSize = const Size(1280, 1600);
         tester.view.devicePixelRatio = 1;
         await tester.pumpWidget(MaterialApp(
-          home: DetailScreen(
-            item: _web,
-            projects: projects,
-            runner: FakeOrchestrator(projects),
-            process: (_) => null,
-            logs: logs,
-            launcher: FakeItemLauncher(projects),
+          home: Scaffold(
+            body: ItemLogView(item: _web, service: web, runner: FakeOrchestrator(projects), logs: logs, launcher: FakeItemLauncher(projects)),
           ),
         ));
         await Future<void>.delayed(const Duration(milliseconds: 300)); // 파일 읽기
       });
       addTearDown(tester.view.reset);
       await tester.pump();
+      expect(find.text('web 로그'), findsOneWidget);
       expect(find.textContaining('VITE ready', findRichText: true), findsOneWidget);
       expect(find.textContaining('warning: pw=****', findRichText: true), findsOneWidget);
-      expect(find.text('npm run dev'), findsOneWidget);
-      expect(find.text('띄운 프로세스 없음'), findsOneWidget);
 
       await tester.tap(find.text('stderr'));
       await tester.pump();

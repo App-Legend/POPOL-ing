@@ -22,7 +22,7 @@ void main() {
   });
 
   Future<void> pump(WidgetTester tester, QaRun run) async {
-    final summary = qaSummarySlot(app); // 등록 전에 만들어도 그릴 때 진짜 구현을 꺼낸다
+    final summary = projectPanels(app).qaSummary!; // 등록 전에 만들어도 그릴 때 진짜 구현을 꺼낸다
     app
       ..provide<QaRunner>(qa)
       ..provide<Orchestrator>(FakeOrchestrator(projects))
@@ -42,5 +42,20 @@ void main() {
     await pump(tester, await qa.runChecks(_id));
     expect(find.widgetWithText(Btn, '키 입력'), findsOneWidget);
     expect(find.widgetWithText(Btn, 'AI 요약'), findsNothing);
+  });
+
+  testWidgets('실패 안내 자리에 원인 분석 패널을 넣는다', (tester) async {
+    final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: _id, serviceId: 'web')});
+    final failure = projectPanels(app).failure!;
+    app
+      ..provide<ProjectRepository>(projects)
+      ..provide<Orchestrator>(runner)
+      ..provide<LlmClient>(llm);
+    final run = await runner.runAll(_id);
+    final item = run.items.firstWhere((r) => r.outcome == ItemOutcome.failed);
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: Scaffold(body: Builder(builder: (c) => failure(c, item, run)))));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(Btn, '원인 분석'), findsOneWidget);
+    expect(llm.sent, isEmpty);
   });
 }

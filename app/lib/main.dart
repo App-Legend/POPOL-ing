@@ -9,6 +9,7 @@ import 'package:popoling_compose/compose.dart' as compose;
 import 'package:popoling_project/project.dart' as project;
 import 'package:popoling_runner/runner.dart' as runner;
 
+import 'ai_slots.dart';
 import 'registry.dart';
 import 'screens/ai_screen.dart';
 import 'screens/category_screen.dart';
@@ -40,6 +41,7 @@ Registry buildRegistry({bool features = true}) {
     compose.register(app);
     catalog.register(app);
     ai.register(app);
+    app.provide<ProjectPanels>(projectPanels(app));
   }
   return app;
 }
