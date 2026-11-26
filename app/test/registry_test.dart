@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popoling/main.dart';
 import 'package:popoling/registry.dart';
@@ -12,6 +13,17 @@ void main() {
     app.provide<ConfigValidator>(fake);
     app.provide<ConfigValidator>(real);
     expect(app.read<ConfigValidator>(), same(real));
+  });
+
+  test('tabs are sorted by order and same id replaces', () {
+    final app = Registry();
+    Widget empty(BuildContext _, String _) => const SizedBox();
+    app.tab(ProjectTab(id: 'settings', label: '설정', order: 30, build: empty));
+    app.tab(ProjectTab(id: 'env', label: '환경', order: 10, build: empty));
+    expect(app.tabs.map((t) => t.id), ['env', 'settings']);
+    app.tab(ProjectTab(id: 'env', label: '환경 점검', order: 10, build: empty));
+    expect(app.tabs, hasLength(2));
+    expect(app.tabs.first.label, '환경 점검');
   });
 
   test('등록하지 않은 타입을 꺼내면 StateError', () {

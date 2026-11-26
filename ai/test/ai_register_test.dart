@@ -10,6 +10,13 @@ import 'package:popoling_core/ui.dart';
 class TestRegistry implements AppRegistry {
   final Map<String, WidgetBuilder> routes = {};
   final Map<Type, Object> _services = {};
+  final Map<String, ProjectTab> _tabs = {};
+
+  @override
+  void tab(ProjectTab tab) => _tabs[tab.id] = tab;
+
+  @override
+  List<ProjectTab> get tabs => _tabs.values.toList()..sort((a, b) => a.order.compareTo(b.order));
 
   @override
   void route(String path, WidgetBuilder builder) => routes[path] = builder;

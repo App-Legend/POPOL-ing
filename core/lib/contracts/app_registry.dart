@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'project_tab.dart';
+
 /// 기능이 앱에 끼어드는 창구. 기능 패키지는 `void register(AppRegistry app)` 하나만 내보내고,
 /// `app/` 이 그 함수를 불러 화면과 구현을 모은다.
 ///
@@ -19,4 +21,10 @@ abstract interface class AppRegistry {
 
   /// 등록된 구현을 꺼낸다. 없으면 [StateError].
   T read<T extends Object>();
+
+  /// 프로젝트 화면에 탭을 끼운다. 같은 [ProjectTab.id] 면 나중 것이 이긴다.
+  void tab(ProjectTab tab);
+
+  /// 등록된 탭을 [ProjectTab.order] 순으로. [read] 처럼 화면을 그릴 때 읽는다.
+  List<ProjectTab> get tabs;
 }

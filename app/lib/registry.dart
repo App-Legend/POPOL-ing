@@ -5,12 +5,19 @@ import 'package:popoling_core/contracts.dart';
 class Registry implements AppRegistry {
   final Map<String, WidgetBuilder> routes = {};
   final Map<Type, Object> _services = {};
+  final Map<String, ProjectTab> _tabs = {};
 
   @override
   void route(String path, WidgetBuilder builder) => routes[path] = builder;
 
   @override
   void provide<T extends Object>(T service) => _services[T] = service;
+
+  @override
+  void tab(ProjectTab tab) => _tabs[tab.id] = tab;
+
+  @override
+  List<ProjectTab> get tabs => _tabs.values.toList()..sort((a, b) => a.order.compareTo(b.order));
 
   @override
   T read<T extends Object>() {
