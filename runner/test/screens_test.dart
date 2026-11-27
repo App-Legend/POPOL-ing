@@ -186,7 +186,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('flow-web')));
       await tester.pump(const Duration(milliseconds: 50));
       await tester.pump();
-      expect(find.text('web 로그'), findsOneWidget);
+      expect(find.textContaining('web 로그', findRichText: true), findsOneWidget);
     });
 
     testWidgets('새로 실패한 항목의 로그를 먼저 보여 준다', (tester) async {
@@ -194,7 +194,7 @@ void main() {
       await pumpScreen(tester, dashboard(runner));
       await tester.tap(find.text('전체 실행'));
       await tester.pumpAndSettle();
-      expect(find.text('web 로그'), findsOneWidget);
+      expect(find.textContaining('web 로그', findRichText: true), findsOneWidget);
     });
 
     testWidgets('failure panel slot', (tester) async {
@@ -315,7 +315,7 @@ void main() {
       });
       addTearDown(tester.view.reset);
       await tester.pump();
-      expect(find.text('web 로그'), findsOneWidget);
+      expect(find.textContaining('web 로그', findRichText: true), findsOneWidget);
       expect(find.textContaining('VITE ready', findRichText: true), findsOneWidget);
       expect(find.textContaining('warning: pw=****', findRichText: true), findsOneWidget);
 

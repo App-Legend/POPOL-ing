@@ -128,6 +128,7 @@ class _ItemLogViewState extends State<ItemLogView> {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             backgroundColor: on ? C.darkLine : Colors.transparent,
             foregroundColor: const Color(0xFFE6E8EC),
+            disabledForegroundColor: const Color(0xFF6B717C),
             side: const BorderSide(color: Color(0xFF3A3E48)),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             textStyle: const TextStyle(fontFamily: bodyFont, fontSize: 13, fontWeight: FontWeight.w500),
@@ -149,22 +150,27 @@ class _ItemLogViewState extends State<ItemLogView> {
             const SizedBox(width: 10),
             tab('전체', 0),
             if (s is ProcessService) ...[tab('stdout', 1), tab('stderr', 2)],
-            const Spacer(),
-            SizedBox(
-              width: 200,
-              height: 32,
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v),
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: '로그에서 찾기',
-                  hintStyle: TextStyle(color: Color(0xFF8A909C), fontSize: 13),
-                  prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF8A909C)),
-                  isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 8),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF3A3E48)), borderRadius: BorderRadius.all(Radius.circular(6))),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: C.primary), borderRadius: BorderRadius.all(Radius.circular(6))),
-                ),
+            // 좁은 창에서는 검색 칸이 줄어든다(최대 200).
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                    width: 200,
+                    height: 32,
+                    child: TextField(
+                      onChanged: (v) => setState(() => _query = v),
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                      decoration: const InputDecoration(
+                        hintText: '로그에서 찾기',
+                        hintStyle: TextStyle(color: Color(0xFF8A909C), fontSize: 13),
+                        prefixIcon: Icon(Icons.search, size: 16, color: Color(0xFF8A909C)),
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 8),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Color(0xFF3A3E48)), borderRadius: BorderRadius.all(Radius.circular(6))),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: C.primary), borderRadius: BorderRadius.all(Radius.circular(6))),
+                      ),
+                    ),
+                  ),
               ),
             ),
             darkButton('자동 스크롤', () => setState(() => _autoScroll = !_autoScroll), on: _autoScroll),

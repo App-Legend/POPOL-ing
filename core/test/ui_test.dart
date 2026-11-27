@@ -191,6 +191,14 @@ void main() {
     expect(find.text('제목 없음'), findsOneWidget);
   });
 
+  testWidgets('Panel: danger 면 제목 앞에 경고 아이콘을 붙인다', (tester) async {
+    await tester.pumpWidget(_host(const Column(children: [
+      Panel(title: 'web이 실패한 이유', danger: true, child: Text('본문')),
+    ])));
+    expect(find.text('web이 실패한 이유'), findsOneWidget);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+  });
+
   testWidgets('KeyValues: 이름과 값이 함께 보인다', (tester) async {
     await tester.pumpWidget(_host(const KeyValues([('경로', Text('~/projects')), ('스택', Text('Flutter'))])));
     expect(find.text('경로'), findsOneWidget);

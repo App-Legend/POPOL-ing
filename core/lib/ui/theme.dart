@@ -34,7 +34,7 @@ class C {
 }
 
 /// 코드·숫자 글꼴(JetBrains Mono). 앱에 넣은 글꼴이라 OS 와 상관없이 같다.
-const mono = TextStyle(fontFamily: 'JetBrainsMono', package: 'popoling_core', fontFamilyFallback: ['packages/popoling_core/IBMPlexSansKR', 'Menlo', 'Consolas', 'monospace']);
+const mono = TextStyle(fontFamily: 'JetBrainsMono', package: 'popoling_core', fontFamilyFallback: ['IBMPlexSansKR']); // package 를 주면 대체 글꼴 이름에도 packages/popoling_core/ 가 붙는다
 
 /// 본문 글꼴(IBM Plex Sans KR).
 const bodyFont = 'packages/popoling_core/IBMPlexSansKR';
@@ -46,4 +46,24 @@ ThemeData buildTheme() => ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: C.primary, primary: C.primary, surface: C.surface),
       textTheme: const TextTheme().apply(bodyColor: C.text, displayColor: C.text),
       dividerColor: C.divider,
+      // 목업 v2 확인 창: 흰 바탕, 모서리 14, 버튼은 높이 38·모서리 8(공통 Btn 과 같은 모양).
+      dialogTheme: DialogThemeData(
+        backgroundColor: C.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: _buttonShape),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _buttonShape.copyWith(
+          foregroundColor: const WidgetStatePropertyAll(C.text),
+          side: const WidgetStatePropertyAll(BorderSide(color: C.borderStrong)),
+        ),
+      ),
     );
+
+final _buttonShape = ButtonStyle(
+  minimumSize: const WidgetStatePropertyAll(Size(0, 38)),
+  padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 16)),
+  shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+  textStyle: const WidgetStatePropertyAll(TextStyle(fontFamily: bodyFont, fontSize: 14, fontWeight: FontWeight.w600)),
+);

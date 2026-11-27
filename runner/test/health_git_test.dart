@@ -81,8 +81,8 @@ void main() {
 
   testWidgets('git tab behind', (tester) async {
     await _pump(tester, GitTab(projectId: _id, projects: projects, git: _Git(const GitStatus(branch: 'dev', changed: 2, upstream: 'origin/dev', behind: 3))));
-    expect(find.text('3커밋 뒤처져 있어요'), findsOneWidget);
-    expect(find.text('커밋 안 한 변경 2개'), findsOneWidget);
+    expect(find.textContaining('3커밋 뒤처져 있어요', findRichText: true), findsOneWidget);
+    expect(find.textContaining('커밋 안 한 변경 2개', findRichText: true), findsOneWidget);
     expect(find.text('dev'), findsOneWidget);
   });
 

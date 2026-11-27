@@ -264,8 +264,11 @@ class Tag extends StatelessWidget {
 
 /// 흰 카드. [title]이 있으면 위에 제목.
 class Panel extends StatelessWidget {
-  const Panel({super.key, this.title, this.titleAction, this.subtitle, this.actions = const [], required this.child, this.padding = const EdgeInsets.all(20)});
+  const Panel({super.key, this.title, this.titleAction, this.subtitle, this.actions = const [], required this.child, this.padding = const EdgeInsets.all(20), this.danger = false});
   final String? title;
+
+  /// 실패 안내(목업 v2): 빨간 테두리, 경고 아이콘과 빨간 제목, 제목 아래 구분선.
+  final bool danger;
 
   /// 제목 바로 옆(예: 상태 칩).
   final Widget? titleAction;
@@ -281,13 +284,15 @@ class Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(color: C.surface, border: Border.all(color: C.border), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: C.surface, border: Border.all(color: danger ? const Color(0xFFF2B8B5) : C.border), borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (title != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+            Container(
+              padding: danger ? const EdgeInsets.fromLTRB(20, 14, 20, 14) : const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              decoration: danger ? const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF6D5D2)))) : null,
               child: Row(spacing: 10, children: [
-                Text(title!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                if (danger) Icon(Icons.warning_amber_rounded, size: 18, color: C.bad.$2),
+                Text(title!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: danger ? C.bad.$2 : null)),
                 ?titleAction,
                 Expanded(child: subtitle == null ? const SizedBox() : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: C.text2))),
                 ...actions,

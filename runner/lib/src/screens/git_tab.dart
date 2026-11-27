@@ -40,21 +40,34 @@ class _GitTabState extends State<GitTab> {
     if (!_loaded) return const LinearProgressIndicator();
     final s = _status;
     if (s == null) return const Text('이 폴더는 Git 저장소가 아니에요', style: TextStyle(color: C.muted));
+    const strong = TextStyle(fontWeight: FontWeight.w700, color: C.text);
+    final compare = s.upstream == null
+        ? const TextSpan(text: '비교할 원격 브랜치가 없어요.')
+        : s.behind > 0
+            ? TextSpan(children: [TextSpan(text: '원격(${s.upstream})보다 '), TextSpan(text: '${s.behind}커밋 뒤처져 있어요', style: strong)])
+            : TextSpan(text: '원격(${s.upstream})과 같아요 · 최신이에요');
     return Panel(
       title: '원격과 비교',
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
-        Row(spacing: 6, children: [
-          const Icon(Icons.call_split, size: 16, color: C.text2, semanticLabel: 'Git 브랜치'),
-          Text(s.branch ?? '브랜치 없음', style: mono.copyWith(fontSize: 14, fontWeight: FontWeight.w600)),
-          if (s.upstream != null) Text('· 원격 ${s.upstream}', style: const TextStyle(fontSize: 13, color: C.muted)),
-        ]),
-        if (s.upstream == null)
-          const Text('비교할 원격 브랜치가 없어요.', style: TextStyle(fontSize: 14))
-        else if (s.behind > 0)
-          Text('${s.behind}커밋 뒤처져 있어요', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.warn.$2))
-        else
-          const Text('최신이에요', style: TextStyle(fontSize: 14)),
-        if (s.changed > 0) Text('커밋 안 한 변경 ${s.changed}개', style: const TextStyle(fontSize: 14, color: C.text2)),
+      titleAction: Tag(s.branch ?? '브랜치 없음'),
+      padding: EdgeInsets.zero,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+          child: Text.rich(compare, style: const TextStyle(fontSize: 14, color: C.text2)),
+        ),
+        if (s.changed > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.divider))),
+            child: Text.rich(
+              TextSpan(children: [
+                const TextSpan(text: '커밋 안 한 변경 '),
+                TextSpan(text: '${s.changed}개', style: strong),
+                const TextSpan(text: ' · 최신 코드를 받아도 내 변경은 그대로 둬요.'),
+              ]),
+              style: const TextStyle(fontSize: 13.5, color: C.text2),
+            ),
+          ),
       ]),
     );
   }

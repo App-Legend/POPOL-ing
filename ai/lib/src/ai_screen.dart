@@ -124,27 +124,27 @@ class _AiScreenState extends State<AiScreen> {
     return AppPage(
       crumbs: const [('AI 검사', null)],
       children: [
-        const Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
-          Text('AI 검사', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
-          Text('[원인 분석]·[AI 요약]으로 받은 답이 남아요.', style: TextStyle(fontSize: 14, color: C.text2)),
-        ]),
-        Panel(
-          child: Wrap(spacing: 12, runSpacing: 10, alignment: WrapAlignment.spaceBetween, crossAxisAlignment: WrapCrossAlignment.center, children: [
-            Wrap(spacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 16, children: [
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
+              Text('AI 검사', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700)),
+              Text('[원인 분석]·[AI 요약]으로 받은 답이 남아요.', style: TextStyle(fontSize: 14, color: C.text2)),
+            ]),
+          ),
+          // 목업 v2: 키 상태는 머리 오른쪽에 한 줄로.
+          Flexible(
+            child: Wrap(spacing: 10, runSpacing: 8, alignment: WrapAlignment.end, crossAxisAlignment: WrapCrossAlignment.center, children: [
               StatusChip(label, tone),
               if (description.isNotEmpty)
                 Text(description, style: hasKey ? mono.copyWith(fontSize: 13, color: C.text2) : const TextStyle(fontSize: 13, color: C.text2)),
+              Btn(hasKey ? '키 바꾸기' : '키 입력', small: true, primary: !hasKey, onPressed: _status == _KeyStatus.loading ? null : _openDialog),
             ]),
-            Btn(hasKey ? '키 바꾸기' : '키 입력', primary: !hasKey, onPressed: _status == _KeyStatus.loading ? null : _openDialog),
-          ]),
-        ),
-        Notice(
-          bg: C.remote.$1,
-          border: const Color(0xFFB9C8F5),
-          icon: Icons.send_outlined,
-          iconColor: C.remote.$2,
-          child: const Text('[보내기]를 누른 뒤에만 Google로 보내요. .env 값과 API 키는 보내지 않아요.', style: body),
-        ),
+          ),
+        ]),
+        const Row(spacing: 8, children: [
+          Icon(Icons.lock_outline, size: 16, color: C.muted),
+          Expanded(child: Text('[보내기]를 누른 뒤에만 Google로 보내요. .env 값과 API 키는 보내지 않아요.', style: TextStyle(fontSize: 13, color: C.text2))),
+        ]),
         if (_status == _KeyStatus.missing || _status == _KeyStatus.unreadable)
           Notice(
             bg: C.headBg,
@@ -186,22 +186,23 @@ class _AiScreenState extends State<AiScreen> {
           onTap: () => setState(() => _open = open ? null : i),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(spacing: 12, children: [
-              SizedBox(width: 72, child: Text(r.kind == AnalysisKind.failure ? '원인 분석' : 'AI 요약', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+            child: Row(spacing: 14, children: [
+              SizedBox(width: 84, child: Align(alignment: Alignment.centerLeft, child: Tag(r.kind == AnalysisKind.failure ? '원인 분석' : 'AI 요약'))),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 2, children: [
-                  Text(where, style: const TextStyle(fontSize: 12, color: C.muted)),
-                  Text(r.title, maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: const TextStyle(fontSize: 14)),
+                  Text(where, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(r.title, maxLines: open ? null : 1, overflow: open ? null : TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: C.text2)),
                 ]),
               ),
-              Text(_time(r.at), style: const TextStyle(fontSize: 12, color: C.muted)),
+              SizedBox(width: 90, child: Text(_time(r.at), style: const TextStyle(fontSize: 13, color: C.text2))),
               received ? const StatusChip('받음', C.ok) : const StatusChip('보내지 못함', C.bad),
+              Icon(open ? Icons.expand_more : Icons.chevron_right, size: 18, color: C.muted),
             ]),
           ),
         ),
         if (open)
           Padding(
-            padding: const EdgeInsets.fromLTRB(104, 0, 20, 16),
+            padding: const EdgeInsets.fromLTRB(118, 0, 20, 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
               if (r.body != null) Text(r.body!, style: const TextStyle(fontSize: 14, height: 1.6)),
               Text('보낸 것: ${r.sentSummary}${r.model == null ? '' : ' · ${r.model}'}', style: const TextStyle(fontSize: 12, color: C.muted)),

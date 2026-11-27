@@ -305,7 +305,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
         Row(spacing: 10, children: [
           Expanded(child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-          Flexible(child: chip),
+          chip,
           SizedBox(
             width: 26,
             height: 26,

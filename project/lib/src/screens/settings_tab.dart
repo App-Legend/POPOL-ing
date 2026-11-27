@@ -67,8 +67,13 @@ class _SettingsTabState extends State<SettingsTab> {
       else
         Panel(
           title: '실행 항목 · ${config.services.length}',
-          padding: const EdgeInsets.only(top: 12, bottom: 8),
+          padding: const EdgeInsets.only(top: 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(
+              color: C.headBg,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+              child: _cells(const Text('이름'), const Text('종류'), const Text('명령'), const Text('포트'), const Text('시작 순서'), header: true),
+            ),
             for (final (i, s) in config.services.indexed) _serviceRow(i, s),
           ]),
         ),
@@ -105,23 +110,26 @@ class _SettingsTabState extends State<SettingsTab> {
     return Container(
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.divider))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        InkWell(
-          onTap: () => setState(() => _open = open ? null : s.id),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(spacing: 12, children: [
-              SizedBox(width: 110, child: Text(s.id, style: const TextStyle(fontWeight: FontWeight.w600))),
-              SizedBox(width: 80, child: Text(kind, style: const TextStyle(color: C.text2))),
-              Expanded(child: Text(command, style: mono.copyWith(fontSize: 13), overflow: TextOverflow.ellipsis)),
-              SizedBox(width: 70, child: Text(port, style: mono.copyWith(fontSize: 13))),
-              SizedBox(width: 130, child: Text(order, style: const TextStyle(fontSize: 13, color: C.text2))),
-              Icon(open ? Icons.expand_less : Icons.expand_more, size: 18, color: C.muted),
-            ]),
+        Material(
+          color: open ? C.primarySoft : Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _open = open ? null : s.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: _cells(
+                Text(s.id, style: const TextStyle(fontWeight: FontWeight.w600)),
+                s is RemoteService ? const StatusChip('원격', C.remote) : Tag(kind),
+                Text(command, style: mono.copyWith(fontSize: 13), overflow: TextOverflow.ellipsis),
+                Text(port, style: mono.copyWith(fontSize: 13)),
+                Text(order, style: const TextStyle(fontSize: 13, color: C.text2)),
+                open: open,
+              ),
+            ),
           ),
         ),
         if (open)
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            padding: const EdgeInsets.fromLTRB(52, 12, 20, 16),
             child: KeyValues([
               if (s case ProcessService(:final cwd, :final envFile, :final stopTimeout)) ...[
                 ('실행할 폴더', Text(cwd, style: mono)),
@@ -135,6 +143,19 @@ class _SettingsTabState extends State<SettingsTab> {
       ]),
     );
   }
+
+  /// 실행 항목 표의 한 줄(머리줄과 내용 줄이 같은 칸 폭을 쓴다).
+  Widget _cells(Widget name, Widget kind, Widget command, Widget port, Widget order, {bool header = false, bool open = false}) => DefaultTextStyle.merge(
+        style: header ? const TextStyle(fontSize: 12.5, color: C.muted, fontWeight: FontWeight.w500) : null,
+        child: Row(spacing: 12, children: [
+          SizedBox(width: 20, child: header ? null : Icon(open ? Icons.expand_more : Icons.chevron_right, size: 18, color: C.muted)),
+          SizedBox(width: 100, child: name),
+          SizedBox(width: 100, child: Align(alignment: Alignment.centerLeft, child: kind)),
+          Expanded(child: command),
+          SizedBox(width: 70, child: port),
+          SizedBox(width: 130, child: order),
+        ]),
+      );
 
   static String _readyTarget(ReadyCondition r) => switch (r) {
         HttpReady(:final url) => url,

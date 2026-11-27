@@ -24,6 +24,7 @@ ProjectPanels projectPanels(AppRegistry app) {
   return ProjectPanels(
     failure: (_, item, run) => Panel(
       title: '${item.item.serviceId}이 실패한 이유',
+      danger: true,
       child: ai.FailureAnalysisPanel(
         item: item,
         run: run,

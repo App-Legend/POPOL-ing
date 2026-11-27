@@ -36,6 +36,12 @@ void main() {
     expect(find.text('my-team-project'), findsNothing);
   });
 
+  testWidgets('rows show mascot by state', (tester) async {
+    await pump(tester);
+    final poses = tester.widgetList<Mascot>(find.byType(Mascot)).map((m) => m.pose).toList();
+    expect(poses, unorderedEquals([MascotPose.fallen, MascotPose.sleeping]));
+  });
+
   testWidgets('heading shown with rows', (tester) async {
     await pump(tester);
     expect(find.text('지금 상태'), findsOneWidget);
