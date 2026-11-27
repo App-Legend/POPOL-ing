@@ -40,10 +40,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _load() async {
-    final projects = await widget.projectRepository.listProjects();
-    final project = widget.projectId != null
-        ? await widget.projectRepository.getProject(widget.projectId!)
-        : projects.isNotEmpty ? projects.first : null;
+    Project? project;
+    try {
+      final projects = await widget.projectRepository.listProjects();
+      project = widget.projectId != null
+          ? await widget.projectRepository.getProject(widget.projectId!)
+          : projects.isNotEmpty ? projects.first : null;
+    } on PopolingException {
+      project = null; // 목록에서 빠졌거나 목록 파일을 못 읽으면 "찾을 수 없어요"를 보여 준다
+    }
 
     if (!mounted) return;
     setState(() {
@@ -71,6 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await widget.projectRepository.updateProject(updated);
+    } on PopolingException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return;
     } on FileSystemException {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

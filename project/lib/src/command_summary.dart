@@ -35,9 +35,12 @@ String _processOneLine(ProcessService s) {
 }
 
 /// 인자 하나를 사람이 읽을 수 있게 따옴표로 감싼다.
+/// 줄바꿈·탭은 `\n`·`\t` 글자로 보여 준다. 남이 만든 설정에서 인자 속 줄바꿈이 다른 명령 줄처럼 보이지 않게.
 String _quoteArgument(String arg) {
-  if (arg.contains(RegExp(r'[ "&;<>|()]')) || arg.contains(RegExp(r'[\\]'))) {
-    return '"${arg.replaceAll('"', '\\"')}"';
+  if (arg.isEmpty) return '""';
+  if (arg.contains(RegExp(r'[ "&;<>|()\\\n\r\t]'))) {
+    final shown = arg.replaceAll('"', r'\"').replaceAll('\n', r'\n').replaceAll('\r', r'\r').replaceAll('\t', r'\t');
+    return '"$shown"';
   }
   return arg;
 }

@@ -29,5 +29,9 @@ void main() {
       final s = RemoteService(id: 'storage', ready: const NoneReady());
       expect(summarizeCommands([s]), 'storage: 원격 연결 확인');
     });
+    test('줄바꿈·탭은 글자로 보여 주고 빈 인자는 ""로 보여 다른 명령 줄처럼 보이지 않는다', () {
+      final s = ProcessService(id: 'x', command: const ['node', '-e', 'a()\nrm -rf ~', '', 'b\tc']);
+      expect(summarizeCommands([s]), r'x: node -e "a()\nrm -rf ~" "" "b\tc"');
+    });
   });
 }
