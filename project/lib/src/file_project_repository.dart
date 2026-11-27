@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:popoling_core/contracts.dart';
 import 'package:yaml/yaml.dart';
+import 'package:yaml_edit/yaml_edit.dart';
 
 /// [ProjectRepository] 의 진짜 구현.
 ///
@@ -71,13 +72,78 @@ class FileProjectRepository implements ProjectRepository {
   Future<Project> updateProject(Project project) async {
     final projects = await _projects();
     final i = _indexOf(projects, project.id);
-    // shortcut: 설정은 메모리에만 바꾸고 popoling.yaml 에는 아직 쓰지 않는다. core 1.0 의 toMap() 이 dev 에 들어오면 yaml_edit 로 저장한다.
-    final updated = projects[i].copyWith(name: project.name, config: project.config);
+    final before = projects[i];
+    if (project.config != null && before.configIssues.isNotEmpty) {
+      // 읽지 못한 설정 위에 새 설정을 쓰면 services 등 원래 내용이 지워진다. 파일을 먼저 고치게 한다.
+      throw PopolingException('popoling.yaml 에 문제가 있어 저장하지 않았어요. 파일을 먼저 고쳐 주세요.');
+    }
+    final updated = before.copyWith(name: project.name, config: project.config);
+
+    // 설정 파일을 먼저 저장하고, 성공하면 목록 파일을 바꾼다. 설정 저장이 실패하면 목록은 바꾸지 않는다.
+    await _saveConfig(before.config, updated);
     final next = [...projects]..[i] = updated;
     await _save(next);
     projects[i] = updated;
     _notify(projects);
     return updated;
+  }
+
+  /// 수정한 설정을 그 폴더의 popoling.yaml 에 저장한다. 설정이 없으면 쓰지 않는다.
+  /// 원자적 저장: 임시 파일에 다 쓴 뒤 바꿔 끼워, 쓰다가 멈춰도 원본을 잃지 않는다.
+  /// 기존 파일이 있으면 [before] 와 달라진 값만 고쳐 주석·형식·모르는 값을 그대로 둔다.
+  Future<void> _saveConfig(ProjectConfig? before, Project project) async {
+    final config = project.config;
+    if (config == null) return;
+    final file = File('${project.folderPath}${Platform.pathSeparator}$configFileName');
+    await file.parent.create(recursive: true);
+
+    final exists = await file.exists();
+    final doc = YamlEditor(exists ? await file.readAsString() : '');
+    if (exists && before != null) {
+      _applyChanges(doc, const [], before.toMap(), config.toMap());
+    } else {
+      doc.update(const [], config.toMap()); // 새 파일은 빈 문서에서 시작해 여러 줄 YAML 이 된다
+    }
+    final content = doc.toString();
+
+    final temp = File('${file.path}.tmp');
+    try {
+      await temp.writeAsString(content, flush: true);
+      await temp.rename(file.path);
+    } on FileSystemException {
+      if (await temp.exists()) await temp.delete(); // 지우다 실패해 원래 오류를 가리지 않게
+      rethrow;
+    }
+  }
+
+  /// [before] 와 [after] 가 다른 곳만 [doc] 에 고친다. 맵은 키마다 내려가고, 목록·값은 통째로 바꾼다.
+  static void _applyChanges(YamlEditor doc, List<Object> path, Object? before, Object? after) {
+    if (before is Map && after is Map) {
+      for (final key in {...before.keys, ...after.keys}) {
+        final at = [...path, key as Object];
+        final inFile = _hasKey(doc, path, key);
+        if (!after.containsKey(key)) {
+          if (inFile) doc.remove(at);
+        } else if (!inFile) {
+          doc.update(at, after[key]);
+        } else {
+          _applyChanges(doc, at, before[key], after[key]);
+        }
+      }
+    } else if (!_same(before, after)) {
+      doc.update(path, after);
+    }
+  }
+
+  static bool _hasKey(YamlEditor doc, List<Object> path, Object key) {
+    final parent = doc.parseAt(path, orElse: () => wrapAsYamlNode(null));
+    return parent is YamlMap && parent.containsKey(key);
+  }
+
+  static bool _same(Object? a, Object? b) {
+    if (a is Map && b is Map) return a.length == b.length && a.keys.every((k) => b.containsKey(k) && _same(a[k], b[k]));
+    if (a is List && b is List) return a.length == b.length && [for (var i = 0; i < a.length; i++) i].every((i) => _same(a[i], b[i]));
+    return a == b;
   }
 
   @override

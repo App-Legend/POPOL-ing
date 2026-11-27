@@ -22,10 +22,19 @@ void main() {
     expect(find.text('동아리 행사 예약 웹서비스 (2025 캡스톤)'), findsOneWidget);
   });
 
-  testWidgets('read only', (tester) async {
+  testWidgets('실행 항목은 아직 고칠 수 없다', (tester) async {
     await pump(tester, 'my-team-project');
-    expect(find.text('저장'), findsNothing);
     expect(find.text('항목 추가'), findsNothing);
+  });
+
+  testWidgets('메모를 고치고 [메모 저장]을 누르면 저장소에 저장된다', (tester) async {
+    final repo = FakeProjectRepository.withSamples();
+    await pump(tester, 'my-team-project', repo: repo);
+    await tester.enterText(find.byKey(const ValueKey('settings-memo')), '새 메모');
+    await tester.tap(find.text('메모 저장'));
+    await tester.pumpAndSettle();
+    expect((await repo.getProject('my-team-project')).about.memo, '새 메모');
+    expect((await repo.getProject('my-team-project')).about.summary, '동아리 행사 예약 웹서비스 (2025 캡스톤)', reason: '다른 소개 값은 그대로');
   });
 
   testWidgets('env file name only', (tester) async {
@@ -58,5 +67,6 @@ void main() {
     await pump(tester, 'bad', repo: repo);
     expect(find.text('설정 파일에 고칠 곳이 1개 있어요'), findsOneWidget);
     expect(find.textContaining('서로를 먼저 시작하라고'), findsOneWidget);
+    expect(find.text('메모 저장'), findsNothing, reason: '읽지 못한 설정 위에 저장하면 원래 내용이 지워진다');
   });
 }

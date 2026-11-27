@@ -11,7 +11,9 @@ import 'src/file_project_repository.dart';
 import 'src/schema_config_validator.dart';
 import 'src/screens/settings_tab.dart';
 
-/// 프로젝트·설정의 화면(프로젝트 화면 설정 탭, 읽기 전용)과 구현을 앱에 등록한다.
+export 'src/command_summary.dart';
+
+/// 프로젝트·설정의 화면(프로젝트 화면 설정 탭)과 구현을 앱에 등록한다.
 void register(AppRegistry app) {
   app.provide<ProjectRepository>(FileProjectRepository(() async {
     final dir = await getApplicationSupportDirectory();

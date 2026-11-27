@@ -1,10 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import '../file_project_repository.dart';
 
-/// 프로젝트 화면 설정 탭(목업 v2 6번). 지금은 읽기 전용: 편집·저장은 PR #76 이 합쳐진 뒤 B 가 연결한다.
+/// 프로젝트 화면 설정 탭(목업 v2 6번). 지금은 메모만 고칠 수 있다. 나머지 편집은 #92.
 ///
 /// `.env` 파일은 이름만 보여 주고 내용은 읽지 않는다.
 class SettingsTab extends StatefulWidget {
@@ -21,15 +23,51 @@ class _SettingsTabState extends State<SettingsTab> {
   Project? _project;
   String? _error;
   String? _open;
+  final _memo = TextEditingController();
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     widget.projects.getProject(widget.projectId).then((p) {
-      if (mounted) setState(() => _project = p);
+      if (mounted) setState(() => _show(p));
     }, onError: (Object e) {
       if (mounted) setState(() => _error = e is PopolingException ? e.message : '설정을 읽지 못했어요.');
     });
+  }
+
+  @override
+  void dispose() {
+    _memo.dispose();
+    super.dispose();
+  }
+
+  void _show(Project p) {
+    _project = p;
+    _memo.text = p.about.memo ?? '';
+  }
+
+  Future<void> _saveMemo() async {
+    final p = _project!;
+    final text = _memo.text.trim();
+    final memo = text.isEmpty ? null : text;
+    final a = p.about;
+    final about = About(summary: a.summary, stack: a.stack, links: a.links, memo: memo);
+    final config = p.config?.copyWith(about: about) ?? ProjectConfig(about: about);
+    setState(() => _saving = true);
+    String message;
+    try {
+      final saved = await widget.projects.updateProject(p.copyWith(config: config));
+      if (mounted) setState(() => _show(saved));
+      message = '메모를 저장했어요.';
+    } on PopolingException catch (e) {
+      message = e.message;
+    } on FileSystemException {
+      message = '저장하지 못했어요. 다른 프로그램이 popoling.yaml 을 열고 있는지 확인해 주세요.';
+    }
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -58,7 +96,23 @@ class _SettingsTabState extends State<SettingsTab> {
           ('한 줄 설명', Text(orNone(about.summary))),
           ('기술', Text(about.stack.isEmpty ? '아직 없어요' : about.stack.join(', '))),
           ('저장소', Text(orNone(about.links['repo']))),
-          ('메모', Text(orNone(about.memo))),
+          (
+            '메모',
+            // 읽지 못한 설정 위에 저장하면 원래 내용이 지워지므로, 문제가 있으면 보기만 한다.
+            p.configIssues.isNotEmpty
+                ? Text(orNone(about.memo))
+                : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
+                    TextField(
+                      key: const ValueKey('settings-memo'),
+                      controller: _memo,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), hintText: '이 프로젝트에 대해 남길 메모'),
+                    ),
+                    Btn('메모 저장', small: true, onPressed: _saving ? null : _saveMemo),
+                  ]),
+          ),
           ('설정 파일', Text('${p.folderPath}/${FileProjectRepository.configFileName}', style: mono.copyWith(fontSize: 13))),
         ]),
       ),
