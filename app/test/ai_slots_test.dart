@@ -56,6 +56,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(theme: buildTheme(), home: Scaffold(body: Builder(builder: (c) => failure(c, item, run)))));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(Btn, '원인 분석'), findsOneWidget);
+    expect(find.text(item.reason!), findsOneWidget, reason: 'API 키가 없어도 실행기가 준 실패 원인은 먼저 보여야 한다');
     expect(llm.sent, isEmpty);
   });
 }
