@@ -64,6 +64,8 @@ class _SettingsTabState extends State<SettingsTab> {
       message = e.message;
     } on FileSystemException {
       message = '저장하지 못했어요. 다른 프로그램이 popoling.yaml 을 열고 있는지 확인해 주세요.';
+    } catch (e) {
+      message = '메모를 저장하지 못했어요: $e'; // 어떤 오류든 [메모 저장] 버튼이 막힌 채 남지 않게
     }
     if (!mounted) return;
     setState(() => _saving = false);

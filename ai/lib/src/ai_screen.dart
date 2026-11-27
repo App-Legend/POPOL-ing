@@ -42,7 +42,8 @@ class _AiScreenState extends State<AiScreen> {
 
   List<AnalysisRecord>? _records;
   var _corrupt = false;
-  int? _open;
+  /// 펼친 기록의 시각. 새 기록이 앞에 붙어도 같은 기록이 펼쳐져 있게 순서 대신 시각으로 기억한다.
+  DateTime? _open;
   StreamSubscription<void>? _changes;
 
   @override
@@ -170,20 +171,20 @@ class _AiScreenState extends State<AiScreen> {
       title: '최근 · ${records.length}',
       padding: const EdgeInsets.only(top: 12, bottom: 8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        for (final (i, r) in records.indexed) _recordRow(i, r),
+        for (final r in records) _recordRow(r),
       ]),
     );
   }
 
-  Widget _recordRow(int i, AnalysisRecord r) {
-    final open = _open == i;
+  Widget _recordRow(AnalysisRecord r) {
+    final open = _open == r.at;
     final received = r.outcome == AnalysisOutcome.received;
     final where = r.serviceId == null ? r.projectId : '${r.projectId} · ${r.serviceId}';
     return Container(
       decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.divider))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         InkWell(
-          onTap: () => setState(() => _open = open ? null : i),
+          onTap: () => setState(() => _open = open ? null : r.at),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             child: Row(spacing: 14, children: [

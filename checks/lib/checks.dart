@@ -34,8 +34,13 @@ void register(AppRegistry app) {
   );
   app.provide<EnvDiff>(envDiff);
   // 등록이 다 끝난 뒤 진짜 Orchestrator 의 성공 이벤트를 받는다(register 안에서 read 하면 가짜일 수 있다).
-  scheduleMicrotask(() => envDiff.listenTo(app.read<Orchestrator>().events));
+  // 데모 모드처럼 EnvDiff 가 가짜로 바뀌었으면 실제 환경 기록 파일을 쓰지 않게 듣지 않는다.
+  scheduleMicrotask(() {
+    if (identical(app.read<EnvDiff>(), envDiff)) envDiff.listenTo(app.read<Orchestrator>().events);
+  });
 
+  // 환경 점검 탭이 다시 점검한 문제 수를 탭 배지에 넘긴다.
+  final problems = StreamController<(String, int)>.broadcast();
   app.tab(ProjectTab(
     id: 'env',
     label: '환경 점검',
@@ -48,6 +53,7 @@ void register(AppRegistry app) {
       runtime: app.read<RuntimeQuery>(),
       runner: app.read<Orchestrator>(),
       diff: app.read<EnvDiff>(),
+      onProblems: (n) => problems.add((projectId, n)),
     ),
     badge: (projectId) => envProblemCount(
       projectId: projectId,
@@ -56,6 +62,7 @@ void register(AppRegistry app) {
       ports: app.read<PortProbe>(),
       runtime: app.read<RuntimeQuery>(),
       diff: app.read<EnvDiff>(),
+      updates: problems.stream.where((e) => e.$1 == projectId).map((e) => e.$2),
     ),
   ));
 }

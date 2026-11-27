@@ -37,5 +37,5 @@ void register(AppRegistry app) {
   app.provide<LlmClient>(gemini);
   app.provide<AnalysisHistory>(history);
   // 키는 늘 Gemini 키라, 나중에 LlmClient 를 바꿔 끼워도 [연결 확인]은 Gemini 로 한다.
-  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey, history: history));
+  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey, history: app.read<AnalysisHistory>()));
 }

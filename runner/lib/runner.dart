@@ -40,7 +40,11 @@ void register(AppRegistry app) {
     git: git,
   );
   app.provide<Orchestrator>(orchestrator);
-  unawaited(orchestrator.recover()); // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다
+  // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다.
+  // 데모 모드처럼 Orchestrator 가 가짜로 바뀌었으면 실제 runtime.json 을 건드리지 않는다.
+  scheduleMicrotask(() {
+    if (identical(app.read<Orchestrator>(), orchestrator)) unawaited(orchestrator.recover());
+  });
   app.provide<RuntimeQuery>(RunnerRuntimeQuery(
     processes: () => orchestrator.liveProcesses,
     launcher: () => app.read<ItemLauncher>(),

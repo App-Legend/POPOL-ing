@@ -17,6 +17,7 @@ class EnvTab extends StatefulWidget {
     required this.runtime,
     required this.runner,
     this.diff,
+    this.onProblems,
   });
 
   final String projectId;
@@ -28,6 +29,9 @@ class EnvTab extends StatefulWidget {
 
   /// 아직 앱에 없으면 null. 그때는 비교 칸에 기록이 없다고 보인다.
   final EnvDiff? diff;
+
+  /// 다시 점검할 때마다 문제 수를 알린다. 탭 배지가 처음 숫자에 멈춰 있지 않게.
+  final void Function(int problems)? onProblems;
 
   @override
   State<EnvTab> createState() => _EnvTabState();
@@ -91,6 +95,8 @@ class _EnvTabState extends State<EnvTab> {
       _loadError = null;
       _loading = false;
     });
+    // 배지(envProblemCount)와 같은 기준: 맞지 않는 도구 + 다른 곳이 쓰는 포트 + 달라진 것.
+    widget.onProblems?.call((tools?.where((t) => t.status != EnvStatus.passed).length ?? 0) + ports.where(_foreign).length + (changes?.length ?? 0));
   }
 
   Future<void> _stop(ItemRef owner) async {
@@ -98,11 +104,18 @@ class _EnvTabState extends State<EnvTab> {
     if (!mounted) return;
     setState(() => _stopping.add(owner));
     try {
-      await widget.runner.stop(owner);
+      final r = await widget.runner.stop(owner);
+      if (r.outcome != ItemOutcome.ok) _say(r.reason ?? '$owner 항목을 멈추지 못했어요.');
       await _load();
+    } catch (e) {
+      _say(e is PopolingException ? e.message : '$owner 항목을 멈추지 못했어요: $e');
     } finally {
       if (mounted) setState(() => _stopping.remove(owner));
     }
+  }
+
+  void _say(String message) {
+    if (mounted) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -264,6 +277,7 @@ Stream<int> envProblemCount({
   required PortProbe ports,
   required RuntimeQuery runtime,
   EnvDiff? diff,
+  Stream<int> updates = const Stream.empty(),
 }) async* {
   final config = (await projects.getProject(projectId)).config;
   var n = 0;
@@ -275,4 +289,5 @@ Stream<int> envProblemCount({
     n += (await diff?.sinceLastSuccess(projectId))?.length ?? 0;
   } catch (_) {}
   yield n;
+  yield* updates; // 환경 점검 탭이 다시 점검한 숫자
 }

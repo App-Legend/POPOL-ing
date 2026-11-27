@@ -53,7 +53,10 @@ class _ItemLogViewState extends State<ItemLogView> {
     switch (widget.service) {
       case ProcessService():
         _readProcessLog();
-        _poll = Timer.periodic(const Duration(seconds: 1), (_) => _readProcessLog());
+        // 다른 화면에 가려져 있으면 읽지 않는다. 화면이 여러 개 쌓여도 매초 큰 파일을 겹쳐 읽지 않게.
+        _poll = Timer.periodic(const Duration(seconds: 1), (_) {
+          if (mounted && ModalRoute.of(context)?.isCurrent != false) _readProcessLog();
+        });
       case final ComposeService s:
         _followCompose(s);
       case RemoteService():
@@ -71,7 +74,12 @@ class _ItemLogViewState extends State<ItemLogView> {
   }
 
   Future<void> _readProcessLog() async {
-    final raw = await widget.logs.tail(_item, lines: _maxLines);
+    final List<String> raw;
+    try {
+      raw = await widget.logs.tail(_item, lines: _maxLines);
+    } catch (_) {
+      return; // 읽지 못하면(권한·잠금) 이번 차례는 건너뛰고 다음 1초에 다시 읽는다
+    }
     if (!mounted) return;
     final lines = [for (final l in raw) parseLogLine(l)];
     if (lines.length == _lines.length && (lines.isEmpty || lines.last == _lines.last)) return;

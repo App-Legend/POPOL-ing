@@ -213,7 +213,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       try {
         if (await widget.ports.whoUses(port) case final PortInUse usage) {
           if (await widget.runtime.ownerOf(usage) case final owner?) {
-            if (mounted) setState(() => _owners[item] = (port, owner));
+            // 찾는 사이 다시 시작했으면 옛 알림을 남기지 않는다
+            if (mounted && widget.runner.stateOf(item) == ItemState.portBusy) setState(() => _owners[item] = (port, owner));
             return;
           }
         }
@@ -234,8 +235,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _git != null &&
         (p.config?.git.pullBeforeRun ?? false) &&
         !_services.any((s) => isUp(widget.runner.stateOf(_ref(s))));
-    final states = [for (final s in _services) widget.runner.stateOf(_ref(s))];
-    final anyUp = states.any(isUp) || states.contains(ItemState.connected);
+    final raw = [for (final s in _services) widget.runner.stateOf(_ref(s))];
+    final anyUp = raw.any(isUp);
+    // [전체 종료]는 원격 항목을 멈추지 않아 연결됨으로 남는다. 띄운 항목이 없으면 연결됨은 실행 중으로 세지 않는다(catalog 와 같은 기준).
+    final states = anyUp ? raw : [for (final s in raw) s == ItemState.connected ? ItemState.stopped : s];
     final alerts = _alerts(p, waitingPull);
     return AppPage(
       crumbs: const [],
@@ -362,8 +365,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final n = states.length;
     final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
     final failed = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.failed || states[i] == ItemState.portBusy) s.id];
-    // 목업 v2 문구. 항목 이름 뒤 조사는 영문 이름이 많아 '항목을'로 받는다.
-    if (failed.isNotEmpty) return '일부만 실행 중이에요 · $n개 중 $k개 준비 완료, ${failed.join(', ')} 항목을 시작하지 못했어요';
+    final lost = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.disconnected) s.id];
+    // 목업 v2 문구. 항목 이름 뒤 조사는 영문 이름이 많아 '항목을'로 받는다. 상태 칩처럼 끊긴 원격 항목도 실패로 본다.
+    if (failed.isNotEmpty || lost.isNotEmpty) {
+      final why = [
+        if (failed.isNotEmpty) '${failed.join(', ')} 항목을 시작하지 못했어요',
+        if (lost.isNotEmpty) '${lost.join(', ')} 항목 연결이 끊겼어요',
+      ];
+      return '일부만 실행 중이에요 · $n개 중 $k개 준비 완료, ${why.join(', ')}';
+    }
     if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return '시작하는 중 · $n개 중 $k개 준비 완료';
     if (k == n) return '실행 중 · $n개 항목이 모두 준비됐어요';
     if (k > 0) return '실행 중 · $n개 중 $k개 준비 완료';

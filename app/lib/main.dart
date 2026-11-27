@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:popoling_core/contracts.dart';
@@ -43,7 +44,7 @@ Registry buildRegistry({bool features = true, bool demo = _demo}) {
 }
 
 /// `flutter run --dart-define=POPOLING_DEMO=true`: 진짜 화면에 샘플 데이터를 넣어 본다(화면 확인·발표 연습용).
-/// 사용자 앱 데이터(등록 목록·실행 기록)는 읽지도 쓰지도 않는다.
+/// 사용자 앱 데이터(등록 목록·실행 기록·환경 기록·AI 기록)는 쓰지 않는다. 로그 탭은 실제 로그 폴더를 읽기만 한다.
 const _demo = bool.fromEnvironment('POPOLING_DEMO');
 
 void _registerDemo(AppRegistry app) {
@@ -63,7 +64,9 @@ void _registerDemo(AppRegistry app) {
     ..provide<PortProbe>(FakePortProbe())
     ..provide<RuntimeQuery>(FakeRuntimeQuery())
     ..provide<ItemLauncher>(FakeItemLauncher(projects))
-    ..provide<LogExcerpt>(FakeLogExcerpt(projects));
+    ..provide<LogExcerpt>(FakeLogExcerpt(projects))
+    // AI 기록은 임시 폴더에 둔다. 발표 연습 기록이 실제 기록에 섞이지 않게.
+    ..provide<ai.AnalysisHistory>(ai.AnalysisHistory(() async => File('${Directory.systemTemp.path}${Platform.pathSeparator}popoling-demo-ai-history.json')));
 }
 
 void _registerFakes(AppRegistry app) {
