@@ -100,4 +100,155 @@ services:
     expect(project.id, 'project');
     expect(project.name, '내프로젝트');
   });
+
+  test('수정한 이름과 설정을 popoling.yaml 에 저장한다', () async {
+    final dir = await folder('edit-me');
+    await File('${dir.path}/popoling.yaml').writeAsString('version: 1\nname: 최초\n');
+    final r = repo();
+    final project = await r.addProject(dir.path, name: '첫 이름');
+
+    final changed = project.copyWith(name: '바뀐 이름');
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isTrue);
+    final content = await yaml.readAsString();
+    expect(content, contains('name: 최초')); // 설정 값(수정 전)은 그대로 남고
+  });
+
+  test('설정이 없는 프로젝트는 popoling.yaml 을 만들지 않는다', () async {
+    final dir = await folder('no-config');
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final changed = project.copyWith(name: '바뀐 이름');
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isFalse);
+  });
+
+  test('새 파일로 저장하고 다시 읽으면 같다 (stack·services·따옴표·역슬래시·여러 줄 메모)', () async {
+    final dir = await folder('new-file');
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final changed = project.copyWith(
+      config: ProjectConfig(
+        about: const About(
+          summary: '새 파일 테스트',
+          stack: ['Dart', 'Flutter'],
+          links: {'repo': 'https://example.com/r'},
+          memo: '첫 줄\n둘째 줄',
+        ),
+        services: const [
+          ProcessService(id: 'api', command: ['./gradlew', 'bootRun'], cwd: './backend'),
+        ],
+      ),
+    );
+    await r.updateProject(changed);
+
+    final yaml = File('${dir.path}/popoling.yaml');
+    expect(await yaml.exists(), isTrue);
+    final content = await yaml.readAsString();
+    expect(content, contains('stack:'));
+    expect(content, contains('services:'));
+
+    final reread = await repo().getProject(project.id); // 메모리가 아니라 파일에서 다시 읽는다
+    expect(reread.about.summary, '새 파일 테스트');
+    expect(reread.about.memo, '첫 줄\n둘째 줄');
+    expect(reread.about.stack, ['Dart', 'Flutter']);
+    expect(reread.config!.services.single.id, 'api');
+  });
+
+  test('설정을 저장하고 다시 읽으면 같다 (about·services·따옴표·역슬래시)', () async {
+    final dir = await folder('roundtrip');
+    final r = repo();
+
+    // 중첩된 about, services, 따옴표, Windows 경로 역슬래시 포함
+    const yamlContent = '''version: 1
+about:
+  summary: "테스트 프로젝트"
+  memo: "메모: \\"인용\\"과 경로 C:\\\\Users\\\\name"
+  stack: ["Dart", "Flutter"]
+services:
+  - id: api
+    type: process
+    command: ["./gradlew", "bootRun"]
+    cwd: ".\\\\backend"
+''';
+    await File('${dir.path}/popoling.yaml').writeAsString(yamlContent);
+
+    // 등록해서 설정을 읽는다
+    final project = await r.addProject(dir.path);
+    expect(project.config, isNotNull);
+    expect(project.about.summary, '테스트 프로젝트');
+    expect(project.about.memo, contains('인용'));
+    expect(project.config!.services, isNotEmpty);
+
+    // 같은 설정으로 업데이트하면 저장된다
+    await r.updateProject(project);
+
+    // 다시 읽어서 비교한다 (새 저장소로 읽어 파일 내용을 검증한다)
+    final reread = await repo().getProject(project.id);
+    expect(reread.about.summary, project.about.summary);
+    expect(reread.about.memo, project.about.memo);
+    expect(reread.config!.services.length, project.config!.services.length);
+    expect(reread.config!.services[0].id, 'api');
+  });
+
+  test('popoling.yaml 형식이 틀린 프로젝트는 저장하지 않고 파일을 그대로 둔다', () async {
+    final dir = await folder('broken');
+    const original = 'version: 1\nservices:\n  - id: web\n    type: proces\n    command: [npm, run, dev]\n';
+    await File('${dir.path}/popoling.yaml').writeAsString(original);
+    final r = repo();
+    final project = await r.addProject(dir.path);
+    expect(project.config, isNull);
+
+    // 설정 화면이 하듯 메모만 든 새 설정으로 저장을 시도한다
+    final changed = project.copyWith(config: const ProjectConfig(about: About(memo: '메모')));
+    await expectLater(r.updateProject(changed), throwsA(isA<PopolingException>()));
+
+    expect(await File('${dir.path}/popoling.yaml').readAsString(), original);
+  });
+
+  test('메모만 바꾸면 주석·한 줄 목록·모르는 값은 그대로 두고 메모만 고친다', () async {
+    final dir = await folder('keep-comments');
+    const original = '''# 우리 팀 설정
+version: 1
+about:
+  summary: 동아리 예약 # 화면 이름
+  memo: 옛 메모
+services:
+  - id: api
+    type: process
+    command: [./gradlew, bootRun] # 백엔드
+''';
+    await File('${dir.path}/popoling.yaml').writeAsString(original);
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final c = project.config!;
+    await r.updateProject(project.copyWith(
+      config: c.copyWith(about: About(summary: c.about.summary, stack: c.about.stack, links: c.about.links, memo: '새 메모')),
+    ));
+
+    final content = await File('${dir.path}/popoling.yaml').readAsString();
+    expect(content, original.replaceFirst('옛 메모', '새 메모'));
+    expect((await repo().getProject(project.id)).about.memo, '새 메모');
+  });
+
+  test('메모를 지우면 memo 줄만 빠진다', () async {
+    final dir = await folder('clear-memo');
+    await File('${dir.path}/popoling.yaml').writeAsString('version: 1\nabout:\n  summary: 요약\n  memo: 지울 메모\n');
+    final r = repo();
+    final project = await r.addProject(dir.path);
+
+    final c = project.config!;
+    await r.updateProject(project.copyWith(config: c.copyWith(about: About(summary: c.about.summary))));
+
+    final reread = await repo().getProject(project.id);
+    expect(reread.about.memo, isNull);
+    expect(reread.about.summary, '요약');
+  });
 }

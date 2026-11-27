@@ -1,47 +1,151 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
+import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
-/// 6. 프로젝트 설정
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
+/// 6. 프로젝트 설정. [ProjectRepository] 에서 프로젝트 메모 등을 읽고 저장한다(FR-15).
+///
+/// [projectId] 가 주어지면 해당 프로젝트를 읽고, 없으면 첫 번째 프로젝트를 읽는다.
+class SettingsScreen extends StatefulWidget {
+  const SettingsScreen({
+    super.key,
+    required this.projectRepository,
+    this.projectId,
+  });
+
+  final ProjectRepository projectRepository;
+  final String? projectId;
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final _memoController = TextEditingController();
+  bool _loading = true;
+  Project? _project;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _memoController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    Project? project;
+    try {
+      final projects = await widget.projectRepository.listProjects();
+      project = widget.projectId != null
+          ? await widget.projectRepository.getProject(widget.projectId!)
+          : projects.isNotEmpty ? projects.first : null;
+    } on PopolingException {
+      project = null; // 목록에서 빠졌거나 목록 파일을 못 읽으면 "찾을 수 없어요"를 보여 준다
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _project = project;
+      _memoController.text = project?.about.memo ?? '';
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    if (_project == null) return;
+
+    final memo = _memoController.text.trim().isEmpty ? null : _memoController.text.trim();
+    final updatedConfig = _project!.config == null
+        ? ProjectConfig(about: About(memo: memo))
+        : _project!.config!.copyWith(
+            about: About(
+              summary: _project!.about.summary,
+              stack: _project!.about.stack,
+              links: _project!.about.links,
+              memo: memo,
+            ),
+          );
+    final updated = _project!.copyWith(config: updatedConfig);
+
+    try {
+      await widget.projectRepository.updateProject(updated);
+    } on PopolingException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      return;
+    } on FileSystemException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('저장하지 못했어요. 다른 프로그램이 popoling.yaml을 열고 있는지 확인해 주세요.'),
+        ),
+      );
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _project = updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('메모를 저장했어요.'),
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const AppPage(crumbs: [('설정', null)], children: [Center(child: CircularProgressIndicator())]);
+    }
+
+    if (_project == null) {
+      return const AppPage(
+        crumbs: [('설정', null)],
+        children: [Center(child: Text('프로젝트를 찾을 수 없어요.'))],
+      );
+    }
+
     return AppPage(
-      crumbs: const [('개발', '/home'), ('my-team-project', '/dashboard'), ('설정', null)],
+      crumbs: [('개발', '/home'), ('프로젝트 설정', null)],
       children: [
-        const PageHead(
+        PageHead(
           title: '프로젝트 설정',
-          sub: '~/projects/my-team-project/popoling.yaml',
+          sub: _project!.folderPath,
           subMono: true,
-          actions: [Btn('popoling.yaml 열기'), Btn('저장', primary: true)],
+          actions: [Btn('popoling.yaml 열기'), Btn('저장', primary: true, onPressed: _save)],
         ),
-        Notice(
-          bg: C.bad.$1,
-          border: const Color(0xFFF3B8B2),
-          icon: Icons.error_outline,
-          iconColor: const Color(0xFF7A1C14),
-          child: const Text.rich(TextSpan(style: TextStyle(fontSize: 14, color: Color(0xFF7A1C14)), children: [
-            TextSpan(text: '저장할 수 없어요 — '),
-            TextSpan(text: '순환 의존', style: TextStyle(fontWeight: FontWeight.w700)),
-            TextSpan(text: ': web → api → web. api 의 의존 항목에서 web 을 빼 주세요.'),
-          ])),
-        ),
-        Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 20, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: Panel(
               title: '프로젝트 소개',
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 14, children: [
-                field('이름', 'my-team-project'),
-                field('한 줄 설명', '동아리 행사 예약 웹서비스 (2025 캡스톤)'),
-                field('기술 스택 (쉼표로 구분)', 'Spring Boot, React, MySQL'),
-                field('저장소 링크', 'https://github.com/example/my-team-project', isMono: true),
-                field('메모', '관리자 계정은 .env 의 ADMIN_* 참고', lines: 3),
-                const Text('처음 등록할 때 README 첫 문단과 Git 원격 주소로 채워졌어요.', style: TextStyle(fontSize: 12, color: C.muted)),
+                field('이름', _project!.name),
+                field('한 줄 설명', _project!.about.summary ?? ''),
+                field('기술 스택 (쉼표로 구분)', _project!.about.stack.join(', '), isMono: true),
+                field('저장소 링크', _project!.about.links['repo'] ?? '', isMono: true),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 6,
+                  children: [
+                    const Text('메모', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    TextFormField(
+                      controller: _memoController,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: _inputDeco,
+                    ),
+                  ],
+                ),
+                Text('처음 등록할 때 README 첫 문단과 Git 원격 주소로 채워졌어요.',
+                    style: const TextStyle(fontSize: 12, color: C.muted)),
               ]),
             ),
           ),
+          const SizedBox(width: 20),
           Expanded(flex: 2, child: _services()),
         ]),
       ],

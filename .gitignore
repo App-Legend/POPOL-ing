@@ -1,5 +1,6 @@
 .env
 .env.*
+.DS_Store
 
 # 개인용 역할 사본
 docs/내_역할.md

@@ -63,7 +63,10 @@ void _registerMockups(AppRegistry app) {
   app.route('/detail', (_) => const DetailScreen());
   app.route('/env', (_) => const EnvCheckScreen());
   app.route('/qa', (_) => const QaScreen());
-  app.route('/settings', (_) => const SettingsScreen());
+  app.route('/settings', (context) => SettingsScreen(
+        projectRepository: app.read<ProjectRepository>(),
+        projectId: ModalRoute.of(context)?.settings.arguments as String?,
+      ));
   app.route('/dialogs', (_) => const DialogsScreen());
   app.route('/ai', (_) => const AiScreen());
 }

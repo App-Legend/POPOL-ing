@@ -10,6 +10,8 @@ import 'package:popoling_core/contracts.dart';
 import 'src/file_project_repository.dart';
 import 'src/schema_config_validator.dart';
 
+export 'src/command_summary.dart';
+
 /// 프로젝트·설정의 화면과 구현을 앱에 등록한다.
 // 3주차에 설정(7)·프로젝트 추가 화면을 여기서 등록한다.
 void register(AppRegistry app) {

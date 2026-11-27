@@ -98,6 +98,26 @@ class ProjectConfig {
   /// 항목 사이의 관계(중복 id, 없는 의존 대상, 순환 의존)는 ConfigValidator 가 검사한다.
   factory ProjectConfig.fromMap(Map<Object?, Object?> map) => readProjectConfig(map);
 
+  /// 메모 등 일부만 바꾼 사본.
+  ProjectConfig copyWith({
+    int? version,
+    String? name,
+    About? about,
+    List<Requirement>? requires,
+    GitConfig? git,
+    List<ServiceConfig>? services,
+    List<CheckConfig>? checks,
+  }) =>
+      ProjectConfig(
+        version: version ?? this.version,
+        name: name ?? this.name,
+        about: about ?? this.about,
+        requires: requires ?? this.requires,
+        git: git ?? this.git,
+        services: services ?? this.services,
+        checks: checks ?? this.checks,
+      );
+
   /// [fromMap] 이 읽는 키 이름 그대로 Map 으로 되돌린다(YAML 로 저장할 때 쓴다).
   /// 없는 값·빈 목록·기본값은 넣지 않고, 시간은 초 숫자로 쓴다.
   Map<String, Object?> toMap() {
