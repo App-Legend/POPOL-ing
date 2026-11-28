@@ -14,6 +14,11 @@ StatusChip stateChip(ItemState state) => switch (state) {
       ItemState.disconnected => const StatusChip('연결 안 됨', C.bad),
       ItemState.portBusy => const StatusChip('포트 사용 중', C.port),
       ItemState.unknown => const StatusChip('확인 불가', C.idle),
+      ItemState.waiting => const StatusChip('대기 중', C.idle),
+      ItemState.skipped => const StatusChip('건너뜀', C.idle),
+      ItemState.startFailed => const StatusChip('시작 실패', C.bad),
+      ItemState.readyTimeout => const StatusChip('준비 시간 초과', C.bad),
+      ItemState.crashed => const StatusChip('멈춤', C.bad),
     };
 
 /// 떠 있거나 뜨는 중이라 [중지] 를 보여 줄 상태.

@@ -6,6 +6,7 @@ export 'contracts/app_registry.dart';
 export 'contracts/config_validator.dart';
 export 'contracts/env_checker.dart';
 export 'contracts/env_diff.dart';
+export 'contracts/file_history.dart';
 export 'contracts/http_probe.dart';
 export 'contracts/item_launcher.dart';
 export 'contracts/llm_client.dart';

@@ -3,6 +3,7 @@ import 'dart:async';
 import '../contracts/orchestrator.dart';
 import '../contracts/project_repository.dart';
 import '../events/run_events.dart';
+import '../models/failure.dart';
 import '../models/item_ref.dart';
 import '../models/run.dart';
 import '../models/service_config.dart';
@@ -10,16 +11,23 @@ import '../models/service_config.dart';
 /// [Orchestrator] 의 가짜 구현. 실제로 띄우지 않고, 상태만 바로바로 바꾸며 이벤트를 보낸다.
 ///
 /// [failing] 에 넣은 항목은 시작에 실패한다(원격이면 연결 안 됨). 테스트 중에 바꿔도 된다.
+/// 실패 원인은 [causes] 에 넣은 것이고, 없으면 `시작 실패`([CommandFailed], 종료 코드 1)다.
+/// 상태는 원인을 따른다(예: [ReadyTimeout] 이면 `준비 시간 초과`). 실패 안내 카드를 원인별로 만들 때 쓴다.
 /// ```dart
+/// const api = ItemRef(projectId: 'my-team-project', serviceId: 'api');
 /// final runner = FakeOrchestrator(FakeProjectRepository.withSamples(),
-///     failing: {const ItemRef(projectId: 'my-team-project', serviceId: 'api')});
-/// final summary = await runner.runAll('my-team-project');   // api 실패, web 건너뜀
+///     failing: {api}, causes: {api: ReadyTimeout(Duration(seconds: 60))});
+/// final summary = await runner.runAll('my-team-project');   // api 준비 시간 초과, web 건너뜀
 /// ```
 class FakeOrchestrator implements Orchestrator {
-  FakeOrchestrator(this._projects, {Set<ItemRef> failing = const {}}) : failing = {...failing};
+  FakeOrchestrator(this._projects, {Set<ItemRef> failing = const {}, Map<ItemRef, FailureCause> causes = const {}})
+      : failing = {...failing},
+        causes = {...causes};
 
   final ProjectRepository _projects;
   final Set<ItemRef> failing;
+  final Map<ItemRef, FailureCause> causes;
+  final Map<ItemRef, FailureCause> _causes = {};
   final _events = StreamController<RunEvent>.broadcast();
   final Map<ItemRef, ItemState> _states = {};
   final Map<String, RunSummary> _lastRuns = {};
@@ -29,6 +37,9 @@ class FakeOrchestrator implements Orchestrator {
 
   @override
   ItemState stateOf(ItemRef item) => _states[item] ?? ItemState.stopped;
+
+  @override
+  FailureCause? causeOf(ItemRef item) => _causes[item];
 
   @override
   Future<RunSummary> runAll(String projectId) async {
@@ -89,9 +100,15 @@ class FakeOrchestrator implements Orchestrator {
     _set(item, ItemState.starting);
     _set(item, ItemState.running);
     if (failing.contains(item)) {
-      const reason = '시작하자마자 종료됐어요 (종료 코드 1).';
-      _set(item, ItemState.failed, reason: reason, exitCode: 1);
-      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: reason, exitCode: 1);
+      final cause =
+          causes[item] ?? const CommandFailed(exitCode: 1, evidence: ['Error: Cannot find module \'express\'']);
+      final exitCode = switch (cause) {
+        CommandFailed(:final exitCode) || Crashed(:final exitCode) => exitCode,
+        _ => null,
+      };
+      final reason = causes.containsKey(item) ? '실패했어요.' : '시작하자마자 종료됐어요 (종료 코드 1).';
+      _set(item, cause.state, reason: reason, exitCode: exitCode, cause: cause);
+      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: reason, exitCode: exitCode, cause: cause);
     }
     _set(item, ItemState.ready);
     return ItemResult(item: item, outcome: ItemOutcome.ok);
@@ -105,9 +122,14 @@ class FakeOrchestrator implements Orchestrator {
     return ItemResult(item: item, outcome: ItemOutcome.ok);
   }
 
-  void _set(ItemRef item, ItemState state, {String? reason, int? exitCode}) {
+  void _set(ItemRef item, ItemState state, {String? reason, int? exitCode, FailureCause? cause}) {
     _states[item] = state;
-    _events.add(ItemStateChanged(item, state, reason: reason, exitCode: exitCode));
+    if (cause == null) {
+      _causes.remove(item);
+    } else {
+      _causes[item] = cause;
+    }
+    _events.add(ItemStateChanged(item, state, reason: reason, exitCode: exitCode, cause: cause));
   }
 
   Future<List<ServiceConfig>> _services(String projectId) async =>

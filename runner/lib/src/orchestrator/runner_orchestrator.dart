@@ -81,6 +81,10 @@ class RunnerOrchestrator implements Orchestrator {
   @override
   ItemState stateOf(ItemRef item) => _states[item] ?? ItemState.stopped;
 
+  // shortcut: 아직 원인을 채우지 않는다(문장 reason 만 보낸다). 실패 원인 채우기(#86 2단계)에서 바꾼다.
+  @override
+  FailureCause? causeOf(ItemRef item) => null;
+
   /// 지금 떠 있는, 이 객체가 띄운 프로세스 항목. `RuntimeQuery` 가 포트 주인을 판단할 때 쓴다.
   Iterable<LiveProcess> get liveProcesses => [
         for (final MapEntry(key: item, value: process) in _running.entries)

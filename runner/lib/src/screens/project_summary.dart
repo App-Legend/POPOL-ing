@@ -8,7 +8,7 @@ import 'package:popoling_core/ui.dart';
   final n = states.length;
   if (n == 0) return (label: '실행 항목 없음', tone: C.idle);
   final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
-  if (states.any((s) => s == ItemState.failed || s == ItemState.portBusy || s == ItemState.disconnected)) {
+  if (states.any((s) => s.isFailure || s == ItemState.portBusy || s == ItemState.disconnected)) {
     return (label: '일부 실패 · $k/$n', tone: C.bad);
   }
   if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return (label: '시작 중 · $k/$n', tone: C.warn);

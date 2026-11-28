@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/fakes.dart';
-import 'package:popoling_core/models.dart';
 import 'package:popoling_core/testing.dart';
 
 /// 가짜 구현이 약속 테스트를 통과하는지 확인한다.
@@ -90,6 +90,41 @@ void main() {
           projectId: project.id,
           services: project.config!.services,
           failingServiceId: 'api',
+        ));
+
+    test('넣어 둔 실패 원인대로 상태를 바꾸고 causeOf 로 꺼낼 수 있다', () async {
+      final api = ItemRef(projectId: project.id, serviceId: 'api');
+      final runner = FakeOrchestrator(FakeProjectRepository.withSamples(),
+          failing: {api}, causes: {api: const ReadyTimeout(Duration(seconds: 60), evidence: ['Waiting for db'])});
+      final changed = runner.events.firstWhere((e) => e is ItemStateChanged && e.item == api && e.state.isFailure);
+
+      final r = await runner.start(api);
+
+      expect(runner.stateOf(api), ItemState.readyTimeout);
+      expect(r.cause, isA<ReadyTimeout>());
+      expect(runner.causeOf(api), same(r.cause));
+      expect((await changed as ItemStateChanged).cause, same(r.cause));
+      await runner.stop(api);
+      expect(runner.causeOf(api), isNull, reason: '멈추면 원인을 지운다');
+    });
+
+    test('원인을 안 넣으면 시작 실패(명령 오류, 종료 코드 1)', () async {
+      final api = ItemRef(projectId: project.id, serviceId: 'api');
+      final r = await FakeOrchestrator(FakeProjectRepository.withSamples(), failing: {api}).start(api);
+      expect(r.cause, isA<CommandFailed>().having((c) => c.exitCode, 'exitCode', 1));
+      expect(r.cause!.state, ItemState.startFailed);
+      expect(r.exitCode, 1);
+    });
+  });
+
+  group('FakeFileHistory', () {
+    final commit = FileCommit(shortHash: '4d6153a', author: '민지', committedAt: DateTime(2026, 11, 27), subject: 'api 포트 바꿈');
+    fileHistoryContract(() async => FileHistoryFixture(
+          history: FakeFileHistory(FakeProjectRepository.withSamples(),
+              commits: {('my-team-project', 'api/popoling.yaml'): commit}),
+          projectId: 'my-team-project',
+          committedPath: 'api/popoling.yaml',
+          uncommittedPath: 'api/.env',
         ));
   });
 

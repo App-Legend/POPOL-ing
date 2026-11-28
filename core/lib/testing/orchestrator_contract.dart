@@ -113,7 +113,7 @@ void orchestratorContract(Future<OrchestratorFixture> Function() setUp) {
     final byId = {for (final r in summary.items) r.item.serviceId: r};
     expect(byId[f.failingServiceId]!.outcome, ItemOutcome.failed);
     expect(byId[f.failingServiceId]!.reason, isNotNull);
-    expect(o.stateOf(f.ref(f.failingServiceId)), ItemState.failed);
+    expect(o.stateOf(f.ref(f.failingServiceId)).isFailure, isTrue, reason: '${o.stateOf(f.ref(f.failingServiceId))}');
     for (final id in skipped) {
       expect(byId[id]!.outcome, ItemOutcome.skipped, reason: id);
       expect(changesOf(events, f.ref(id)), isEmpty, reason: '$id 는 시작하지 않아야 한다');
