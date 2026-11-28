@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:popoling_core/ui.dart';
 
 import 'field_data.dart';
+import 'field_lineup.dart';
 
 /// 운동장 레인 하나에 세울 프로젝트(목업 v2 홈 오른쪽).
 enum FieldPose {
@@ -23,7 +24,7 @@ class FieldRunner {
 
   final String name;
 
-  /// 이름표 둘째 줄. 예: `준비 완료 · 1/1`, `실패 · 원인 보기`
+  /// 이름표 둘째 줄. 예: `실행 중 · 1/1`, `실패 · 원인 보기`
   final String status;
   final FieldPose pose;
 }
@@ -32,13 +33,10 @@ class FieldRunner {
 ///
 /// 그림만으로 구분하지 않게 이름표에 상태 글자를 함께 쓴다.
 class FieldPanel extends StatefulWidget {
-  const FieldPanel({super.key, required this.lanes, this.bench});
+  const FieldPanel({super.key, required this.lineup});
 
-  /// 최대 4개. 넘치면 앞의 4개만.
-  final List<FieldRunner> lanes;
-
-  /// 벤치에서 조는 프로젝트(오래됨). 이름과 상태 글자.
-  final (String, String)? bench;
+  /// 레인(앞의 4개만 그린다)·벤치·전광판 숫자.
+  final FieldLineup lineup;
 
   @override
   State<FieldPanel> createState() => _FieldPanelState();
@@ -62,9 +60,9 @@ class _FieldPanelState extends State<FieldPanel> {
         ),
       );
     }
-    final lanes = widget.lanes.take(4).toList();
-    final running = lanes.where((l) => l.pose == FieldPose.run).length;
-    final fallen = lanes.where((l) => l.pose == FieldPose.fallen).length;
+    final lanes = widget.lineup.lanes.take(4).toList();
+    final bench = widget.lineup.bench;
+    final score = widget.lineup.score;
     return Container(
       width: 300,
       color: const Color(0xFF1C1E24),
@@ -87,11 +85,17 @@ class _FieldPanelState extends State<FieldPanel> {
             ),
           ]),
         ),
-        Semantics(
-          label: '운동장: ${[for (final l in lanes) '${l.name} ${l.status}', if (widget.bench case (final n, final s)?) '$n $s'].join(', ')}',
-          child: AspectRatio(
-            aspectRatio: 90 / 200,
-            child: CustomPaint(painter: _FieldPainter(lanes, widget.bench, '달리는 중 $running · 넘어짐 $fallen')),
+        // 창이 낮아도 넘치지 않게 남은 높이에 맞춰 줄인다(1280×720 에서 24px 넘쳤다).
+        Expanded(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: Semantics(
+              label: '운동장 $score: ${[for (final l in widget.lineup.lanes) '${l.name} ${l.status}', if (bench case (final n, final s)?) '$n $s'].join(', ')}',
+              child: AspectRatio(
+                aspectRatio: 90 / 200,
+                child: CustomPaint(painter: _FieldPainter(lanes, bench, score)),
+              ),
+            ),
           ),
         ),
       ]),

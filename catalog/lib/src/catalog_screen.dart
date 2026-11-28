@@ -5,6 +5,7 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import 'catalog_view.dart';
+import 'field/field_lineup.dart';
 import 'field/field_panel.dart';
 import 'run_info.dart';
 
@@ -131,25 +132,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
     );
   }
 
-  /// 오른쪽 운동장: 레인 4개(실행 중·실패·중지·실행 방법 없음 순)와 벤치(오래된 프로젝트 하나).
-  Widget _field(List<Project> projects, DateTime now) {
-    final entries = [for (final p in projects) CatalogEntry(p, _runs[p.id] ?? RunInfo.none)];
-    final stale = entries.where((e) => e.isStale(now)).toList();
-    FieldRunner runner(CatalogEntry e) {
-      final p = e.project;
-      if (e.serviceCount == 0 && (p.config?.services.isEmpty ?? true)) return FieldRunner(name: p.name, status: '실행 방법 없음', pose: FieldPose.empty);
-      if (e.isRunning) return FieldRunner(name: p.name, status: '준비 완료 · ${e.run.running}/${e.serviceCount}', pose: FieldPose.run);
-      if (e.run.lastSucceeded == false) return FieldRunner(name: p.name, status: '실패 · 원인 보기', pose: FieldPose.fallen);
-      return FieldRunner(name: p.name, status: '중지 · 출발선 대기', pose: FieldPose.wait);
-    }
-
-    final lanes = [for (final e in entries) if (!e.isStale(now)) runner(e)]
-      ..sort((a, b) => a.pose.index.compareTo(b.pose.index));
-    return FieldPanel(
-      lanes: lanes,
-      bench: stale.isEmpty ? null : (stale.first.project.name, cardStateLabel(stale.first, now)),
-    );
-  }
+  /// 오른쪽 운동장: 레인 4개(실행 중·실패·중지·실행 방법 없음 순)와 벤치(오래된 프로젝트).
+  Widget _field(List<Project> projects, DateTime now) =>
+      FieldPanel(lineup: fieldLineup([for (final p in projects) CatalogEntry(p, _runs[p.id] ?? RunInfo.none)], now));
 
   List<Widget> _catalog(List<Project> projects, DateTime now) {
     final entries = [for (final p in projects) CatalogEntry(p, _runs[p.id] ?? RunInfo.none)];
