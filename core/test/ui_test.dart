@@ -87,7 +87,7 @@ void main() {
     expect(find.text('카테고리 · 개발'), findsOneWidget);
     expect(find.text('내 프로젝트'), findsWidgets);
     expect(find.text('AI 검사'), findsOneWidget);
-    expect(find.text('앱 설정'), findsNothing);
+    expect(find.text('앱 설정'), findsOneWidget); // 화면은 ai/ 가 /app-settings 로 등록한다(#105)
   });
 
   testWidgets('menu navigates', (tester) async {

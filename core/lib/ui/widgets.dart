@@ -5,7 +5,7 @@ import 'theme.dart';
 
 /// 왼쪽 메뉴 + 본문 틀. 모든 내부 화면이 공유한다(목업 v2).
 ///
-/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 [ShellScope] 자리(지금 상태 목록).
+/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 앱 설정, 그 아래 [ShellScope] 자리(지금 상태 목록).
 class AppPage extends StatelessWidget {
   const AppPage({super.key, required this.crumbs, required this.children, this.trailing, this.side, this.header});
 
@@ -71,7 +71,11 @@ class AppPage extends StatelessWidget {
 class _SideMenu extends StatelessWidget {
   const _SideMenu();
 
-  static const _items = [('내 프로젝트', '/home', Icons.folder_outlined), ('AI 검사', '/ai', Icons.auto_awesome_outlined)];
+  static const _items = [
+    ('내 프로젝트', '/home', Icons.folder_outlined),
+    ('AI 검사', '/ai', Icons.auto_awesome_outlined),
+    ('앱 설정', '/app-settings', Icons.settings_outlined), // 화면은 ai/ 가 등록한다(#105)
+  ];
 
   @override
   Widget build(BuildContext context) {
