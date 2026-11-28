@@ -17,8 +17,8 @@ class Opened {
   Object? arguments;
 }
 
-Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner}) async {
-  tester.view.physicalSize = const Size(1280, 900);
+Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, double width = 1280}) async {
+  tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final opened = Opened();
@@ -57,6 +57,15 @@ Future<void> tapChip(WidgetTester tester, String label) async {
 }
 
 void main() {
+  testWidgets('#99: 창이 좁아도(860) 필터 칩이 한 줄에 여러 개 들어간다', (tester) async {
+    await open(tester, width: 860);
+    expect(tester.takeException(), isNull);
+    final all = tester.getTopLeft(find.widgetWithText(ChoiceChip, '전체'));
+    final running = tester.getTopLeft(find.widgetWithText(ChoiceChip, '실행 중'));
+    expect(running.dy, all.dy);
+    expect(find.byKey(const Key('catalog-sort')), findsOneWidget);
+  });
+
   testWidgets('AT-13: 카드 5개에 설명·스택·마지막 실행일이 보인다', (tester) async {
     await open(tester);
     expect(find.text('내 프로젝트  5'), findsOneWidget);

@@ -140,10 +140,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
     final entries = [for (final p in projects) CatalogEntry(p, _runs[p.id] ?? RunInfo.none)];
     final visible = visibleEntries(entries, query: _query, filter: _filter, sort: _sort, now: now);
     final filters = [CatalogFilter.all, CatalogFilter.running, CatalogFilter.stale, ...stackTags(projects).map(CatalogFilter.tag)];
-    return [
-      Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 12, children: [
-        Expanded(
-          child: Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+    final search = Wrap(spacing: 8, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
             SizedBox(
               width: 230,
               height: 38,
@@ -165,9 +162,8 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
             for (final f in filters) _filterChip(f),
-          ]),
-        ),
-        Row(mainAxisSize: MainAxisSize.min, spacing: 8, children: [
+          ]);
+    final sort = Row(mainAxisSize: MainAxisSize.min, spacing: 8, children: [
           const Text('정렬', style: TextStyle(fontSize: 13, color: C.muted)),
           Container(
             height: 38,
@@ -184,8 +180,14 @@ class _CatalogScreenState extends State<CatalogScreen> {
               ),
             ),
           ),
-        ]),
-      ]),
+        ]);
+    return [
+      // 좁은 창에서는 정렬을 아래 줄로 내린다. 옆에 두면 필터 칸이 좁아져 칩이 한 줄에 하나씩 쌓인다(#87·#99).
+      LayoutBuilder(
+        builder: (context, box) => box.maxWidth < 640
+            ? Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [search, sort])
+            : Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 12, children: [Expanded(child: search), sort]),
+      ),
       if (visible.isEmpty)
         const Padding(
           padding: EdgeInsets.symmetric(vertical: 48),
