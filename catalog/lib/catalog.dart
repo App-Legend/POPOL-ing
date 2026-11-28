@@ -14,10 +14,27 @@ import 'src/status_list.dart';
 /// 카테고리 선택(1, `/`)과 개발 홈 카탈로그(2, `/home`)를 등록한다.
 ///
 /// `ProjectRepository`·`Orchestrator` 는 화면을 그릴 때 읽는다. 등록이 다 끝난 뒤라 가짜가 진짜로 바뀌어 있다.
-// 4주차 후반에 오래된 프로젝트 점검(FR-17)을 여기서 더한다.
+/// 오래된 프로젝트 [실행 점검](FR-17)은 `EnvChecker`·`QaRunner` 가 등록돼 있을 때만 보인다.
 void register(AppRegistry app) {
   app.route('/', (_) => CategoryScreen(projects: app.read<ProjectRepository>(), runs: _runInfo(app)));
-  app.route('/home', (_) => CatalogScreen(projects: app.read<ProjectRepository>(), runs: _runInfo(app), runner: app.read<Orchestrator>()));
+  app.route(
+    '/home',
+    (_) => CatalogScreen(
+      projects: app.read<ProjectRepository>(),
+      runs: _runInfo(app),
+      runner: app.read<Orchestrator>(),
+      env: _tryRead<EnvChecker>(app),
+      qa: _tryRead<QaRunner>(app),
+    ),
+  );
+}
+
+T? _tryRead<T extends Object>(AppRegistry app) {
+  try {
+    return app.read<T>();
+  } on StateError {
+    return null; // 아직 붙지 않은 기능
+  }
 }
 
 /// 앱 하나에 실행 정보 계산 하나. 화면이 여러 개 쌓여도 이벤트마다 실행 기록을 한 번만 읽는다.

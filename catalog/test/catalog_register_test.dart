@@ -24,7 +24,7 @@ class TestRegistry implements AppRegistry {
   void provide<T extends Object>(T service) => _services[T] = service;
 
   @override
-  T read<T extends Object>() => _services[T]! as T;
+  T read<T extends Object>() => _services[T] as T? ?? (throw StateError('$T 가 등록되지 않았어요')); // AppRegistry 계약대로
 }
 
 /// 가짜를 먼저 깔고 catalog 를 등록한다(app/ 의 순서).

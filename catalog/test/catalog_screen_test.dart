@@ -17,7 +17,8 @@ class Opened {
   Object? arguments;
 }
 
-Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, double width = 1280}) async {
+Future<Opened> open(WidgetTester tester,
+    {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, EnvChecker? env, QaRunner? qa, double width = 1280}) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -35,6 +36,8 @@ Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSo
       projects: repo,
       runs: runs ?? FakeRunInfoSource.samples(clock: () => now),
       runner: runner ?? FakeOrchestrator(repo),
+      env: env,
+      qa: qa,
       clock: () => now,
     ),
     routes: {for (final r in ['/dashboard', '/settings', '/add-project']) r: page(r)},
@@ -57,6 +60,35 @@ Future<void> tapChip(WidgetTester tester, String label) async {
 }
 
 void main() {
+  group('#44 실행 점검(FR-17)', () {
+    testWidgets('오래된 카드에는 [실행 점검], 누르면 환경 점검 → 전체 실행 → 헬스체크', (tester) async {
+      final repo = FakeProjectRepository.withSamples();
+      final qa = FakeQaRunner(repo, clock: () => now);
+      await open(tester, projects: repo, env: FakeEnvChecker(installed: {'node': '22.3.0'}), qa: qa);
+      expect(inCard('shop-clone', find.text('실행 점검')), findsOneWidget);
+      await tester.tap(inCard('shop-clone', find.text('실행 점검')));
+      await tester.pumpAndSettle();
+      expect(find.text('shop-clone: 지금도 실행돼요. 헬스체크(샘플) 1개 통과.'), findsOneWidget); // 진짜 QaRunner 가 아직 없다
+      expect((await qa.history('shop-clone')).single.trigger, QaTrigger.staleCheck);
+    });
+
+    testWidgets('환경 점검에서 문제가 나오면 실행하지 않고 카드에 알린다', (tester) async {
+      final repo = FakeProjectRepository.withSamples();
+      final runner = FakeOrchestrator(repo);
+      await open(tester, projects: repo, runner: runner, env: FakeEnvChecker(), qa: FakeQaRunner(repo, clock: () => now));
+      await tester.tap(inCard('shop-clone', find.text('실행 점검')));
+      await tester.pumpAndSettle();
+      expect(inCard('shop-clone', find.text('환경 점검에서 문제 1개가 나와 실행하지 않았어요. 프로젝트 화면의 환경 점검 탭에서 확인해 주세요.')), findsOneWidget);
+      expect(runner.stateOf(const ItemRef(projectId: 'shop-clone', serviceId: 'web')), isNot(ItemState.running));
+    });
+
+    testWidgets('점검 기능이 없으면 [전체 실행] 그대로', (tester) async {
+      await open(tester);
+      expect(inCard('shop-clone', find.text('실행 점검')), findsNothing);
+      expect(inCard('shop-clone', find.text('전체 실행')), findsOneWidget);
+    });
+  });
+
   testWidgets('#99: 창이 좁아도(860) 필터 칩이 한 줄에 여러 개 들어간다', (tester) async {
     await open(tester, width: 860);
     expect(tester.takeException(), isNull);

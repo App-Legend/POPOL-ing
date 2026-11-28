@@ -8,6 +8,7 @@ import 'catalog_view.dart';
 import 'field/field_lineup.dart';
 import 'field/field_panel.dart';
 import 'run_info.dart';
+import 'stale_check.dart';
 
 /// 2. 개발 홈 — 프로젝트 카탈로그(FR-14). 등록한 프로젝트를 카드로 보여 주고 검색·필터·정렬한다.
 ///
@@ -15,11 +16,15 @@ import 'run_info.dart';
 /// [프로젝트 추가] `/add-project`. 목업 v2 개발 홈.
 /// 카드의 [전체 실행]·[전체 종료]는 [runner] 에 맡기고, 실패하면 카드에 한 줄로 남긴다.
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.clock});
+  const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.env, this.qa, this.clock});
 
   final ProjectRepository projects;
   final RunInfoSource runs;
   final Orchestrator runner;
+
+  /// 오래된 카드의 [실행 점검](FR-17)에 쓴다. 둘 중 하나라도 없으면 그 카드도 [전체 실행]만 보인다.
+  final EnvChecker? env;
+  final QaRunner? qa;
 
   /// 지금 시각. 테스트에서 고정한다.
   final DateTime Function()? clock;
@@ -44,6 +49,9 @@ class _CatalogScreenState extends State<CatalogScreen> {
 
   /// 마지막 전체 실행·종료에서 생긴 문제(프로젝트 ID → 한 줄). 그 카드에서 다시 누르면 지운다.
   final Map<String, String> _problems = {};
+
+  /// [실행 점검] 중인 프로젝트 ID.
+  final Set<String> _checking = {};
 
   /// 요청 자체가 예외로 끝난 프로젝트. 원인 볼 실행 결과가 없으니 다시 실행할 수 있게 둔다.
   final Set<String> _requestFailed = {};
@@ -101,6 +109,28 @@ class _CatalogScreenState extends State<CatalogScreen> {
     if (problem == null) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('${p.name}: ${stop ? '모두 멈췄어요.' : '모두 실행됐어요.'}')));
     }
+  }
+
+  /// 오래된 프로젝트 [실행 점검]: 환경 점검 → 전체 실행 → 헬스체크. 통과하면 알림, 아니면 카드에 한 줄.
+  Future<void> _staleCheck(Project p) async {
+    setState(() {
+      _checking.add(p.id);
+      _problems.remove(p.id);
+      _requestFailed.remove(p.id);
+    });
+    StaleCheckResult result;
+    try {
+      result = await runStaleCheck(p, env: widget.env!, runner: widget.runner, qa: widget.qa!);
+    } catch (e) {
+      result = (ok: false, message: e is PopolingException ? '실행 점검을 끝내지 못했어요. ${e.message}' : '실행 점검을 끝내지 못했어요.');
+      _requestFailed.add(p.id);
+    }
+    if (!mounted) return;
+    setState(() {
+      _checking.remove(p.id);
+      if (!result.ok) _problems[p.id] = result.message;
+    });
+    if (result.ok) ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('${p.name}: ${result.message}')));
   }
 
   @override
@@ -322,18 +352,23 @@ class _CatalogScreenState extends State<CatalogScreen> {
             Expanded(
               child: !e.isRunning && _busy[p.id] == null && !_requestFailed.contains(p.id) && (problem != null || succeeded == false)
                   ? Btn('원인 보기', onPressed: () => _open('/dashboard', p.id))
-                  : _runButton(p, running: e.isRunning),
+                  : _runButton(p, running: e.isRunning, stale: cardStateOf(e, now) == CardState.stale),
             ),
         ]),
       ]),
     );
   }
 
-  /// 떠 있으면 [전체 종료], 아니면 [전체 실행]. 기다리는 동안은 눌리지 않는다.
-  Widget _runButton(Project p, {required bool running}) => switch (_busy[p.id]) {
-        true => const Btn('멈추는 중…', onPressed: null),
-        false => const Btn('시작하는 중…', onPressed: null),
-        null when running => Btn('전체 종료', onPressed: () => _runAll(p, stop: true)),
-        null => Btn('전체 실행', onPressed: () => _runAll(p, stop: false)),
-      };
+  /// 떠 있으면 [전체 종료], 오래됐으면 [실행 점검], 아니면 [전체 실행]. 기다리는 동안은 눌리지 않는다.
+  Widget _runButton(Project p, {required bool running, required bool stale}) {
+    if (_checking.contains(p.id)) return const Btn('점검하는 중…', onPressed: null);
+    final canCheck = widget.env != null && widget.qa != null;
+    return switch (_busy[p.id]) {
+      true => const Btn('멈추는 중…', onPressed: null),
+      false => const Btn('시작하는 중…', onPressed: null),
+      null when running => Btn('전체 종료', onPressed: () => _runAll(p, stop: true)),
+      null when stale && canCheck => Btn('실행 점검', onPressed: () => _staleCheck(p)),
+      null => Btn('전체 실행', onPressed: () => _runAll(p, stop: false)),
+    };
+  }
 }
