@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:popoling_catalog/src/catalog_screen.dart';
+import 'package:popoling_catalog/src/home_layout.dart';
 import 'package:popoling_catalog/src/orchestrator_run_info.dart';
 import 'package:popoling_catalog/src/run_info.dart';
 import 'package:popoling_core/contracts.dart';
@@ -17,8 +19,9 @@ class Opened {
   Object? arguments;
 }
 
-Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner}) async {
-  tester.view.physicalSize = const Size(1280, 900);
+Future<Opened> open(WidgetTester tester,
+    {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, EnvChecker? env, QaRunner? qa, HomeLayoutStore? layout, double width = 1280}) async {
+  tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final opened = Opened();
@@ -35,6 +38,9 @@ Future<Opened> open(WidgetTester tester, {ProjectRepository? projects, RunInfoSo
       projects: repo,
       runs: runs ?? FakeRunInfoSource.samples(clock: () => now),
       runner: runner ?? FakeOrchestrator(repo),
+      env: env,
+      qa: qa,
+      layout: layout,
       clock: () => now,
     ),
     routes: {for (final r in ['/dashboard', '/settings', '/add-project']) r: page(r)},
@@ -57,6 +63,87 @@ Future<void> tapChip(WidgetTester tester, String label) async {
 }
 
 void main() {
+  group('#99 묶음·고정(FR-14)', () {
+    testWidgets('AT-35: 핀으로 고정하고 회사 묶음으로 옮기면 고정과 회사에 보인다', (tester) async {
+      final layout = HomeLayoutStore.memory();
+      await open(tester, layout: layout);
+      expect(find.text('고정'), findsNothing); // 정리한 게 없으면 묶음 제목 없이 한 목록
+
+      await tester.tap(inCard('shop-clone', find.byTooltip('고정하기')));
+      await tester.pumpAndSettle();
+      expect(find.text('고정'), findsOneWidget);
+      expect(shownCards(tester).first, 'shop-clone');
+      expect(inCard('shop-clone', find.byTooltip('고정 풀기')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const ValueKey('catalog-card-shop-clone'))).width,
+          tester.getSize(find.byKey(const ValueKey('catalog-card-popoling'))).width, reason: '혼자인 고정 카드도 다른 카드와 폭이 같다');
+
+      await tester.ensureVisible(inCard('weather-bot', find.byTooltip('묶음 정하기')));
+      await tester.pumpAndSettle();
+      await tester.tap(inCard('weather-bot', find.byTooltip('묶음 정하기')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('회사').last);
+      await tester.pumpAndSettle();
+      expect(find.text('회사'), findsOneWidget);
+      expect(find.text('묶음 없음'), findsOneWidget);
+      expect((await layout.load())['weather-bot']!.group, HomeGroup.company);
+    });
+
+    testWidgets('저장해 둔 정리로 처음부터 나눠 보인다', (tester) async {
+      final layout = HomeLayoutStore.memory();
+      await layout.setGroup('popoling', HomeGroup.personal);
+      await open(tester, layout: layout);
+      expect(find.text('개인'), findsOneWidget);
+    });
+  });
+
+  testWidgets('AT-36: Ctrl K 는 검색 칸으로 간다', (tester) async {
+    await open(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    final field = tester.widget<EditableText>(find.descendant(of: find.byKey(const Key('catalog-search')), matching: find.byType(EditableText)));
+    expect(field.focusNode.hasFocus, isTrue);
+  });
+
+  group('#44 실행 점검(FR-17)', () {
+    testWidgets('오래된 카드에는 [실행 점검], 누르면 환경 점검 → 전체 실행 → 헬스체크', (tester) async {
+      final repo = FakeProjectRepository.withSamples();
+      final qa = FakeQaRunner(repo, clock: () => now);
+      await open(tester, projects: repo, env: FakeEnvChecker(installed: {'node': '22.3.0'}), qa: qa);
+      expect(inCard('shop-clone', find.text('실행 점검')), findsOneWidget);
+      await tester.tap(inCard('shop-clone', find.text('실행 점검')));
+      await tester.pumpAndSettle();
+      expect(find.text('shop-clone: 지금도 실행돼요. 헬스체크(샘플) 1개 통과.'), findsOneWidget); // 진짜 QaRunner 가 아직 없다
+      expect((await qa.history('shop-clone')).single.trigger, QaTrigger.staleCheck);
+    });
+
+    testWidgets('환경 점검에서 문제가 나오면 실행하지 않고 카드에 알린다', (tester) async {
+      final repo = FakeProjectRepository.withSamples();
+      final runner = FakeOrchestrator(repo);
+      await open(tester, projects: repo, runner: runner, env: FakeEnvChecker(), qa: FakeQaRunner(repo, clock: () => now));
+      await tester.tap(inCard('shop-clone', find.text('실행 점검')));
+      await tester.pumpAndSettle();
+      expect(inCard('shop-clone', find.text('환경 점검에서 문제 1개가 나와 실행하지 않았어요. 프로젝트 화면의 환경 점검 탭에서 확인해 주세요.')), findsOneWidget);
+      expect(runner.stateOf(const ItemRef(projectId: 'shop-clone', serviceId: 'web')), isNot(ItemState.running));
+    });
+
+    testWidgets('점검 기능이 없으면 [전체 실행] 그대로', (tester) async {
+      await open(tester);
+      expect(inCard('shop-clone', find.text('실행 점검')), findsNothing);
+      expect(inCard('shop-clone', find.text('전체 실행')), findsOneWidget);
+    });
+  });
+
+  testWidgets('#99: 창이 좁아도(860) 필터 칩이 한 줄에 여러 개 들어간다', (tester) async {
+    await open(tester, width: 860);
+    expect(tester.takeException(), isNull);
+    final all = tester.getTopLeft(find.widgetWithText(ChoiceChip, '전체'));
+    final running = tester.getTopLeft(find.widgetWithText(ChoiceChip, '실행 중'));
+    expect(running.dy, all.dy);
+    expect(find.byKey(const Key('catalog-sort')), findsOneWidget);
+  });
+
   testWidgets('AT-13: 카드 5개에 설명·스택·마지막 실행일이 보인다', (tester) async {
     await open(tester);
     expect(find.text('내 프로젝트  5'), findsOneWidget);

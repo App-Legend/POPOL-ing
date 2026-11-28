@@ -65,7 +65,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
                 child: InkWell(
                   key: const Key('category-dev'),
                   borderRadius: BorderRadius.circular(16),
-                  onTap: () => Navigator.pushNamed(context, '/home'),
+                  // 홈 위에서 왼쪽 메뉴로 열었으면 그 홈으로 돌아간다(홈을 또 쌓지 않게, AT-16).
+                  onTap: () => go(context, '/home'),
                   child: Padding(
                     padding: const EdgeInsets.all(28),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 16, children: [
