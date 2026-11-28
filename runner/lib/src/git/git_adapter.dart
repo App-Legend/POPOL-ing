@@ -66,6 +66,23 @@ class GitAdapter {
     }
   }
 
+  /// [folder] 기준 상대 경로 [path] 파일을 마지막으로 바꾼 커밋. 저장소가 아니거나 커밋된 적 없으면 null.
+  /// [path] 가 폴더 안인지는 부르는 쪽이 확인한다.
+  Future<FileCommit?> lastCommit(String folder, String path) async {
+    try {
+      if (!await _isProjectRepository(folder) || await _hasLocalConfig(folder, _readCommands)) return null;
+      // :(literal) 은 경로의 * 같은 글자를 패턴으로 읽지 않게 한다
+      final out = await _git(folder, ['log', '-1', '--no-mailmap', '--format=%h%x00%an%x00%cI%x00%s', '--', ':(literal)$path']);
+      if (out case final text? when text.trim().isNotEmpty) {
+        final [hash, author, at, subject] = text.trim().split('\x00');
+        return FileCommit(shortHash: hash, author: author, committedAt: DateTime.parse(at), subject: subject);
+      }
+      return null;
+    } on Object {
+      return null;
+    }
+  }
+
   /// 원격을 한 번 확인한다. 작업 중인 파일은 바뀌지 않는다. 실패하면 false.
   Future<bool> fetch(String folder) async {
     try {

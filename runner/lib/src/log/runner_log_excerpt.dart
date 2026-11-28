@@ -11,12 +11,15 @@ class RunnerLogExcerpt implements LogExcerpt {
   final ProjectRepository Function() projects;
   final LogStore logs;
 
-  static final _prefix = RegExp(r'^\S+ (?:out|err) \| ');
-
   @override
   Future<List<String>> tail(String projectId, String serviceId, {int lines = 50}) async {
     await projects().getProject(projectId); // 없으면 ProjectNotFoundException
     final item = ItemRef(projectId: projectId, serviceId: serviceId);
-    return [for (final line in await logs.tail(item, lines: lines)) line.replaceFirst(_prefix, '')];
+    return [for (final line in await logs.tail(item, lines: lines)) stripLogPrefix(line)];
   }
 }
+
+final _prefix = RegExp(r'^\S+ (?:out|err) \| ');
+
+/// 로그 파일 한 줄에서 앞의 `<시각> out | ` 표시를 뗀다.
+String stripLogPrefix(String line) => line.replaceFirst(_prefix, '');

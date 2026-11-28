@@ -5,6 +5,7 @@ library;
 export 'testing/config_validator_contract.dart';
 export 'testing/env_checker_contract.dart';
 export 'testing/env_diff_contract.dart';
+export 'testing/file_history_contract.dart';
 export 'testing/http_probe_contract.dart';
 export 'testing/item_launcher_contract.dart';
 export 'testing/llm_client_contract.dart';

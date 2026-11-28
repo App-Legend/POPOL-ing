@@ -5,6 +5,7 @@ library;
 export 'fakes/fake_config_validator.dart';
 export 'fakes/fake_env_checker.dart';
 export 'fakes/fake_env_diff.dart';
+export 'fakes/fake_file_history.dart';
 export 'fakes/fake_http_probe.dart';
 export 'fakes/fake_item_launcher.dart';
 export 'fakes/fake_llm_client.dart';

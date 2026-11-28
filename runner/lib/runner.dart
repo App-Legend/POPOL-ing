@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
 import 'src/git/git_adapter.dart';
+import 'src/git/runner_file_history.dart';
 import 'src/log/log_store.dart';
 import 'src/log/runner_log_excerpt.dart';
 import 'src/orchestrator/runner_orchestrator.dart';
@@ -21,7 +22,7 @@ import 'src/screens/dashboard_screen.dart';
 import 'src/screens/exit_guard.dart';
 import 'src/screens/git_tab.dart';
 
-/// 실행 제어의 화면(프로젝트 화면 `/dashboard`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt])을 앱에 등록한다.
+/// 실행 제어의 화면(프로젝트 화면 `/dashboard`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt]·[FileHistory])을 앱에 등록한다.
 ///
 /// 다른 기능의 구현([ProjectRepository]·[ItemLauncher]·[PortProbe]·[HttpProbe]·[RuntimeQuery])은 처음 쓸 때 꺼낸다.
 void register(AppRegistry app) {
@@ -50,6 +51,7 @@ void register(AppRegistry app) {
     launcher: () => app.read<ItemLauncher>(),
   ));
   app.provide<LogExcerpt>(RunnerLogExcerpt(projects: () => app.read<ProjectRepository>(), logs: logs));
+  app.provide<FileHistory>(RunnerFileHistory(projects: () => app.read<ProjectRepository>(), git: git));
 
   Object? args(BuildContext context) => ModalRoute.of(context)?.settings.arguments;
   app.route(

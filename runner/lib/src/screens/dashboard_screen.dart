@@ -117,7 +117,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       if (e case ItemStateChanged(:final item, :final state, :final reason) when item.projectId == _id) {
         setState(() {
           _reasons[item] = reason;
-          if (state == ItemState.failed) _picked = item.serviceId;
+          if (state.isFailure) _picked = item.serviceId;
         });
         if (state == ItemState.portBusy) unawaited(_findOwner(item));
         if (state != ItemState.portBusy) _owners.remove(item);
@@ -145,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       for (final r in _summary?.items ?? const <ItemResult>[])
         if (r.outcome == ItemOutcome.failed) r.item.serviceId,
     };
-    bool failed(ServiceConfig s) => widget.runner.stateOf(_ref(s)) == ItemState.failed;
+    bool failed(ServiceConfig s) => widget.runner.stateOf(_ref(s)).isFailure;
     bool failedLast(ServiceConfig s) => lastFailed.contains(s.id) && !isUp(widget.runner.stateOf(_ref(s)));
     return (services.where(failed).firstOrNull ?? services.where(failedLast).firstOrNull)?.id;
   }
@@ -257,8 +257,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   /// 머리 캐릭터: 프로젝트 요약 상태에 맞춘다(그림만으로 구분하지 않게 옆에 상태 글자가 있다).
   MascotPose _pose(List<ItemState> states) {
     if (states.isEmpty) return MascotPose.empty;
-    if (states.any((s) => s == ItemState.failed || s == ItemState.portBusy || s == ItemState.disconnected)) return MascotPose.fallen;
-    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return MascotPose.warmup;
+    if (states.any((s) => s.isFailure || s == ItemState.portBusy || s == ItemState.disconnected)) return MascotPose.fallen;
+    if (states.any(isStarting)) return MascotPose.warmup;
     final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
     if (k == states.length) return MascotPose.running;
     return k > 0 ? MascotPose.running2 : MascotPose.resting;
@@ -364,7 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_services.isEmpty) return '실행 항목이 아직 없어요. popoling.yaml 에 실행 방법을 적어 주세요.';
     final n = states.length;
     final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
-    final failed = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.failed || states[i] == ItemState.portBusy) s.id];
+    final failed = [for (final (i, s) in _services.indexed) if (states[i].isFailure || states[i] == ItemState.portBusy) s.id];
     final lost = [for (final (i, s) in _services.indexed) if (states[i] == ItemState.disconnected) s.id];
     // 목업 v2 문구. 항목 이름 뒤 조사는 영문 이름이 많아 '항목을'로 받는다. 상태 칩처럼 끊긴 원격 항목도 실패로 본다.
     if (failed.isNotEmpty || lost.isNotEmpty) {
@@ -374,7 +374,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
       return '일부만 실행 중이에요 · $n개 중 $k개 준비 완료, ${why.join(', ')}';
     }
-    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return '시작하는 중 · $n개 중 $k개 준비 완료';
+    if (states.any(isStarting)) return '시작하는 중 · $n개 중 $k개 준비 완료';
     if (k == n) return '실행 중 · $n개 항목이 모두 준비됐어요';
     if (k > 0) return '실행 중 · $n개 중 $k개 준비 완료';
     if (_summary case final s?) {
@@ -442,7 +442,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final busy = _busy.contains(s.id) || _busy.contains('all') || _busy.contains('stopAll');
     final selected = s.id == _selectedService?.id;
     final skipped = !isUp(state) &&
-        state != ItemState.failed &&
+        !state.isFailure &&
         (_summary?.items.any((r) => r.item == item && r.outcome == ItemOutcome.skipped) ?? false);
     final kind = s is RemoteService ? '원격 · 연결만 확인' : kindOf(s);
     final port = s is ProcessService && s.ports.isNotEmpty ? ' · ${s.ports.join(', ')}' : '';
@@ -453,7 +453,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onChanged: busy || state == ItemState.stopping ? null : (on) => on ? _start(s) : _stop(s),
         ),
     };
-    final failed = state == ItemState.failed || state == ItemState.portBusy || state == ItemState.disconnected;
+    final failed = state.isFailure || state == ItemState.portBusy || state == ItemState.disconnected;
     return Material(
       color: failed ? const Color(0xFFFEF6F5) : C.surface,
       shape: RoundedRectangleBorder(

@@ -6,11 +6,15 @@ import 'package:popoling_core/contracts.dart';
 class ReadyResult {
   const ReadyResult.ready()
       : ok = true,
-        reason = null;
+        reason = null,
+        timedOut = false;
 
-  const ReadyResult.failed(String this.reason) : ok = false;
+  const ReadyResult.failed(String this.reason, {this.timedOut = false}) : ok = false;
 
   final bool ok;
+
+  /// 제한 시간이 지나 실패했다(준비 시간 초과). 프로세스가 먼저 끝났거나 멈췄으면 false.
+  final bool timedOut;
 
   /// 실패 이유. 화면에 그대로 보여줄 수 있는 문장.
   final String? reason;
@@ -102,6 +106,6 @@ class Readiness {
   static ReadyResult _timedOut(ReadyCondition condition, String last) {
     final t = condition.timeout;
     final limit = t.inSeconds >= 1 ? '${t.inSeconds}초' : '${t.inMilliseconds}ms';
-    return ReadyResult.failed('준비 시간($limit)을 넘겼어요. 마지막 확인: $last');
+    return ReadyResult.failed('준비 시간($limit)을 넘겼어요. 마지막 확인: $last', timedOut: true);
   }
 }

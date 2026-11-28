@@ -1,5 +1,6 @@
 import '../events/run_events.dart';
 import '../models/errors.dart';
+import '../models/failure.dart';
 import '../models/item_ref.dart';
 import '../models/run.dart';
 
@@ -11,19 +12,25 @@ import '../models/run.dart';
 ///
 /// 지켜야 할 약속. `package:popoling_core/testing.dart` 의 [orchestratorContract] 로 확인한다.
 /// 1. 전체 실행은 `dependsOn` 순서를 지킨다. 항목은 의존하는 항목이 모두 성공한 뒤에 시작한다.
-/// 2. 항목이 실패하면 그 항목에 의존하는 항목은 시작하지 않고 [ItemOutcome.skipped] 다.
+/// 2. 항목이 실패하면 그 항목에 의존하는 항목은 시작하지 않고 [ItemOutcome.skipped]·[ItemState.skipped] 다.
+///    실패한 항목은 실패 상태([ItemState.isFailure])와 원인([ItemResult.cause]·[causeOf])을 함께 알린다.
+///    차례를 기다리는 항목은 [ItemState.waiting] 으로 알릴 수 있다.
 ///    나머지 독립 항목은 계속하고, 이미 시작한 항목은 자동으로 멈추지 않는다.
 /// 3. 원격 항목은 켜지 않고 연결만 확인한다. 연결 안 됨은 실패와 같이 처리한다. 전체 종료에서는 건드리지 않는다.
 /// 4. 전체 종료는 실행의 역순으로, 포폴링이 띄운 항목만 멈춘다.
 /// 5. 상태가 바뀔 때마다 [ItemStateChanged] 를 보낸다. 전체 실행이 모두 성공하면 끝에 [RunSucceeded] 를 한 번 보낸다.
 /// 6. 등록되지 않은 프로젝트면 [ProjectNotFoundException], 프로젝트에 없는 항목이면 [ArgumentError].
-///    항목의 실패는 예외가 아니라 결과([ItemResult]·[ItemState.failed])로 알린다.
+///    항목의 실패는 예외가 아니라 결과([ItemResult]·실패 상태·[FailureCause])로 알린다.
 abstract interface class Orchestrator {
   /// 모든 프로젝트의 상태 변화와 전체 실행 성공. 여러 곳에서 동시에 구독할 수 있다.
   Stream<RunEvent> get events;
 
   /// [item] 의 지금 상태. 한 번도 띄우지 않았으면 [ItemState.stopped].
   ItemState stateOf(ItemRef item);
+
+  /// [item] 이 지금 실패 상태면 그 원인. 실패가 아니거나 원인을 모르면 null.
+  /// 실패한 뒤에 연 화면(실패 안내 카드)이 원인을 꺼내는 데 쓴다.
+  FailureCause? causeOf(ItemRef item);
 
   /// 프로젝트 전체 실행. 모든 항목의 결과가 정해지면(준비 완료·실패·건너뜀) 끝난다.
   /// 이미 준비 완료인 항목은 다시 띄우지 않고 성공으로 친다.

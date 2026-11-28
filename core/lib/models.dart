@@ -8,6 +8,8 @@ export 'models/env_check.dart';
 export 'models/item_ref.dart';
 export 'models/launch.dart';
 export 'models/errors.dart';
+export 'models/failure.dart';
+export 'models/file_commit.dart';
 export 'models/llm.dart';
 export 'models/probe.dart';
 export 'models/project.dart';

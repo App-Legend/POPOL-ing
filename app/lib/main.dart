@@ -65,6 +65,7 @@ void _registerDemo(AppRegistry app) {
     ..provide<RuntimeQuery>(FakeRuntimeQuery())
     ..provide<ItemLauncher>(FakeItemLauncher(projects))
     ..provide<LogExcerpt>(FakeLogExcerpt(projects))
+    ..provide<FileHistory>(FakeFileHistory(projects))
     // AI 기록은 임시 폴더에 둔다. 발표 연습 기록이 실제 기록에 섞이지 않게.
     ..provide<ai.AnalysisHistory>(ai.AnalysisHistory(() async => File('${Directory.systemTemp.path}${Platform.pathSeparator}popoling-demo-ai-history.json')));
 }

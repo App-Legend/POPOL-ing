@@ -2,9 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:popoling_core/contracts.dart';
+import 'package:popoling_runner_relay/log_file.dart';
 
 import '../git/git_adapter.dart';
 import '../log/log_store.dart';
+import '../log/runner_log_excerpt.dart';
 import '../process/process_launcher.dart';
 import '../ready/readiness.dart';
 import '../runtime/runtime_store.dart';
@@ -50,6 +52,7 @@ class RunnerOrchestrator implements Orchestrator {
   final _states = <ItemRef, ItemState>{};
   final _running = <ItemRef, RunningProcess>{};
   final _exitCodes = <ItemRef, int>{};
+  final _causes = <ItemRef, FailureCause>{};
 
   /// 진행 중인 시작. 멈추면 완료해서 그 시작을 끊는다.
   final _starting = <ItemRef, Completer<void>>{};
@@ -80,6 +83,9 @@ class RunnerOrchestrator implements Orchestrator {
 
   @override
   ItemState stateOf(ItemRef item) => _states[item] ?? ItemState.stopped;
+
+  @override
+  FailureCause? causeOf(ItemRef item) => _causes[item];
 
   /// 지금 떠 있는, 이 객체가 띄운 프로세스 항목. `RuntimeQuery` 가 포트 주인을 판단할 때 쓴다.
   Iterable<LiveProcess> get liveProcesses => [
@@ -178,15 +184,27 @@ class RunnerOrchestrator implements Orchestrator {
     final startedAt = DateTime.now();
     final pull = project.config?.git.pullBeforeRun ?? false ? await git?.pull(project.folderPath, veto: () => _noPull(projectId, stopAlls)) : null;
     final results = <String, ItemResult>{};
+    final order = inStartOrder(_services(project));
+    for (final s in order) {
+      final item = _ref(project, s);
+      if (_waits(stateOf(item))) {
+        _set(item, ItemState.waiting, reason: s.dependsOn.isEmpty ? '차례를 기다리는 중' : '${s.dependsOn.first} 준비를 기다리는 중');
+      }
+    }
     // shortcut: 의존이 없는 항목도 차례로 띄운다(§6: MVP 는 순차 허용). 느리면 병렬로 바꾼다.
-    for (final s in inStartOrder(_services(project))) {
+    for (final s in order) {
+      final item = _ref(project, s);
       final failedDep = s.dependsOn.where((d) => results[d] != null && results[d]!.outcome != ItemOutcome.ok);
-      results[s.id] = (_stopAlls[projectId] ?? 0) != stopAlls
-          ? ItemResult(item: _ref(project, s), outcome: ItemOutcome.skipped, reason: '전체 종료를 눌러서 시작하지 않았어요.')
-          : failedDep.isNotEmpty
-              ? ItemResult(
-                  item: _ref(project, s), outcome: ItemOutcome.skipped, reason: '${failedDep.first} 항목이 실패해서 시작하지 않았어요.')
-              : await _up(project, s);
+      if ((_stopAlls[projectId] ?? 0) != stopAlls) {
+        if (stateOf(item) == ItemState.waiting) _set(item, ItemState.stopped);
+        results[s.id] = ItemResult(item: item, outcome: ItemOutcome.skipped, reason: '전체 종료를 눌러서 시작하지 않았어요.');
+      } else if (failedDep.isNotEmpty) {
+        final reason = '${failedDep.first} 항목이 실패해서 시작하지 않았어요.';
+        if (stateOf(item) == ItemState.waiting) _set(item, ItemState.skipped, reason: reason);
+        results[s.id] = ItemResult(item: item, outcome: ItemOutcome.skipped, reason: reason);
+      } else {
+        results[s.id] = await _up(project, s);
+      }
     }
     final summary = RunSummary(
         projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values], pull: pull);
@@ -194,6 +212,19 @@ class RunnerOrchestrator implements Orchestrator {
     if (summary.succeeded) _events.add(RunSucceeded(summary));
     return summary;
   }
+
+  /// 전체 실행에서 `대기 중`으로 바꿀 상태. 떠 있거나(준비 시간 초과 포함) 멈추는 중이거나 확인 불가인 항목은 그대로 둔다.
+  static bool _waits(ItemState s) => switch (s) {
+        ItemState.starting ||
+        ItemState.running ||
+        ItemState.ready ||
+        ItemState.connected ||
+        ItemState.stopping ||
+        ItemState.readyTimeout ||
+        ItemState.unknown =>
+          false,
+        _ => true,
+      };
 
   /// 지금 코드를 바꾸면 안 되는 이유. [stopAlls] 는 전체 실행을 시작할 때의 전체 종료 횟수.
   String? _noPull(String projectId, int stopAlls) {
@@ -341,7 +372,7 @@ class RunnerOrchestrator implements Orchestrator {
       cancelled: cancel.future,
     );
     if (cancel.isCompleted) return _cancelled(item);
-    if (!r.ok) return _fail(item, r.reason!);
+    if (!r.ok) return _fail(item, r.reason!, cause: r.timedOut ? ReadyTimeout(service.ready.timeout) : const CommandFailed());
     _set(item, ItemState.ready);
     return ItemResult(item: item, outcome: ItemOutcome.ok);
   }
@@ -357,10 +388,7 @@ class RunnerOrchestrator implements Orchestrator {
 
     final busy = await _busyPort(service);
     if (cancel.isCompleted) return _cancelled(item);
-    if (busy != null) {
-      _set(item, ItemState.portBusy, reason: busy);
-      return ItemResult(item: item, outcome: ItemOutcome.failed, reason: busy);
-    }
+    if (busy != null) return _fail(item, busy.reason, cause: busy.cause);
 
     final cwd = _inside(project.folderPath, service.cwd);
     if (cwd == null) return _fail(item, '작업 폴더를 찾을 수 없거나 프로젝트 폴더 밖이에요: ${service.cwd}');
@@ -375,7 +403,7 @@ class RunnerOrchestrator implements Orchestrator {
         env.addAll(fromFile);
         secrets.addAll(fromFile.values);
       } on FileSystemException {
-        return _fail(item, '.env 파일을 읽을 수 없거나 프로젝트 폴더 밖이에요: $envFile');
+        return _fail(item, '.env 파일을 읽을 수 없거나 프로젝트 폴더 밖이에요: $envFile', cause: EnvFileMissing(envFile));
       }
     }
     env.addAll(service.env);
@@ -418,7 +446,17 @@ class RunnerOrchestrator implements Orchestrator {
 
     final r = await ready;
     if (cancel.isCompleted) return _cancelled(item);
-    if (!r.ok) return _fail(item, r.reason!, exitCode: _exitCodes[item]); // 준비 시간 초과여도 자동 종료하지 않는다(§6)
+    if (!r.ok) {
+      final code = _exitCodes[item];
+      final evidence = await _evidence(item);
+      if (cancel.isCompleted) return _cancelled(item);
+      final FailureCause cause = r.timedOut
+          ? ReadyTimeout(service.ready.timeout, evidence: evidence)
+          : code == 127 // 명령을 찾지 못하면 중계·Windows 실행기가 127 로 끝낸다
+              ? ToolMissing(service.command.first, evidence: evidence)
+              : CommandFailed(exitCode: code, evidence: evidence);
+      return _fail(item, r.reason!, exitCode: code, cause: cause); // 준비 시간 초과여도 자동 종료하지 않는다(§6)
+    }
     _set(item, ItemState.ready);
     return ItemResult(item: item, outcome: ItemOutcome.ok);
   }
@@ -441,26 +479,31 @@ class RunnerOrchestrator implements Orchestrator {
     _running.remove(item);
     unawaited(store.removeProcess(item));
     final recovered = _recovered.remove(item);
-    if (_stopping.contains(item) || (stateOf(item) != ItemState.ready && !recovered)) return;
-    _set(item, code == 0 ? ItemState.stopped : ItemState.failed,
-        reason: switch (code) {
-          0 => null,
-          -1 => '앱을 다시 켠 뒤 종료됐어요.',
-          _ => '실행 중에 종료됐어요 (종료 코드 $code).',
-        },
-        exitCode: code == -1 ? null : code);
+    final state = stateOf(item);
+    if (_stopping.contains(item) || (state != ItemState.ready && state != ItemState.readyTimeout && !recovered)) return;
+    if (code == 0) return _set(item, ItemState.stopped);
+    final exitCode = code == -1 ? null : code;
+    final reason = exitCode == null ? '앱을 다시 켠 뒤 종료됐어요.' : '실행 중에 종료됐어요 (종료 코드 $code).';
+    // 근거 로그를 읽는 사이 다시 시작했으면 그 시작의 상태를 덮지 않는다.
+    unawaited(_evidence(item).then((evidence) {
+      if (stateOf(item) == state && !_running.containsKey(item)) {
+        _fail(item, reason, exitCode: exitCode, cause: Crashed(exitCode: exitCode, evidence: evidence));
+      }
+    }));
   }
 
   /// 항목이 쓸 포트를 다른 프로그램이 쓰고 있으면 그 이유. 확인할 수 없으면 null(시작은 막지 않는다).
   /// 내가 띄운 다른 항목이 쓰고 있으면 그 항목을 알려 준다(AT-17).
-  Future<String?> _busyPort(ProcessService service) async {
+  Future<({String reason, PortBusy cause})?> _busyPort(ProcessService service) async {
     for (final port in service.ports) {
       try {
         if (await ports().whoUses(port) case final PortInUse usage) {
-          if (await runtime().ownerOf(usage) case final owner?) return '포트 $port 를 $owner 항목이 쓰고 있어요.';
+          if (await runtime().ownerOf(usage) case final owner?) {
+            return (reason: '포트 $port 를 $owner 항목이 쓰고 있어요.', cause: PortBusy(usage, owner: owner));
+          }
           final PortInUse(:processName, :pid) = usage;
           final who = processName == null ? '' : '($processName${pid == null ? '' : ', PID $pid'})';
-          return '포트 $port 를 다른 프로그램$who이 쓰고 있어요.';
+          return (reason: '포트 $port 를 다른 프로그램$who이 쓰고 있어요.', cause: PortBusy(usage));
         }
       } on Object catch (e) {
         if (e is! Exception && e is! UnimplementedError) rethrow;
@@ -508,7 +551,7 @@ class RunnerOrchestrator implements Orchestrator {
       return ItemResult(item: item, outcome: ItemOutcome.ok, forced: forced);
     } catch (e) {
       if (process != null) _running[item] ??= process; // 다시 멈출 수 있게 핸들을 되돌린다
-      return _fail(item, e is PopolingException ? e.message : '멈추지 못했어요: $e');
+      return _fail(item, e is PopolingException ? e.message : '멈추지 못했어요: $e', state: ItemState.failed);
     } finally {
       _stopping.remove(item);
     }
@@ -535,7 +578,7 @@ class RunnerOrchestrator implements Orchestrator {
     for (final MapEntry(key: item, value: service) in [..._launched.entries]) {
       final alive = switch (stateOf(item)) {
         ItemState.starting || ItemState.running || ItemState.ready || ItemState.stopping => true,
-        ItemState.failed when service is ComposeService =>
+        final s when s.isFailure && service is ComposeService =>
           await _composeLeftUp(item.projectId, service).timeout(const Duration(seconds: 3), onTimeout: () => true),
         _ => false,
       };
@@ -575,14 +618,34 @@ class RunnerOrchestrator implements Orchestrator {
   static ItemResult _cancelled(ItemRef item) =>
       ItemResult(item: item, outcome: ItemOutcome.failed, reason: '시작하는 중에 멈췄어요.');
 
-  ItemResult _fail(ItemRef item, String reason, {int? exitCode}) {
-    _set(item, ItemState.failed, reason: reason, exitCode: exitCode);
-    return ItemResult(item: item, outcome: ItemOutcome.failed, reason: reason, exitCode: exitCode);
+  /// 실패로 바꾼다. 상태는 [cause] 를 따르고, 원인이 없으면 명령 오류(시작 실패)로 본다.
+  /// 시작이 아닌 실패(멈추지 못함)는 [state] 로 옛 `failed` 를 주고 원인은 두지 않는다.
+  ItemResult _fail(ItemRef item, String reason, {int? exitCode, FailureCause? cause, ItemState? state}) {
+    final c = state == null ? cause ?? CommandFailed(exitCode: exitCode) : cause;
+    _set(item, state ?? c!.state, reason: reason, exitCode: exitCode, cause: c);
+    return ItemResult(item: item, outcome: ItemOutcome.failed, reason: reason, exitCode: exitCode, cause: c);
   }
 
-  void _set(ItemRef item, ItemState state, {String? reason, int? exitCode}) {
+  void _set(ItemRef item, ItemState state, {String? reason, int? exitCode, FailureCause? cause}) {
     _states[item] = state;
-    _events.add(ItemStateChanged(item, state, reason: reason, exitCode: exitCode));
+    if (cause == null) {
+      _causes.remove(item);
+    } else {
+      _causes[item] = cause;
+    }
+    _events.add(ItemStateChanged(item, state, reason: reason, exitCode: exitCode, cause: cause));
+  }
+
+  /// 실패 원인의 근거: 비밀값을 가린 로그 파일의 마지막 몇 줄(중계가 남긴 종료 코드 줄은 뺀다). 읽지 못하면 빈 목록.
+  Future<List<String>> _evidence(ItemRef item) async {
+    try {
+      return [
+        for (final line in await logs.tail(item, lines: 6))
+          if (exitCodeOf(line) == null) stripLogPrefix(line),
+      ];
+    } on Object {
+      return const [];
+    }
   }
 
   /// 멈출 때는 설정이 깨져 있어도 띄운 것을 멈출 수 있게 [checkConfig] 를 끈다.
