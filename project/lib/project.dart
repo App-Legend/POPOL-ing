@@ -9,17 +9,19 @@ import 'package:popoling_core/contracts.dart';
 
 import 'src/file_project_repository.dart';
 import 'src/schema_config_validator.dart';
+import 'src/screens/add_project_screen.dart';
 import 'src/screens/settings_tab.dart';
 
 export 'src/command_summary.dart';
 
-/// 프로젝트·설정의 화면(프로젝트 화면 설정 탭)과 구현을 앱에 등록한다.
+/// 프로젝트·설정의 화면(프로젝트 추가, 프로젝트 화면 설정 탭)과 구현을 앱에 등록한다.
 void register(AppRegistry app) {
   app.provide<ProjectRepository>(FileProjectRepository(() async {
     final dir = await getApplicationSupportDirectory();
     return File('${dir.path}${Platform.pathSeparator}projects.json');
   }));
   app.provide<ConfigValidator>(const SchemaConfigValidator());
+  app.route('/add-project', (_) => AddProjectScreen(projects: app.read<ProjectRepository>()));
   app.tab(ProjectTab(
     id: 'settings',
     label: '설정',

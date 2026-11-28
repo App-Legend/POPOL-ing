@@ -56,7 +56,7 @@ class FileProjectRepository implements ProjectRepository {
       }
     }
     final folderName = _folderName(folderPath);
-    final project = await _withConfig(Project(
+    final project = await withFolderConfig(Project(
       id: _newId(projects, folderName),
       name: (name == null || name.trim().isEmpty) ? folderName : name.trim(),
       folderPath: folderPath,
@@ -173,7 +173,7 @@ class FileProjectRepository implements ProjectRepository {
     }
     return [
       for (final item in raw.cast<Map<String, Object?>>())
-        await _withConfig(Project(
+        await withFolderConfig(Project(
           id: item['id']! as String,
           name: item['name']! as String,
           folderPath: item['folderPath']! as String,
@@ -195,7 +195,8 @@ class FileProjectRepository implements ProjectRepository {
   }
 
   /// 폴더의 popoling.yaml 을 읽어 붙인다. 없으면 설정 없음, 형식이 틀리면 문제 목록에 담는다(등록은 된다).
-  Future<Project> _withConfig(Project project) async {
+  /// 프로젝트 추가 화면이 등록 전에 실행할 명령을 보여 줄 때도 쓴다.
+  static Future<Project> withFolderConfig(Project project) async {
     final file = File('${project.folderPath}${Platform.pathSeparator}$configFileName');
     if (!await file.exists()) {
       return project;
