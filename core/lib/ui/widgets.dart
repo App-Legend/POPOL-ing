@@ -1,53 +1,137 @@
 import 'package:flutter/material.dart';
 
+import 'shell.dart';
 import 'theme.dart';
 
-/// 상단 바(로고 + 경로) + 가운데 정렬된 본문. 모든 내부 화면이 공유한다.
+/// 왼쪽 메뉴 + 본문 틀. 모든 내부 화면이 공유한다(목업 v2).
+///
+/// 메뉴: 로고, 카테고리 · 개발, 내 프로젝트, AI 검사, 그 아래 [ShellScope] 자리(지금 상태 목록).
 class AppPage extends StatelessWidget {
-  const AppPage({super.key, required this.crumbs, required this.children, this.trailing});
+  const AppPage({super.key, required this.crumbs, required this.children, this.trailing, this.side, this.header});
 
-  /// 경로. 마지막 항목은 현재 화면, 나머지는 (이름, 라우트).
+  /// 경로. 마지막 항목은 현재 화면, 나머지는 (이름, 라우트). 본문 맨 위에 작게 보인다.
   final List<(String, String?)> crumbs;
   final List<Widget> children;
   final Widget? trailing;
 
+  /// 본문 오른쪽에 붙는 패널(예: 개발 홈의 운동장). 본문과 따로 스크롤된다.
+  final Widget? side;
+
+  /// 본문 위 흰 머리 영역(프로젝트 화면의 이름·탭). 화면 폭 전체에 붙고 아래 테두리가 있다.
+  final Widget? header;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(children: [
-        Container(
-          height: 60,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.border))),
-          child: Row(children: [
-            InkWell(
-              onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
-              child: const Row(children: [Logo(size: 28), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17))]),
-            ),
-            const SizedBox(width: 16),
-            for (final (i, (label, route)) in crumbs.indexed) ...[
-              const Text(' / ', style: TextStyle(color: C.muted, fontSize: 14)),
-              i == crumbs.length - 1
-                  ? Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500))
-                  : LinkText(label, onTap: () => go(context, route!)),
-            ],
-            const Spacer(),
-            ?trailing,
-          ]),
-        ),
+      body: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        const _SideMenu(),
         Expanded(
           child: SingleChildScrollView(
-            child: Center(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              if (header case final h?)
+                Container(
+                  decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.border))),
+                  child: Align(alignment: Alignment.topLeft, child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1304), child: h)),
+                ),
+              Align(
+              alignment: Alignment.topLeft,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1200),
+                constraints: const BoxConstraints(maxWidth: 1240),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 40),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 20, children: children),
+                  padding: const EdgeInsets.fromLTRB(32, 20, 32, 40),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 20, children: [
+                    // 목업 v2: 아래 단계 화면만 맨 위에 "‹ 상위 화면" 돌아가기 링크를 둔다.
+                    if (crumbs.length > 1 || trailing != null)
+                      Row(children: [
+                        if (crumbs.length > 1 && crumbs.first.$2 != null)
+                          InkWell(
+                            onTap: () => go(context, crumbs.first.$2!),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.chevron_left, size: 16, color: C.text2),
+                              Text(crumbs.first.$1, style: const TextStyle(fontSize: 13, color: C.text2)),
+                            ]),
+                          ),
+                        const Spacer(),
+                        ?trailing,
+                      ]),
+                    ...children,
+                  ]),
+                ),
+              ),
+              ),
+            ]),
+          ),
+        ),
+        ?side,
+      ]),
+    );
+  }
+}
+
+class _SideMenu extends StatelessWidget {
+  const _SideMenu();
+
+  static const _items = [('내 프로젝트', '/home', Icons.folder_outlined), ('AI 검사', '/ai', Icons.auto_awesome_outlined)];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ModalRoute.of(context)?.settings.name;
+    final active = current == '/dashboard' ? '/home' : current;
+    final status = ShellScope.statusOf(context);
+    return Container(
+      width: 224,
+      color: C.nav,
+      padding: const EdgeInsets.fromLTRB(10, 14, 10, 14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        InkWell(
+          onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
+          child: const Padding(
+            padding: EdgeInsets.fromLTRB(12, 2, 12, 10),
+            child: Row(children: [Logo(size: 18), SizedBox(width: 8), Text('포폴링', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white))]),
+          ),
+        ),
+        InkWell(
+          onTap: () => go(context, '/'),
+          borderRadius: BorderRadius.circular(8),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            child: Row(children: [
+              Icon(Icons.chevron_left, size: 16, color: C.navMuted),
+              SizedBox(width: 4),
+              Text('카테고리 · 개발', style: TextStyle(fontSize: 13, color: C.navMuted)),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 6),
+        for (final (label, route, icon) in _items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Material(
+              color: active == route ? C.navActive : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                key: ValueKey('menu-$route'),
+                borderRadius: BorderRadius.circular(8),
+                onTap: () => go(context, route),
+                child: SizedBox(
+                  height: 42,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(children: [
+                      Icon(icon, size: 18, color: active == route ? Colors.white : C.navText),
+                      const SizedBox(width: 10),
+                      Text(label, style: TextStyle(fontSize: 14, fontWeight: active == route ? FontWeight.w600 : FontWeight.w400, color: active == route ? Colors.white : C.navText)),
+                    ]),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
+        // "지금 상태" 제목은 목록이 직접 그린다(보여 줄 프로젝트가 없으면 제목도 숨긴다).
+        if (status != null) ...[
+          const Spacer(),
+          ConstrainedBox(constraints: const BoxConstraints(maxHeight: 360), child: SingleChildScrollView(child: status)),
+        ],
       ]),
     );
   }
@@ -64,18 +148,36 @@ void go(BuildContext context, String route) {
   if (!found) nav.pushNamed(route);
 }
 
+/// 포폴링 로고(주황 P). 목업 v2 의 SVG 경로를 그대로 그린다.
 class Logo extends StatelessWidget {
   const Logo({super.key, this.size = 28});
   final double size;
 
   @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(color: C.primary, borderRadius: BorderRadius.circular(size * 0.28)),
-        child: Text('P', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: size * 0.48)),
-      );
+  Widget build(BuildContext context) => CustomPaint(size: Size.square(size), painter: const _LogoPainter());
+}
+
+class _LogoPainter extends CustomPainter {
+  const _LogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 256);
+    // M53 210V100A75 75 0 1 1 128 175A19 19 0 0 1 128 137A37 37 0 1 0 91 100V210A19 19 0 0 1 53 210Z
+    final path = Path()
+      ..moveTo(53, 210)
+      ..lineTo(53, 100)
+      ..arcToPoint(const Offset(128, 175), radius: const Radius.circular(75), largeArc: true)
+      ..arcToPoint(const Offset(128, 137), radius: const Radius.circular(19))
+      ..arcToPoint(const Offset(91, 100), radius: const Radius.circular(37), largeArc: true, clockwise: false)
+      ..lineTo(91, 210)
+      ..arcToPoint(const Offset(53, 210), radius: const Radius.circular(19))
+      ..close();
+    canvas.drawPath(path, Paint()..color = C.logo);
+  }
+
+  @override
+  bool shouldRepaint(_LogoPainter oldDelegate) => false;
 }
 
 class LinkText extends StatelessWidget {
@@ -127,17 +229,18 @@ class StatusChip extends StatelessWidget {
   final bool dot;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-        decoration: BoxDecoration(color: tone.$1, borderRadius: BorderRadius.circular(999)),
+  Widget build(BuildContext context) => Align(alignment: Alignment.centerLeft, widthFactor: 1, heightFactor: 1, child: Container(
+        height: 24,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        decoration: BoxDecoration(color: tone.$1, borderRadius: BorderRadius.circular(12)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           if (dot) ...[
             Container(width: 7, height: 7, decoration: BoxDecoration(color: tone.$2, shape: BoxShape.circle)),
             const SizedBox(width: 6),
           ],
-          Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: tone.$2, fontSize: 12, fontWeight: FontWeight.w500))),
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: TextStyle(color: tone.$2, fontSize: 12.5, fontWeight: FontWeight.w600))),
         ]),
-      );
+      ));
 }
 
 /// 기술 스택·유형 태그.
@@ -148,35 +251,51 @@ class Tag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         decoration: BoxDecoration(
-          color: tone?.$1 ?? C.surface,
-          border: Border.all(color: tone == null ? C.borderStrong : const Color(0xFFB9C8F5)),
+          color: tone?.$1 ?? C.headBg,
+          border: Border.all(color: tone == null ? C.border : const Color(0xFFB9C8F5)),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Text(label, style: TextStyle(fontSize: 12, color: tone?.$2 ?? C.text2)),
+        child: Center(widthFactor: 1, child: Text(label, style: TextStyle(fontSize: 12, color: tone?.$2 ?? C.text2))),
       );
 }
 
 /// 흰 카드. [title]이 있으면 위에 제목.
 class Panel extends StatelessWidget {
-  const Panel({super.key, this.title, this.titleAction, required this.child, this.padding = const EdgeInsets.all(20)});
+  const Panel({super.key, this.title, this.titleAction, this.subtitle, this.actions = const [], required this.child, this.padding = const EdgeInsets.all(20), this.danger = false});
   final String? title;
+
+  /// 실패 안내(목업 v2): 빨간 테두리, 경고 아이콘과 빨간 제목, 제목 아래 구분선.
+  final bool danger;
+
+  /// 제목 바로 옆(예: 상태 칩).
   final Widget? titleAction;
+
+  /// 제목 줄의 짧은 설명(목업 v2: 칩 뒤에 회색 글자).
+  final String? subtitle;
+
+  /// 제목 줄 오른쪽 버튼들.
+  final List<Widget> actions;
   final Widget child;
   final EdgeInsets padding;
 
   @override
   Widget build(BuildContext context) => Container(
         clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(color: C.surface, border: Border.all(color: C.border), borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: C.surface, border: Border.all(color: danger ? const Color(0xFFF2B8B5) : C.border), borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           if (title != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(children: [
-                Expanded(child: Text(title!, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            Container(
+              padding: danger ? const EdgeInsets.fromLTRB(20, 14, 20, 14) : const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              decoration: danger ? const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFF6D5D2)))) : null,
+              child: Row(spacing: 10, children: [
+                if (danger) Icon(Icons.warning_amber_rounded, size: 18, color: C.bad.$2),
+                Text(title!, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: danger ? C.bad.$2 : null)),
                 ?titleAction,
+                Expanded(child: subtitle == null ? const SizedBox() : Text(subtitle!, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: C.text2))),
+                ...actions,
               ]),
             ),
           Padding(padding: padding, child: child),
@@ -199,12 +318,13 @@ class Btn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = (primary ? FilledButton.styleFrom() : OutlinedButton.styleFrom()).copyWith(
-      minimumSize: WidgetStatePropertyAll(Size(0, small ? 36 : 44)),
+      minimumSize: WidgetStatePropertyAll(Size(0, small ? 32 : 38)),
       padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: small ? 12 : 16)),
       shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
       side: primary ? null : WidgetStatePropertyAll(BorderSide(color: ghost ? Colors.transparent : C.borderStrong)),
       foregroundColor: primary ? null : const WidgetStatePropertyAll(C.text),
-      textStyle: const WidgetStatePropertyAll(TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+      textStyle: WidgetStatePropertyAll(TextStyle(fontFamily: bodyFont, fontSize: small ? 13 : 14, fontWeight: primary ? FontWeight.w600 : FontWeight.w500)),
+      backgroundColor: primary ? null : WidgetStatePropertyAll(ghost ? Colors.transparent : C.surface),
     );
     final child = icon == null
         ? Text(label)
@@ -341,6 +461,37 @@ class AutoGrid extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
         final cols = ((box.maxWidth + gap) / (minItemWidth + gap)).floor().clamp(1, children.length);
         final w = (box.maxWidth - gap * (cols - 1)) / cols;
-        return Wrap(spacing: gap, runSpacing: gap, children: [for (final c in children) SizedBox(width: w, child: c)]);
+        // 한 줄의 카드 높이를 맞춘다(목업 v2 격자). 마지막 줄의 빈 칸은 비워 둔다.
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: gap, children: [
+          for (var i = 0; i < children.length; i += cols)
+            IntrinsicHeight(
+              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: gap, children: [
+                for (final c in children.skip(i).take(cols)) SizedBox(width: w, child: c),
+              ]),
+            ),
+        ]);
       });
 }
+
+/// 다른 프로젝트 항목을 멈추기 전 확인(FR-06, 목업 v2 3c). [중지]면 true.
+///
+/// 포트를 내 다른 프로젝트 항목이 쓸 때만 쓴다. 외부 프로그램은 멈추지 않으므로 이 창도 없다.
+Future<bool> confirmStopOther(BuildContext context, {required String project, required String service}) async =>
+    await showDialog<bool>(
+      context: context,
+      builder: (c) => Dialog(
+        child: DialogBody('다른 프로젝트의 $project / $service을 중지할까요?', [
+          Text(
+            '지금 보고 있는 프로젝트가 아니라 $project의 $service 항목이에요. 포폴링이 시작한 항목이라 중지할 수 있어요. '
+            '$project의 다른 항목은 그대로 둬요.',
+            style: const TextStyle(fontSize: 14, color: C.text2, height: 1.6),
+          ),
+          Row(mainAxisAlignment: MainAxisAlignment.end, spacing: 8, children: [
+            // 기본(Enter) 포커스는 [취소]. 다른 프로젝트 항목을 실수로 멈추지 않게 한다.
+            OutlinedButton(autofocus: true, onPressed: () => closeDialog(c, false), child: const Text('취소')),
+            FilledButton(onPressed: () => closeDialog(c, true), child: const Text('중지')),
+          ]),
+        ]),
+      ),
+    ) ??
+    false;

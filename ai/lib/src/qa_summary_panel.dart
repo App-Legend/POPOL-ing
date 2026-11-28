@@ -3,6 +3,8 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import 'ai_request.dart';
+import 'messages.dart';
+import 'analysis_history.dart';
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
 import 'qa_summary.dart';
@@ -27,6 +29,7 @@ class QaSummaryPanel extends StatefulWidget {
     required this.orchestrator,
     this.checkKey,
     this.onKeysChanged,
+    this.onRecord,
   });
 
   /// 요약할 검사.
@@ -47,6 +50,9 @@ class QaSummaryPanel extends StatefulWidget {
 
   /// 패널의 [키 입력]·[키 바꾸기]로 키를 저장하거나 지웠을 때. 화면 머리의 키 상태를 다시 읽게 한다.
   final VoidCallback? onKeysChanged;
+
+  /// 요약이 끝나면(답 받음·보내지 못함) 기록 하나를 넘긴다.
+  final void Function(AnalysisRecord record)? onRecord;
 
   @override
   State<QaSummaryPanel> createState() => _QaSummaryPanelState();
@@ -128,7 +134,20 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
         description: _description,
         checkKey: widget.checkKey,
         onKeysChanged: widget.onKeysChanged,
+        onDone: (sentences) => _record(AnalysisOutcome.received, sentences.first.text, sentences.map((s) => s.text).join('\n')),
+        onFailed: (failure) => _record(AnalysisOutcome.failed, llmErrorText(failure).title, null),
       );
+
+  void _record(AnalysisOutcome outcome, String title, String? body) => widget.onRecord?.call(AnalysisRecord(
+        kind: AnalysisKind.qaSummary,
+        projectId: widget.run.projectId,
+        title: title,
+        body: body,
+        sentSummary: '헬스체크 결과 ${widget.run.results.length}건(주소는 경로만)',
+        model: outcome == AnalysisOutcome.received ? widget.client.modelName : null,
+        at: DateTime.now(),
+        outcome: outcome,
+      ));
 
   Widget _done(QaSummaryInput input, List<QaSummarySentence> sentences, VoidCallback again) {
     const body = TextStyle(fontSize: 14, height: 1.6);

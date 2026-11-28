@@ -1,0 +1,232 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:popoling_core/contracts.dart';
+import 'package:popoling_core/ui.dart';
+
+import '../file_project_repository.dart';
+
+/// 프로젝트 화면 설정 탭(목업 v2 6번). 지금은 메모만 고칠 수 있다. 나머지 편집은 #92.
+///
+/// `.env` 파일은 이름만 보여 주고 내용은 읽지 않는다.
+class SettingsTab extends StatefulWidget {
+  const SettingsTab({super.key, required this.projectId, required this.projects});
+
+  final String projectId;
+  final ProjectRepository projects;
+
+  @override
+  State<SettingsTab> createState() => _SettingsTabState();
+}
+
+class _SettingsTabState extends State<SettingsTab> {
+  Project? _project;
+  String? _error;
+  String? _open;
+  final _memo = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.projects.getProject(widget.projectId).then((p) {
+      if (mounted) setState(() => _show(p));
+    }, onError: (Object e) {
+      if (mounted) setState(() => _error = e is PopolingException ? e.message : '설정을 읽지 못했어요.');
+    });
+  }
+
+  @override
+  void dispose() {
+    _memo.dispose();
+    super.dispose();
+  }
+
+  void _show(Project p) {
+    _project = p;
+    _memo.text = p.about.memo ?? '';
+  }
+
+  Future<void> _saveMemo() async {
+    final p = _project!;
+    final text = _memo.text.trim();
+    final memo = text.isEmpty ? null : text;
+    final a = p.about;
+    final about = About(summary: a.summary, stack: a.stack, links: a.links, memo: memo);
+    final config = p.config?.copyWith(about: about) ?? ProjectConfig(about: about);
+    setState(() => _saving = true);
+    String message;
+    try {
+      final saved = await widget.projects.updateProject(p.copyWith(config: config));
+      if (mounted) setState(() => _show(saved));
+      message = '메모를 저장했어요.';
+    } on PopolingException catch (e) {
+      message = e.message;
+    } on FileSystemException {
+      message = '저장하지 못했어요. 다른 프로그램이 popoling.yaml 을 열고 있는지 확인해 주세요.';
+    } catch (e) {
+      message = '메모를 저장하지 못했어요: $e'; // 어떤 오류든 [메모 저장] 버튼이 막힌 채 남지 않게
+    }
+    if (!mounted) return;
+    setState(() => _saving = false);
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = _project;
+    if (p == null) return _error == null ? const LinearProgressIndicator() : Text(_error!, style: const TextStyle(color: C.muted));
+    final config = p.config;
+    final about = p.about;
+    String orNone(String? v) => v == null || v.isEmpty ? '아직 없어요' : v;
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
+      if (p.configIssues.isNotEmpty)
+        Notice(
+          bg: C.bad.$1,
+          border: C.bad.$1,
+          icon: Icons.error_outline,
+          iconColor: C.bad.$2,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
+            Text('설정 파일에 고칠 곳이 ${p.configIssues.length}개 있어요', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: C.bad.$2)),
+            for (final i in p.configIssues)
+              Text(i.path.isEmpty ? i.message : '${i.path}: ${i.message}', style: TextStyle(fontSize: 13, color: C.bad.$2)),
+          ]),
+        ),
+      Panel(
+        title: '소개·메모',
+        child: KeyValues([
+          ('한 줄 설명', Text(orNone(about.summary))),
+          ('기술', Text(about.stack.isEmpty ? '아직 없어요' : about.stack.join(', '))),
+          ('저장소', Text(orNone(about.links['repo']))),
+          (
+            '메모',
+            // 읽지 못한 설정 위에 저장하면 원래 내용이 지워지므로, 문제가 있으면 보기만 한다.
+            p.configIssues.isNotEmpty
+                ? Text(orNone(about.memo))
+                : Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 8, children: [
+                    TextField(
+                      key: const ValueKey('settings-memo'),
+                      controller: _memo,
+                      minLines: 1,
+                      maxLines: 3,
+                      style: const TextStyle(fontSize: 14),
+                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), hintText: '이 프로젝트에 대해 남길 메모'),
+                    ),
+                    Btn('메모 저장', small: true, onPressed: _saving ? null : _saveMemo),
+                  ]),
+          ),
+          ('설정 파일', Text('${p.folderPath}/${FileProjectRepository.configFileName}', style: mono.copyWith(fontSize: 13))),
+        ]),
+      ),
+      if (config == null || config.services.isEmpty)
+        const Panel(title: '실행 항목', child: Text('실행 방법이 아직 없어요', style: TextStyle(fontSize: 14)))
+      else
+        Panel(
+          title: '실행 항목 · ${config.services.length}',
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Container(
+              color: C.headBg,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+              child: _cells(const Text('이름'), const Text('종류'), const Text('명령'), const Text('포트'), const Text('시작 순서'), header: true),
+            ),
+            for (final (i, s) in config.services.indexed) _serviceRow(i, s),
+          ]),
+        ),
+      if (config != null && config.requires.isNotEmpty)
+        Panel(
+          title: '필요한 도구',
+          child: SimpleTable(
+            minWidth: 400,
+            columns: const ['도구', '필요 버전'],
+            rows: [
+              for (final r in config.requires)
+                switch (r) {
+                  CliRequirement(:final cli, :final version) => [Text(cli, style: mono), Text(version ?? '설치돼 있으면 돼요')],
+                  DockerRequirement() => [Text('Docker', style: mono), const Text('켜져 있어야 해요')],
+                },
+            ],
+          ),
+        ),
+    ]);
+  }
+
+  Widget _serviceRow(int index, ServiceConfig s) {
+    final open = _open == s.id;
+    final (kind, command, port) = switch (s) {
+      ProcessService(:final command, :final ports) => ('프로세스', command.join(' '), ports.isEmpty ? '—' : ports.join(', ')),
+      ComposeService(:final file, :final services) => ('Compose', [file, ...services].join(' · '), '—'),
+      RemoteService(:final ready) => ('원격', _readyTarget(ready), '—'),
+    };
+    final order = s is RemoteService
+        ? '연결만 확인'
+        : s.dependsOn.isEmpty
+            ? '${index + 1} · 가장 먼저'
+            : '${index + 1} · ${s.dependsOn.join(', ')} 다음';
+    return Container(
+      decoration: const BoxDecoration(border: Border(top: BorderSide(color: C.divider))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Material(
+          color: open ? C.primarySoft : Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _open = open ? null : s.id),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: _cells(
+                Text(s.id, style: const TextStyle(fontWeight: FontWeight.w600)),
+                s is RemoteService ? const StatusChip('원격', C.remote) : Tag(kind),
+                Text(command, style: mono.copyWith(fontSize: 13), overflow: TextOverflow.ellipsis),
+                Text(port, style: mono.copyWith(fontSize: 13)),
+                Text(order, style: const TextStyle(fontSize: 13, color: C.text2)),
+                open: open,
+              ),
+            ),
+          ),
+        ),
+        if (open)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(52, 12, 20, 16),
+            child: KeyValues([
+              if (s case ProcessService(:final cwd, :final envFile, :final stopTimeout)) ...[
+                ('실행할 폴더', Text(cwd, style: mono)),
+                if (envFile != null) ('비밀값 파일', Text(envFile, style: mono)),
+                ('중지 대기', Text('${stopTimeout.inSeconds}초')),
+              ],
+              ('먼저 시작할 항목', Text(s.dependsOn.isEmpty ? '없음' : s.dependsOn.join(', '))),
+              ('준비 확인', Text(_readyText(s.ready))),
+            ]),
+          ),
+      ]),
+    );
+  }
+
+  /// 실행 항목 표의 한 줄(머리줄과 내용 줄이 같은 칸 폭을 쓴다).
+  Widget _cells(Widget name, Widget kind, Widget command, Widget port, Widget order, {bool header = false, bool open = false}) => DefaultTextStyle.merge(
+        style: header ? const TextStyle(fontSize: 12.5, color: C.muted, fontWeight: FontWeight.w500) : null,
+        child: Row(spacing: 12, children: [
+          SizedBox(width: 20, child: header ? null : Icon(open ? Icons.expand_more : Icons.chevron_right, size: 18, color: C.muted)),
+          SizedBox(width: 100, child: name),
+          SizedBox(width: 100, child: Align(alignment: Alignment.centerLeft, child: kind)),
+          Expanded(child: command),
+          SizedBox(width: 70, child: port),
+          SizedBox(width: 130, child: order),
+        ]),
+      );
+
+  static String _readyTarget(ReadyCondition r) => switch (r) {
+        HttpReady(:final url) => url,
+        PortReady(:final host, :final port) => '${host ?? 'localhost'}:$port',
+        _ => '—',
+      };
+
+  static String _readyText(ReadyCondition r) {
+    final what = switch (r) {
+      PortReady(:final host, :final port) => '포트 ${host ?? 'localhost'}:$port 열림',
+      HttpReady(:final url) => '주소 응답 · $url',
+      LogReady(:final pattern) => '로그에 "$pattern"',
+      ComposeHealthyReady() => 'Compose healthcheck',
+      NoneReady() => '시작하면 바로 준비 완료',
+    };
+    return r is NoneReady ? what : '$what · 최대 ${r.timeout.inSeconds}초';
+  }
+}

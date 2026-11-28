@@ -3,9 +3,11 @@ import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import 'ai_request.dart';
+import 'analysis_history.dart';
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
 import 'failure_analysis.dart';
+import 'messages.dart';
 import 'redact.dart';
 
 /// 보내기 전 확인 창에 쓰는 분석 이름.
@@ -35,6 +37,7 @@ class FailureAnalysisPanel extends StatefulWidget {
     this.description,
     this.checkKey,
     this.onKeysChanged,
+    this.onRecord,
   });
 
   /// 분석할 실패 항목.
@@ -54,6 +57,9 @@ class FailureAnalysisPanel extends StatefulWidget {
   final String? description;
   final ApiKeyCheck? checkKey;
   final VoidCallback? onKeysChanged;
+
+  /// 분석이 끝나면(답 받음·보내지 못함) 기록 하나를 넘긴다. AI 검사 화면 기록에 남긴다.
+  final void Function(AnalysisRecord record)? onRecord;
 
   @override
   State<FailureAnalysisPanel> createState() => _FailureAnalysisPanelState();
@@ -91,7 +97,32 @@ class _FailureAnalysisPanelState extends State<FailureAnalysisPanel> {
         description: widget.description,
         checkKey: widget.checkKey,
         onKeysChanged: widget.onKeysChanged,
+        onDone: (candidates) => _record(
+          AnalysisOutcome.received,
+          candidates.first.cause,
+          [
+            for (final c in candidates) ...[
+              '원인 후보 · ${likelihoodLabel(c.likelihood)}: ${c.cause}',
+              for (final line in c.logLines) '근거 로그: ${redactSecrets(line).text}',
+              for (final e in c.envChanges) '환경 차이: ${envChangeLabel(e)}',
+              for (final (i, fix) in c.fixes.indexed) '해결 ${i + 1}. $fix',
+            ],
+          ].join('\n'),
+        ),
+        onFailed: (failure) => _record(AnalysisOutcome.failed, llmErrorText(failure).title, null),
       );
+
+  void _record(AnalysisOutcome outcome, String title, String? body) => widget.onRecord?.call(AnalysisRecord(
+        kind: AnalysisKind.failure,
+        projectId: widget.item.item.projectId,
+        serviceId: widget.item.item.serviceId,
+        title: title,
+        body: body,
+        sentSummary: '${widget.item.item.serviceId} 로그(비밀값 가림), 마지막 성공 때와 달라진 환경, 실행 설정',
+        model: outcome == AnalysisOutcome.received ? widget.client.modelName : null,
+        at: DateTime.now(),
+        outcome: outcome,
+      ));
 
   Widget _done(List<FailureCandidate> candidates, VoidCallback again) {
     const body = TextStyle(fontSize: 14, height: 1.6);

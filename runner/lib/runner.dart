@@ -18,10 +18,10 @@ import 'src/runtime/legacy_data.dart';
 import 'src/runtime/runner_runtime_query.dart';
 import 'src/runtime/runtime_store.dart';
 import 'src/screens/dashboard_screen.dart';
-import 'src/screens/detail_screen.dart';
 import 'src/screens/exit_guard.dart';
+import 'src/screens/git_tab.dart';
 
-/// 실행 제어의 화면(대시보드 `/dashboard`, 항목 상세 `/detail`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt])을 앱에 등록한다.
+/// 실행 제어의 화면(프로젝트 화면 `/dashboard`)과 구현([Orchestrator]·[RuntimeQuery]·[LogExcerpt])을 앱에 등록한다.
 ///
 /// 다른 기능의 구현([ProjectRepository]·[ItemLauncher]·[PortProbe]·[HttpProbe]·[RuntimeQuery])은 처음 쓸 때 꺼낸다.
 void register(AppRegistry app) {
@@ -40,7 +40,11 @@ void register(AppRegistry app) {
     git: git,
   );
   app.provide<Orchestrator>(orchestrator);
-  unawaited(orchestrator.recover()); // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다
+  // 앱을 다시 켜기 전에 띄운 항목을 되살린다(FR-11). 다른 기능이 모두 등록된 뒤 돈다.
+  // 데모 모드처럼 Orchestrator 가 가짜로 바뀌었으면 실제 runtime.json 을 건드리지 않는다.
+  scheduleMicrotask(() {
+    if (identical(app.read<Orchestrator>(), orchestrator)) unawaited(orchestrator.recover());
+  });
   app.provide<RuntimeQuery>(RunnerRuntimeQuery(
     processes: () => orchestrator.liveProcesses,
     launcher: () => app.read<ItemLauncher>(),
@@ -58,17 +62,17 @@ void register(AppRegistry app) {
             runtime: app.read<RuntimeQuery>(),
             git: git,
             logs: logs,
-          ));
-  app.route(
-      '/detail',
-      (context) => DetailScreen(
-            item: args(context) as ItemRef,
-            projects: app.read<ProjectRepository>(),
-            runner: app.read<Orchestrator>(),
-            process: (item) => orchestrator.liveProcesses.where((p) => p.item == item).firstOrNull,
-            logs: logs,
             launcher: app.read<ItemLauncher>(),
+            tabs: app.tabs,
+            panels: _tryRead<ProjectPanels>(app) ?? const ProjectPanels(),
+            qa: _tryRead<QaRunner>(app),
           ));
+  app.tab(ProjectTab(
+    id: 'git',
+    label: 'Git',
+    order: 20,
+    build: (_, projectId) => GitTab(projectId: projectId, projects: app.read<ProjectRepository>(), git: git),
+  ));
 }
 
 /// [child] 를 감싸, 앱을 닫을 때 실행 중인 항목이 있으면 묻는다(FR-12). 가짜 구현이면 그대로 둔다.
@@ -85,3 +89,12 @@ String relayPath() =>
 
 /// 앱 이름을 ppoling 에서 popoling 으로 바꾸기 전의 앱 데이터를 새 폴더로 옮긴다. 다른 기능이 데이터를 읽기 전에 `main` 에서 한 번 부른다.
 Future<void> moveLegacyData() async => moveLegacyDataDir(await getApplicationSupportDirectory());
+
+/// 등록된 구현을 꺼낸다. 아직 없으면 null.
+T? _tryRead<T extends Object>(AppRegistry app) {
+  try {
+    return app.read<T>();
+  } on StateError {
+    return null;
+  }
+}

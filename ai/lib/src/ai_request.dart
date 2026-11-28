@@ -13,7 +13,6 @@ const aiWorkingText = '분석하고 있어요. 그동안에도 실행·종료 �
 ///
 /// 키 확인 → [startLabel] → 보내기 전 확인 창([AiSender]) → 분석 중·[취소] → [done] 또는 오류 안내.
 /// 각 기능은 무엇을 보낼지([content])와 답을 어떻게 읽고 그릴지([parse]·[done])만 넘긴다.
-// #43 분석 기록은 여기서 분석이 끝날 때(완료·실패·취소) 한 번 남긴다.
 class AiRequestView<T extends Object> extends StatefulWidget {
   const AiRequestView({
     super.key,
@@ -30,6 +29,8 @@ class AiRequestView<T extends Object> extends StatefulWidget {
     this.description,
     this.checkKey,
     this.onKeysChanged,
+    this.onDone,
+    this.onFailed,
   });
 
   final LlmClient client;
@@ -68,6 +69,12 @@ class AiRequestView<T extends Object> extends StatefulWidget {
 
   /// [키 입력]·[키 바꾸기]로 키를 저장하거나 지웠을 때. 화면 머리의 키 상태를 다시 읽게 한다.
   final VoidCallback? onKeysChanged;
+
+  /// 답을 읽었을 때 한 번(분석 기록). 취소한 분석은 부르지 않는다.
+  final void Function(T result)? onDone;
+
+  /// 보냈는데 실패했을 때 한 번(분석 기록). 키가 없어 보내지 않은 것도 부르지 않는다.
+  final void Function(LlmFailure failure)? onFailed;
 
   @override
   State<AiRequestView<T>> createState() => _AiRequestViewState<T>();
@@ -145,12 +152,14 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
         return _set(_Phase.unreadable);
       }
       _result = result;
+      widget.onDone?.call(result);
       _set(_Phase.done);
     } on LlmException catch (e) {
       if (attempt != _attempt) {
         return;
       }
       _failure = e.failure;
+      if (e.failure != LlmFailure.missingKey) widget.onFailed?.call(e.failure);
       _set(e.failure == LlmFailure.missingKey ? _Phase.missingKey : _Phase.failed);
     } catch (_) {
       // LlmException 이 아닌 오류. 보내기 전이면 키 저장소 문제, 보낸 뒤면 연결 문제로 안내한다("분석 중"에 멈추지 않게).
@@ -159,6 +168,7 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
       }
       if (confirmed) {
         _failure = LlmFailure.network;
+        widget.onFailed?.call(LlmFailure.network);
         _set(_Phase.failed);
       } else {
         _set(_Phase.keyUnreadable);

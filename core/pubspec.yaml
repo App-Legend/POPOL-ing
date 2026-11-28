@@ -15,3 +15,26 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^6.0.0
+
+flutter:
+  # 목업 v2 글꼴(둘 다 OFL, 라이선스는 fonts/OFL-*.txt). 인터넷 없이도 같은 모양이 나오게 앱에 넣는다.
+  fonts:
+    - family: IBMPlexSansKR
+      fonts:
+        - asset: fonts/IBMPlexSansKR-Regular.ttf
+        - asset: fonts/IBMPlexSansKR-Medium.ttf
+          weight: 500
+        - asset: fonts/IBMPlexSansKR-SemiBold.ttf
+          weight: 600
+        - asset: fonts/IBMPlexSansKR-Bold.ttf
+          weight: 700
+    - family: JetBrainsMono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf
+        - asset: fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: fonts/JetBrainsMono-SemiBold.ttf
+          weight: 600
+  # 목업 v2 마스코트(상태별 캐릭터). 목업 SVG 를 192px PNG 로 바꿨다.
+  assets:
+    - assets/mascot/

@@ -69,14 +69,16 @@ void main() {
     expect(stops, 1);
   });
 
-  testWidgets('그대로 두고 닫기는 멈추지 않고 닫는다', (tester) async {
+  testWidgets('exit dialog has two buttons', (tester) async {
     await pump(tester);
-    final response = request(tester);
+    unawaited(request(tester));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('그대로 두고 닫기'));
+    expect(find.text('그대로 두고 닫기'), findsNothing);
+    expect(find.text('모두 종료하고 닫기'), findsOneWidget);
+    expect(find.text('취소'), findsOneWidget);
+    expect(find.textContaining('demo — db, api'), findsOneWidget);
+    await tester.tap(find.text('취소'));
     await tester.pumpAndSettle();
-    expect(await response, AppExitResponse.exit);
-    expect(stops, 0);
   });
 
   testWidgets('취소와 Esc 는 닫지 않고, 다시 닫으면 또 묻는다', (tester) async {

@@ -10,6 +10,13 @@ import 'package:popoling_core/ui.dart';
 class TestRegistry implements AppRegistry {
   final Map<String, WidgetBuilder> routes = {};
   final Map<Type, Object> _services = {};
+  final Map<String, ProjectTab> _tabs = {};
+
+  @override
+  void tab(ProjectTab tab) => _tabs[tab.id] = tab;
+
+  @override
+  List<ProjectTab> get tabs => _tabs.values.toList()..sort((a, b) => a.order.compareTo(b.order));
 
   @override
   void route(String path, WidgetBuilder builder) => routes[path] = builder;
@@ -41,6 +48,7 @@ void main() {
     ai.register(app);
     expect(app.read<LlmClient>(), isA<ai.GeminiLlmClient>());
     expect(app.routes.keys, contains('/ai'));
+    expect(app.read<ai.AnalysisHistory>(), isA<ai.AnalysisHistory>());
   });
 
   testWidgets('/ai 는 OS 보안 저장소에 둔 키를 읽어 보여 준다', (tester) async {
@@ -61,59 +69,5 @@ void main() {
     app.provide<LlmClient>(FakeLlmClient(modelName: 'local-model'));
     await openAi(tester, app);
     expect(find.text('local-model · 키 ••••••••9876'), findsOneWidget);
-  });
-
-  testWidgets('/ai 에 프로젝트 ID 를 넘기면 등록된 QaRunner·Orchestrator 로 헬스체크 결과 요약 카드를 그린다', (tester) async {
-    FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
-    final projects = FakeProjectRepository.withSamples();
-    final qa = FakeQaRunner(projects, failing: {'API 헬스'});
-    await qa.runChecks('my-team-project');
-    final app = TestRegistry()
-      ..provide<QaRunner>(qa)
-      ..provide<Orchestrator>(FakeOrchestrator(projects));
-    ai.register(app);
-    tester.view.physicalSize = const Size(1280, 900);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      routes: app.routes,
-      home: Builder(builder: (c) => Btn('열기', onPressed: () => Navigator.pushNamed(c, '/ai', arguments: 'my-team-project'))),
-    ));
-    await tester.tap(find.text('열기'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('헬스체크 결과 요약'), findsOneWidget);
-    expect(find.text('AI 요약'), findsOneWidget);
-  });
-
-  testWidgets('/ai 에 프로젝트를 넘기면 EnvDiff·LogExcerpt 가 등록되지 않아도 원인 분석을 연다', (tester) async {
-    FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
-    final projects = FakeProjectRepository.withSamples();
-    final runner = FakeOrchestrator(projects, failing: {const ItemRef(projectId: 'my-team-project', serviceId: 'api')});
-    await runner.runAll('my-team-project');
-    final app = TestRegistry()
-      ..provide<ProjectRepository>(projects)
-      ..provide<QaRunner>(FakeQaRunner(projects))
-      ..provide<Orchestrator>(runner);
-    ai.register(app);
-    tester.view.physicalSize = const Size(1280, 1600);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    await tester.pumpWidget(MaterialApp(
-      theme: buildTheme(),
-      routes: app.routes,
-      home: Builder(builder: (c) => Btn('열기', onPressed: () => Navigator.pushNamed(c, '/ai', arguments: 'my-team-project'))),
-    ));
-    await tester.tap(find.text('열기'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('원인 분석'));
-    await tester.pumpAndSettle();
-    final preview = tester.widget<SelectableText>(find.byKey(const Key('send-preview'))).data!;
-    expect(preview, contains('[환경 차이] 환경 비교를 아직 쓸 수 없어요.'));
-    expect(preview, contains('[로그] 로그를 읽지 못했어요.'));
-    await tester.tap(find.text('취소'));
-    await tester.pumpAndSettle();
   });
 }

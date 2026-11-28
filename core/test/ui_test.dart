@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popoling_core/ui.dart';
 
@@ -35,7 +36,7 @@ void main() {
     expect(result, 'ok');
   });
 
-  testWidgets('AppPage: 경로를 보여주고, 로고를 누르면 첫 화면으로 간다', (tester) async {
+  testWidgets('AppPage: 상위 화면 링크를 보여주고, 로고를 누르면 첫 화면으로 간다', (tester) async {
     tester.view.physicalSize = const Size(1280, 900);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -52,14 +53,83 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('포폴링'), findsOneWidget);
-    expect(find.text('개발'), findsOneWidget);
-    expect(find.text('현재 화면'), findsOneWidget);
+    expect(find.text('개발'), findsOneWidget, reason: '상위 화면으로 돌아가는 링크');
+    expect(find.text('현재 화면'), findsNothing, reason: '현재 화면 이름은 본문 제목이 보여 준다');
     expect(find.text('본문'), findsOneWidget);
 
     await tester.tap(find.text('포폴링'));
     await tester.pumpAndSettle();
     expect(find.text('첫 화면'), findsOneWidget);
     expect(find.text('본문'), findsNothing);
+  });
+
+  Future<NavigatorState> pumpShell(WidgetTester tester, {Widget? status, String crumb = '현재 화면'}) async {
+    tester.view.physicalSize = const Size(1280, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      builder: (_, child) => ShellScope(status: status, child: child!),
+      home: const Text('첫 화면'),
+      routes: {
+        '/second': (_) => AppPage(crumbs: [('내 프로젝트', '/home'), (crumb, null)], children: const [Text('본문')]),
+        '/home': (_) => const Text('홈 화면'),
+      },
+    ));
+    final nav = tester.state<NavigatorState>(find.byType(Navigator));
+    nav.pushNamed('/second');
+    await tester.pumpAndSettle();
+    return nav;
+  }
+
+  testWidgets('AppPage shows side menu', (tester) async {
+    await pumpShell(tester);
+    expect(find.text('카테고리 · 개발'), findsOneWidget);
+    expect(find.text('내 프로젝트'), findsWidgets);
+    expect(find.text('AI 검사'), findsOneWidget);
+    expect(find.text('앱 설정'), findsNothing);
+  });
+
+  testWidgets('menu navigates', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const ValueKey('menu-/home')));
+    await tester.pumpAndSettle();
+    expect(find.text('홈 화면'), findsOneWidget);
+  });
+
+  testWidgets('status slot', (tester) async {
+    await pumpShell(tester, status: const Text('X'));
+    expect(find.text('X'), findsOneWidget);
+  });
+
+  testWidgets('long status list scrolls instead of overflowing', (tester) async {
+    await pumpShell(tester, status: Column(children: [for (var i = 0; i < 40; i++) SizedBox(height: 48, child: Text('항목 $i'))]));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('long crumb ellipsis', (tester) async {
+    await pumpShell(tester, crumb: '2025-2학기-캡스톤-동아리-행사-예약-웹서비스-최종-진짜최종' * 4);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('confirmStopOther: 취소면 false, 중지면 true', (tester) async {
+    bool? result;
+    await tester.pumpWidget(MaterialApp(
+      theme: buildTheme(),
+      home: Scaffold(body: Builder(builder: (c) => Btn('열기', onPressed: () async => result = await confirmStopOther(c, project: 'shop-clone', service: 'web')))),
+    ));
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    expect(find.text('다른 프로젝트의 shop-clone / web을 중지할까요?'), findsOneWidget);
+    expect(find.textContaining('포폴링이 시작한 항목이라 중지할 수 있어요'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(result, isFalse, reason: 'Enter 기본값은 취소');
+    await tester.tap(find.text('열기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '중지'));
+    await tester.pumpAndSettle();
+    expect(result, isTrue);
   });
 
   testWidgets('PageHead: 제목·설명·버튼이 보이고, 눌 수 없는 버튼은 비활성이다', (tester) async {
@@ -119,6 +189,14 @@ void main() {
     expect(find.text('동작'), findsOneWidget);
     expect(find.text('패널 본문'), findsOneWidget);
     expect(find.text('제목 없음'), findsOneWidget);
+  });
+
+  testWidgets('Panel: danger 면 제목 앞에 경고 아이콘을 붙인다', (tester) async {
+    await tester.pumpWidget(_host(const Column(children: [
+      Panel(title: 'web이 실패한 이유', danger: true, child: Text('본문')),
+    ])));
+    expect(find.text('web이 실패한 이유'), findsOneWidget);
+    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
   });
 
   testWidgets('KeyValues: 이름과 값이 함께 보인다', (tester) async {

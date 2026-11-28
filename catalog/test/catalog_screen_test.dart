@@ -68,7 +68,7 @@ void main() {
     expect(inCard('popoling', find.text('마지막 실행 어제 · 성공')), findsOneWidget);
     expect(inCard('weather-bot', find.text('마지막 실행 2026-03-12 · 실패')), findsOneWidget);
     expect(inCard('weather-bot', find.text('오래됨 · 8개월')), findsOneWidget);
-    expect(inCard('algo-study', find.text('실행 기록 없음')), findsOneWidget);
+    expect(inCard('algo-study', find.text('실행 방법 없음')), findsOneWidget);
   });
 
   testWidgets('AT-13: 태그 필터', (tester) async {
@@ -97,9 +97,10 @@ void main() {
 
   testWidgets('등록한 프로젝트가 없으면 추가 안내', (tester) async {
     final opened = await open(tester, projects: FakeProjectRepository(), runs: FakeRunInfoSource());
-    expect(find.text('아직 등록한 프로젝트가 없어요. 프로젝트 폴더를 추가하면 여기에 모여요.'), findsOneWidget);
+    expect(find.text('첫 프로젝트를 등록해 주세요'), findsOneWidget);
+    expect(find.text('명령은 처음 실행할 때 목록을 보여주고 확인받은 뒤에만 실행해요.'), findsOneWidget);
     expect(find.text('조건에 맞는 프로젝트가 없어요. 검색어나 필터를 바꿔 보세요.'), findsNothing);
-    await tester.tap(find.text('프로젝트 추가').last);
+    await tester.tap(find.text('프로젝트 폴더 고르기'));
     await tester.pumpAndSettle();
     expect(opened.route, '/add-project');
   });
@@ -113,12 +114,42 @@ void main() {
       configIssues: const [ConfigIssue(path: 'services', message: '목록으로 적어 주세요.')],
     );
     final opened = await open(tester, projects: FakeProjectRepository(projects: [broken]), runs: FakeRunInfoSource());
-    expect(inCard('broken', find.text('설명이 없어요. README에서 가져오거나 직접 적어 주세요.')), findsOneWidget);
-    expect(inCard('broken', find.text('실행 항목이 아직 없어요.')), findsOneWidget);
-    await tester.tap(inCard('broken', find.text('실행 방법 설정하기')));
+    expect(inCard('broken', find.text('설명이 아직 없어요. README에서 가져오거나 직접 적어 주세요.')), findsOneWidget);
+    expect(inCard('broken', find.text('실행 방법 없음')), findsOneWidget);
+    expect(inCard('broken', find.text('전체 실행')), findsNothing);
+    await tester.tap(inCard('broken', find.text('열기')));
     await tester.pumpAndSettle();
-    expect(opened.route, '/settings');
+    expect(opened.route, '/dashboard');
     expect(opened.arguments, 'broken');
+  });
+
+  testWidgets('failed card shows 원인 보기', (tester) async {
+    final opened = await open(tester);
+    expect(inCard('weather-bot', find.text('전체 실행')), findsNothing);
+    await tester.tap(inCard('weather-bot', find.text('원인 보기')));
+    await tester.pumpAndSettle();
+    expect(opened.route, '/dashboard');
+    expect(opened.arguments, 'weather-bot');
+  });
+
+  testWidgets('filter running', (tester) async {
+    await open(tester);
+    await tapChip(tester, '실행 중');
+    expect(shownCards(tester), ['my-team-project']);
+  });
+
+  testWidgets('search by stack', (tester) async {
+    await open(tester);
+    expect(find.widgetWithText(TextField, '이름·설명·기술로 찾기'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('catalog-search')), 'Python');
+    await tester.pumpAndSettle();
+    expect(shownCards(tester), ['algo-study']);
+  });
+
+  testWidgets('long name', (tester) async {
+    final long = Project(id: 'long', name: '2025-2학기-캡스톤-동아리-행사-예약-웹서비스-최종-진짜최종' * 3, folderPath: '/projects/long', registeredAt: DateTime(2026, 11, 1));
+    await open(tester, projects: FakeProjectRepository(projects: [long]), runs: FakeRunInfoSource());
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('[열기]는 프로젝트 ID 를 넘겨 대시보드로', (tester) async {
@@ -185,14 +216,14 @@ void main() {
       expect(find.text('popoling: 모두 멈췄어요.'), findsOneWidget);
     });
 
-    testWidgets('실패하면 카드에 한 줄 요약과 [대시보드에서 보기]', (tester) async {
+    testWidgets('실패하면 카드에 한 줄 요약', (tester) async {
       runner.failing.add(const ItemRef(projectId: 'my-team-project', serviceId: 'api'));
       final opened = await openLive(tester);
       await tapInCard(tester, 'my-team-project', '전체 실행');
       expect(inCard('my-team-project', find.text('시작하지 못한 항목: api · 건너뜀: web')), findsOneWidget);
       expect(inCard('my-team-project', find.text('실행 중 1/3')), findsOneWidget);
       expect(find.textContaining('모두 실행됐어요'), findsNothing);
-      await tapInCard(tester, 'my-team-project', '대시보드에서 보기');
+      await tapInCard(tester, 'my-team-project', '열기');
       expect(opened.route, '/dashboard');
       expect(opened.arguments, 'my-team-project');
     });

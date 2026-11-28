@@ -143,9 +143,9 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
   Widget build(BuildContext context) {
     const note = TextStyle(fontSize: 12.5, color: C.muted, height: 1.5);
     final check = widget.check;
-    return DialogBody('Gemini API 키 입력', maxWidth: 480, [
+    return DialogBody(widget.hasKey ? 'Gemini API 키 바꾸기' : 'AI 기능을 쓰려면 Gemini API 키가 필요해요', maxWidth: 480, [
       const Text(
-        'AI 분석에 쓸 내 Gemini API 키를 넣어 주세요. 키는 Google AI Studio에서 무료로 만들 수 있어요.',
+        '키가 없어도 실행·종료·헬스체크는 그대로 쓸 수 있어요. 키는 Google AI Studio에서 무료로 만들 수 있어요.',
         style: TextStyle(fontSize: 14, color: C.text2, height: 1.6),
       ),
       Column(crossAxisAlignment: CrossAxisAlignment.start, spacing: 4, children: [
@@ -180,10 +180,10 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
       if (_check case final result?) _checkLine(result),
       const Row(crossAxisAlignment: CrossAxisAlignment.start, spacing: 6, children: [
         Icon(Icons.lock_outline, size: 15, color: C.muted),
-        Expanded(child: Text('키는 이 컴퓨터의 보안 저장소에만 두고, 화면과 로그에는 가려서 보여요. popoling.yaml에는 쓰지 않아요.', style: note)),
+        Expanded(child: Text('이 컴퓨터의 보안 저장소에만 저장하고, 화면과 로그에는 끝 4자리만 보여줘요. popoling.yaml에는 쓰지 않아요.', style: note)),
       ]),
       if (check != null) const Text('[연결 확인]은 이 키로 Google에 연결되는지만 봐요. 다른 내용은 보내지 않아요.', style: note),
-      const Text('무료 등급은 사용량 제한이 있고, 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요. 자세한 조건은 Google 약관을 확인해 주세요.', style: note),
+      const Text('무료 등급 키는 사용량 제한이 있고, 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요. 팀원도 각자 자기 키를 넣어 주세요.', style: note),
       Row(spacing: 8, children: [
         if (widget.hasKey) Btn('키 지우기', ghost: true, onPressed: _busy ? null : _delete),
         const Spacer(),
