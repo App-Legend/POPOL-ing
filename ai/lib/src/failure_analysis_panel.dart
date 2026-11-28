@@ -110,6 +110,7 @@ class _FailureAnalysisPanelState extends State<FailureAnalysisPanel> {
           ].join('\n'),
         ),
         onFailed: (failure) => _record(AnalysisOutcome.failed, llmErrorText(failure).title, null),
+        onUnreadable: () => _record(AnalysisOutcome.received, 'AI 답을 읽지 못했어요.', null),
       );
 
   void _record(AnalysisOutcome outcome, String title, String? body) => widget.onRecord?.call(AnalysisRecord(
@@ -118,7 +119,7 @@ class _FailureAnalysisPanelState extends State<FailureAnalysisPanel> {
         serviceId: widget.item.item.serviceId,
         title: title,
         body: body,
-        sentSummary: '${widget.item.item.serviceId} 로그(비밀값 가림), 마지막 성공 때와 달라진 환경, 실행 설정',
+        sentSummary: _input?.sentSummary ?? '실패 이유',
         model: outcome == AnalysisOutcome.received ? widget.client.modelName : null,
         at: DateTime.now(),
         outcome: outcome,

@@ -87,7 +87,15 @@ class AnalysisHistory {
   /// 기록이 더해질 때마다 알린다.
   Stream<void> get changes => _changes.stream;
 
-  /// 최신순. 파일이 없으면 빈 목록, 깨졌으면 [AnalysisHistoryCorrupt].
+  String? _recoveredTo;
+
+  /// 깨진 기록 파일을 옮겨 둔 곳(`ai-history.json.bak`). 옮긴 적이 없으면 null.
+  String? get recoveredTo => _recoveredTo;
+
+  /// 최신순. 파일이 없으면 빈 목록.
+  ///
+  /// 깨졌으면 지우지 않고 `.bak` 으로 옮긴 뒤 빈 목록으로 새로 시작한다. 그대로 두면 다음 기록부터 영영 남지 않아서.
+  /// 옮기지도 못하면 덮어쓰지 않도록 [AnalysisHistoryCorrupt].
   Future<List<AnalysisRecord>> list() async {
     final file = await _file();
     if (!await file.exists()) return [];
@@ -95,7 +103,14 @@ class AnalysisHistory {
       final raw = jsonDecode(await file.readAsString()) as List<Object?>;
       return [for (final r in raw) AnalysisRecord.fromJson((r! as Map).cast<String, Object?>())];
     } on Object {
-      throw AnalysisHistoryCorrupt(file.path);
+      final backup = '${file.path}.bak';
+      try {
+        await file.rename(backup);
+      } on Object {
+        throw AnalysisHistoryCorrupt(file.path);
+      }
+      _recoveredTo = backup;
+      return [];
     }
   }
 

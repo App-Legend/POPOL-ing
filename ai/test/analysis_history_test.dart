@@ -54,11 +54,23 @@ void main() {
     expect(await AnalysisHistory(() async => file).list(), isEmpty);
   });
 
-  test('corrupt file not overwritten', () async {
+  test('corrupt file moves to .bak and recording goes on', () async {
     file.writeAsStringSync('not json');
+    final h = AnalysisHistory(() async => file);
+    expect(await h.list(), isEmpty);
+    expect(h.recoveredTo, '${file.path}.bak');
+    expect(File('${file.path}.bak').readAsStringSync(), 'not json'); // 지우지 않고 옮겨 둔다
+    await h.add(rec('x', DateTime(2026)));
+    expect((await AnalysisHistory(() async => file).list()).map((r) => r.title), ['x']);
+  });
+
+  test('corrupt file stays when it cannot be moved', () async {
+    file.writeAsStringSync('not json');
+    Directory('${file.path}.bak').createSync(); // .bak 자리에 폴더가 있어 옮기지 못한다
     final h = AnalysisHistory(() async => file);
     await expectLater(h.list(), throwsA(isA<AnalysisHistoryCorrupt>()));
     await expectLater(h.add(rec('x', DateTime(2026))), throwsA(isA<AnalysisHistoryCorrupt>()));
     expect(file.readAsStringSync(), 'not json');
+    expect(h.recoveredTo, isNull);
   });
 }
