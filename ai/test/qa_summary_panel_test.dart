@@ -78,7 +78,8 @@ class Setup {
   late final FakeOrchestrator orchestrator;
 }
 
-Future<void> show(WidgetTester tester, QaRun run, LlmClient ai, Setup s, {ApiKeyStore? keys, Key? key}) async {
+Future<void> show(WidgetTester tester, QaRun run, LlmClient ai, Setup s,
+    {ApiKeyStore? keys, Key? key, void Function(AnalysisRecord)? onRecord}) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -86,7 +87,7 @@ Future<void> show(WidgetTester tester, QaRun run, LlmClient ai, Setup s, {ApiKey
     theme: buildTheme(),
     home: Scaffold(
       body: SingleChildScrollView(
-        child: QaSummaryPanel(key: key, run: run, client: ai, keys: keys ?? MemoryApiKeyStore(storedKey), qa: s.qa, orchestrator: s.orchestrator),
+        child: QaSummaryPanel(key: key, run: run, client: ai, keys: keys ?? MemoryApiKeyStore(storedKey), qa: s.qa, orchestrator: s.orchestrator, onRecord: onRecord),
       ),
     ),
   ));
@@ -207,6 +208,18 @@ void main() {
 
     expect(find.text('AI 답을 읽지 못했어요.'), findsOneWidget);
     expect(btn('다시 요약'), findsOneWidget);
+  });
+
+  testWidgets('답을 못 읽어도 받음으로 기록한다', (tester) async {
+    final s = Setup();
+    final run = await s.qa.runChecks('my-team-project');
+    final records = <AnalysisRecord>[];
+    await show(tester, run, FakeLlmClient(reply: '다 괜찮아요!', modelName: 'gemini-flash-latest'), s, onRecord: records.add);
+    await summarize(tester);
+
+    expect(records.single.outcome, AnalysisOutcome.received);
+    expect(records.single.title, 'AI 답을 읽지 못했어요.');
+    expect(records.single.model, 'gemini-flash-latest');
   });
 
   testWidgets('분석 중 [취소]하면 분석을 멈췄어요, 늦게 온 답은 버린다', (tester) async {

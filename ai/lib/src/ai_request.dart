@@ -31,6 +31,7 @@ class AiRequestView<T extends Object> extends StatefulWidget {
     this.onKeysChanged,
     this.onDone,
     this.onFailed,
+    this.onUnreadable,
   });
 
   final LlmClient client;
@@ -75,6 +76,9 @@ class AiRequestView<T extends Object> extends StatefulWidget {
 
   /// 보냈는데 실패했을 때 한 번(분석 기록). 키가 없어 보내지 않은 것도 부르지 않는다.
   final void Function(LlmFailure failure)? onFailed;
+
+  /// 답은 받았는데 읽지 못했을 때 한 번(분석 기록). 이미 보낸 분석이라 `받음`으로 남긴다.
+  final VoidCallback? onUnreadable;
 
   @override
   State<AiRequestView<T>> createState() => _AiRequestViewState<T>();
@@ -149,6 +153,7 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
       }
       final result = widget.parse(reply);
       if (result == null) {
+        widget.onUnreadable?.call();
         return _set(_Phase.unreadable);
       }
       _result = result;

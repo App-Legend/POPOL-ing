@@ -166,6 +166,17 @@ class _AiScreenState extends State<AiScreen> {
     final records = _records;
     if (_corrupt) return const Text('기록 파일을 읽지 못했어요', style: TextStyle(fontSize: 14));
     if (widget.history != null && records == null) return const SizedBox.shrink(); // 읽는 동안은 비워 둔다(보통 바로 끝난다)
+    final recovered = widget.history?.recoveredTo;
+    if (recovered != null) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 12, children: [
+        Text('기록 파일을 읽지 못해 $recovered 으로 옮겨 두고 새로 시작했어요.', style: const TextStyle(fontSize: 13, color: C.muted)),
+        _recordList(records),
+      ]);
+    }
+    return _recordList(records);
+  }
+
+  Widget _recordList(List<AnalysisRecord>? records) {
     if (records == null || records.isEmpty) return const Text('아직 받은 답이 없어요.', style: TextStyle(fontSize: 14, color: C.muted));
     return Panel(
       title: '최근 · ${records.length}',

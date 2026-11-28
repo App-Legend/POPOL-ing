@@ -186,14 +186,22 @@ void main() {
       await openHistory(tester, _MemHistory(null));
       expect(find.text('기록 파일을 읽지 못했어요'), findsOneWidget);
     });
+
+    testWidgets('moved corrupt file is mentioned once', (tester) async {
+      await openHistory(tester, _MemHistory(const [], recoveredTo: '/data/ai-history.json.bak'));
+      expect(find.text('기록 파일을 읽지 못해 /data/ai-history.json.bak 으로 옮겨 두고 새로 시작했어요.'), findsOneWidget);
+    });
   });
 }
 
 /// 메모리에 둔 기록. [items] 가 null 이면 파일이 깨진 것처럼 군다.
 class _MemHistory extends AnalysisHistory {
-  _MemHistory(this.items) : super(() async => File('unused'));
+  _MemHistory(this.items, {this.recoveredTo}) : super(() async => File('unused'));
 
   final List<AnalysisRecord>? items;
+
+  @override
+  final String? recoveredTo;
 
   @override
   Future<List<AnalysisRecord>> list() async => items ?? (throw const AnalysisHistoryCorrupt('unused'));

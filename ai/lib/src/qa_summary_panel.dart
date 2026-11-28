@@ -136,6 +136,7 @@ class _QaSummaryPanelState extends State<QaSummaryPanel> {
         onKeysChanged: widget.onKeysChanged,
         onDone: (sentences) => _record(AnalysisOutcome.received, sentences.first.text, sentences.map((s) => s.text).join('\n')),
         onFailed: (failure) => _record(AnalysisOutcome.failed, llmErrorText(failure).title, null),
+        onUnreadable: () => _record(AnalysisOutcome.received, 'AI 답을 읽지 못했어요.', null),
       );
 
   void _record(AnalysisOutcome outcome, String title, String? body) => widget.onRecord?.call(AnalysisRecord(

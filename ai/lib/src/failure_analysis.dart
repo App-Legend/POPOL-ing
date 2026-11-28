@@ -92,6 +92,18 @@ class FailureAnalysisInput {
     return FailureAnalysisInput(item: item, run: run, service: service, envAvailable: envAvailable, envChanges: changes, logs: lines);
   }
 
+  /// 분석 기록의 "보낸 것". 실제로 [prompt] 에 담긴 것만 적는다(못 읽은 로그·환경은 빼고).
+  String get sentSummary {
+    final logs = this.logs;
+    final changes = envChanges;
+    return [
+      '실패 이유',
+      if (logs != null && logs.isNotEmpty) '${item.item.serviceId} 로그 ${logs.length}줄(비밀값 가림)',
+      if (envAvailable && changes != null) '달라진 환경 ${changes.length}건',
+      if (service != null) '실행 설정',
+    ].join(', ');
+  }
+
   String get prompt {
     final id = item.item.serviceId;
     final kind = switch (service) {

@@ -121,6 +121,42 @@ void main() {
     expect(records.single.outcome, AnalysisOutcome.failed);
   });
 
+  testWidgets('unreadable reply is recorded as received', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: FakeLlmClient(reply: 'not json', modelName: 'gemini-flash-latest'), onRecord: records.add);
+    await analyze(tester);
+    final r = records.single; // 이미 Google 로 보냈고 답도 받았다(§7 `받음`)
+    expect(r.outcome, AnalysisOutcome.received);
+    expect(r.title, 'AI 답을 읽지 못했어요.');
+    expect(r.model, 'gemini-flash-latest');
+  });
+
+  testWidgets('quick double tap opens one send dialog', (tester) async {
+    final client = HeldLlmClient();
+    await open(tester, client: client);
+    await tester.tap(btn('원인 분석'));
+    await tester.tap(btn('원인 분석'), warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(btn('보내기'), findsOneWidget);
+    await tester.tap(btn('보내기'));
+    await tester.pumpAndSettle();
+    expect(client.sent, hasLength(1));
+  });
+
+  testWidgets('sent summary lists only what was sent', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: FakeLlmClient(reply: goodReply), onRecord: records.add);
+    await analyze(tester);
+    expect(records.single.sentSummary, '실패 이유, api 로그 2줄(비밀값 가림), 달라진 환경 1건, 실행 설정');
+  });
+
+  testWidgets('sent summary leaves out logs that were not read', (tester) async {
+    final records = <AnalysisRecord>[];
+    await open(tester, client: FakeLlmClient(reply: 'not json'), logs: ChangingLogs([]), onRecord: records.add);
+    await analyze(tester);
+    expect(records.single.sentSummary, '실패 이유, 달라진 환경 1건, 실행 설정');
+  });
+
   testWidgets('cancel not recorded', (tester) async {
     final records = <AnalysisRecord>[];
     await open(tester, client: HeldLlmClient(), onRecord: records.add);
