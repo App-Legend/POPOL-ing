@@ -39,11 +39,22 @@ class TestRegistry implements AppRegistry {
   return (app: app, repo: repo, runner: runner);
 }
 
-Future<void> openApp(WidgetTester tester, TestRegistry app) async {
+/// 쌓인 화면 이름을 센다.
+class PushLog extends NavigatorObserver {
+  final pushed = <String?>[];
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) => pushed.add(route.settings.name);
+}
+
+Future<void> openApp(WidgetTester tester, TestRegistry app, {String initialRoute = '/', NavigatorObserver? observer}) async {
   tester.view.physicalSize = const Size(1280, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(MaterialApp(theme: buildTheme(), routes: app.routes));
+  await tester.pumpWidget(MaterialApp(theme: buildTheme(), routes: app.routes,
+      initialRoute: initialRoute,
+      // 처음 화면 하나만 쌓는다(기본은 '/home' 이면 '/' 위에 쌓는다).
+      onGenerateInitialRoutes: (name) => [MaterialPageRoute(settings: RouteSettings(name: name), builder: app.routes[name]!)],
+      navigatorObservers: [?observer]));
   await tester.pumpAndSettle();
 }
 
@@ -62,6 +73,19 @@ void main() {
     await tester.tap(find.byKey(const Key('category-dev')));
     await tester.pumpAndSettle();
     expect(find.text('내 프로젝트  5'), findsOneWidget);
+  });
+
+  testWidgets('AT-16: 홈 위에서 연 카테고리 선택의 개발 카드는 홈을 또 쌓지 않고 돌아간다', (tester) async {
+    final (:app, repo: _, runner: _) = setUpApp();
+    final log = PushLog();
+    await openApp(tester, app, initialRoute: '/home', observer: log);
+    await tester.tap(find.text('카테고리 · 개발'));
+    await tester.pumpAndSettle();
+    expect(find.text('어떤 포트폴리오를 관리할까요?'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('category-dev')));
+    await tester.pumpAndSettle();
+    expect(find.text('내 프로젝트  5'), findsOneWidget);
+    expect(log.pushed.where((n) => n == '/home'), hasLength(1), reason: '처음 연 홈으로 돌아가고 새로 쌓지 않는다');
   });
 
   testWidgets('실행 중인 프로젝트 수를 보여 준다', (tester) async {
