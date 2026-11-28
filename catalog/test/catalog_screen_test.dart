@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
 import 'package:popoling_catalog/src/catalog_screen.dart';
+import 'package:popoling_catalog/src/home_layout.dart';
 import 'package:popoling_catalog/src/orchestrator_run_info.dart';
 import 'package:popoling_catalog/src/run_info.dart';
 import 'package:popoling_core/contracts.dart';
@@ -18,7 +20,7 @@ class Opened {
 }
 
 Future<Opened> open(WidgetTester tester,
-    {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, EnvChecker? env, QaRunner? qa, double width = 1280}) async {
+    {ProjectRepository? projects, RunInfoSource? runs, Orchestrator? runner, EnvChecker? env, QaRunner? qa, HomeLayoutStore? layout, double width = 1280}) async {
   tester.view.physicalSize = Size(width, 900);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -38,6 +40,7 @@ Future<Opened> open(WidgetTester tester,
       runner: runner ?? FakeOrchestrator(repo),
       env: env,
       qa: qa,
+      layout: layout,
       clock: () => now,
     ),
     routes: {for (final r in ['/dashboard', '/settings', '/add-project']) r: page(r)},
@@ -60,6 +63,47 @@ Future<void> tapChip(WidgetTester tester, String label) async {
 }
 
 void main() {
+  group('#99 묶음·고정(FR-14)', () {
+    testWidgets('AT-35: 핀으로 고정하고 회사 묶음으로 옮기면 고정과 회사에 보인다', (tester) async {
+      final layout = HomeLayoutStore.memory();
+      await open(tester, layout: layout);
+      expect(find.text('고정'), findsNothing); // 정리한 게 없으면 묶음 제목 없이 한 목록
+
+      await tester.tap(inCard('shop-clone', find.byTooltip('고정하기')));
+      await tester.pumpAndSettle();
+      expect(find.text('고정'), findsOneWidget);
+      expect(shownCards(tester).first, 'shop-clone');
+      expect(inCard('shop-clone', find.byTooltip('고정 풀기')), findsOneWidget);
+
+      await tester.ensureVisible(inCard('weather-bot', find.byTooltip('묶음 정하기')));
+      await tester.pumpAndSettle();
+      await tester.tap(inCard('weather-bot', find.byTooltip('묶음 정하기')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('회사').last);
+      await tester.pumpAndSettle();
+      expect(find.text('회사'), findsOneWidget);
+      expect(find.text('묶음 없음'), findsOneWidget);
+      expect((await layout.load())['weather-bot']!.group, HomeGroup.company);
+    });
+
+    testWidgets('저장해 둔 정리로 처음부터 나눠 보인다', (tester) async {
+      final layout = HomeLayoutStore.memory();
+      await layout.setGroup('popoling', HomeGroup.personal);
+      await open(tester, layout: layout);
+      expect(find.text('개인'), findsOneWidget);
+    });
+  });
+
+  testWidgets('AT-36: Ctrl K 는 검색 칸으로 간다', (tester) async {
+    await open(tester);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyK);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    final field = tester.widget<EditableText>(find.descendant(of: find.byKey(const Key('catalog-search')), matching: find.byType(EditableText)));
+    expect(field.focusNode.hasFocus, isTrue);
+  });
+
   group('#44 실행 점검(FR-17)', () {
     testWidgets('오래된 카드에는 [실행 점검], 누르면 환경 점검 → 전체 실행 → 헬스체크', (tester) async {
       final repo = FakeProjectRepository.withSamples();

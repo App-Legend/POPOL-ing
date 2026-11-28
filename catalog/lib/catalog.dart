@@ -2,11 +2,15 @@
 /// `import 'package:popoling_catalog/catalog.dart' as catalog;`
 library;
 
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
 import 'src/catalog_screen.dart';
 import 'src/category_screen.dart';
+import 'src/home_layout.dart';
 import 'src/orchestrator_run_info.dart';
 import 'src/run_info.dart';
 import 'src/status_list.dart';
@@ -25,6 +29,9 @@ void register(AppRegistry app) {
       runner: app.read<Orchestrator>(),
       env: _tryRead<EnvChecker>(app),
       qa: _tryRead<QaRunner>(app),
+      layout: _layout[app] ??= HomeLayoutStore(
+        () async => File('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}home-layout.json'),
+      ),
     ),
   );
 }
@@ -36,6 +43,9 @@ T? _tryRead<T extends Object>(AppRegistry app) {
     return null; // 아직 붙지 않은 기능
   }
 }
+
+/// 앱 하나에 묶음·고정 저장소 하나. 홈을 다시 열어도 읽어 둔 정리를 그대로 쓴다.
+final _layout = Expando<HomeLayoutStore>();
 
 /// 앱 하나에 실행 정보 계산 하나. 화면이 여러 개 쌓여도 이벤트마다 실행 기록을 한 번만 읽는다.
 final _shared = Expando<RunInfoSource>();

@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:popoling_core/contracts.dart';
 import 'package:popoling_core/ui.dart';
 
 import 'catalog_view.dart';
 import 'field/field_lineup.dart';
 import 'field/field_panel.dart';
+import 'home_layout.dart';
 import 'run_info.dart';
 import 'stale_check.dart';
 
@@ -16,7 +18,7 @@ import 'stale_check.dart';
 /// [프로젝트 추가] `/add-project`. 목업 v2 개발 홈.
 /// 카드의 [전체 실행]·[전체 종료]는 [runner] 에 맡기고, 실패하면 카드에 한 줄로 남긴다.
 class CatalogScreen extends StatefulWidget {
-  const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.env, this.qa, this.clock});
+  const CatalogScreen({super.key, required this.projects, required this.runs, required this.runner, this.env, this.qa, this.layout, this.clock});
 
   final ProjectRepository projects;
   final RunInfoSource runs;
@@ -25,6 +27,9 @@ class CatalogScreen extends StatefulWidget {
   /// 오래된 카드의 [실행 점검](FR-17)에 쓴다. 둘 중 하나라도 없으면 그 카드도 [전체 실행]만 보인다.
   final EnvChecker? env;
   final QaRunner? qa;
+
+  /// 홈 묶음·고정(FR-14). 없으면 카드에 핀·묶음 버튼이 없고 한 목록으로 보인다.
+  final HomeLayoutStore? layout;
 
   /// 지금 시각. 테스트에서 고정한다.
   final DateTime Function()? clock;
@@ -56,9 +61,17 @@ class _CatalogScreenState extends State<CatalogScreen> {
   /// 요청 자체가 예외로 끝난 프로젝트. 원인 볼 실행 결과가 없으니 다시 실행할 수 있게 둔다.
   final Set<String> _requestFailed = {};
 
+  /// 프로젝트 ID → 묶음·고정. [CatalogScreen.layout] 에서 읽는다.
+  Map<String, HomePlacement> _placements = const {};
+
+  final _searchFocus = FocusNode(debugLabel: 'catalog-search');
+
   @override
   void initState() {
     super.initState();
+    widget.layout?.load().then((p) {
+      if (mounted) setState(() => _placements = p);
+    });
     _projectSub = widget.projects.watchProjects().listen(
       (projects) => setState(() {
         _projects = projects;
@@ -78,6 +91,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
   void dispose() {
     _projectSub.cancel();
     _runSub.cancel();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -137,6 +151,18 @@ class _CatalogScreenState extends State<CatalogScreen> {
   Widget build(BuildContext context) {
     final projects = _projects;
     final now = (widget.clock ?? DateTime.now)();
+    // 검색 단축키 Ctrl K(macOS Cmd K). OS 를 가리지 않고 둘 다 받는다(화면에 OS 분기를 두지 않으려고).
+    // 확인 창이 떠 있으면 포커스가 창에 있어 동작하지 않는다(AT-36).
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): _searchFocus.requestFocus,
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): _searchFocus.requestFocus,
+      },
+      child: Focus(autofocus: true, child: _page(projects, now)),
+    );
+  }
+
+  Widget _page(List<Project>? projects, DateTime now) {
     return AppPage(
       crumbs: const [('내 프로젝트', null)],
       side: projects == null || projects.isEmpty ? null : _field(projects, now),
@@ -176,12 +202,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
               height: 38,
               child: TextField(
                 key: const Key('catalog-search'),
+                focusNode: _searchFocus,
                 onChanged: (v) => setState(() => _query = v),
                 style: const TextStyle(fontSize: 13.5),
                 decoration: const InputDecoration(
                   hintText: '이름·설명·기술로 찾기',
                   hintStyle: TextStyle(fontSize: 13.5, color: C.muted),
                   prefixIcon: Icon(Icons.search, size: 16, color: C.muted),
+                  // 버튼 옆에 단축키를 함께 보여 준다(기획서 §9 공통 틀). macOS 는 Cmd K 도 된다.
+                  suffixIcon: Padding(padding: EdgeInsets.only(right: 10), child: Text('Ctrl K', style: TextStyle(fontSize: 11.5, color: C.muted))),
+                  suffixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
                   isDense: true,
                   filled: true,
                   fillColor: C.surface,
@@ -224,7 +254,69 @@ class _CatalogScreenState extends State<CatalogScreen> {
           child: Center(child: Text('조건에 맞는 프로젝트가 없어요. 검색어나 필터를 바꿔 보세요.', style: TextStyle(fontSize: 14, color: C.muted))),
         )
       else
-        AutoGrid(minItemWidth: 240, gap: 12, children: [for (final e in visible) _card(e, now)]),
+        ..._sections(visible, now),
+    ];
+  }
+
+  /// 정리한 게 없으면 한 목록. 있으면 고정 → 팀 → 개인 → 회사 → 묶음 없음 순으로 나눈다(FR-14).
+  /// 고정한 카드는 자기 묶음에도 보인다(AT-35). 묶음이 없으면 고정에만.
+  List<Widget> _sections(List<CatalogEntry> visible, DateTime now) {
+    HomePlacement placed(CatalogEntry e) => _placements[e.project.id] ?? HomePlacement.none;
+    Widget grid(Iterable<CatalogEntry> entries) => AutoGrid(minItemWidth: 240, gap: 12, children: [for (final e in entries) _card(e, now)]);
+    if (visible.every((e) => placed(e).isEmpty)) return [grid(visible)];
+    final sections = <(String, List<CatalogEntry>)>[
+      ('고정', [for (final e in visible) if (placed(e).pinned) e]),
+      for (final g in HomeGroup.values) (g.label, [for (final e in visible) if (placed(e).group == g) e]),
+      ('묶음 없음', [for (final e in visible) if (placed(e).group == null && !placed(e).pinned) e]),
+    ];
+    return [
+      for (final (title, entries) in sections)
+        if (entries.isNotEmpty) ...[
+          Row(spacing: 6, children: [
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: C.text2)),
+            Text('${entries.length}', style: const TextStyle(fontSize: 13, color: C.muted)),
+          ]),
+          grid(entries),
+        ],
+    ];
+  }
+
+  Future<void> _place(String projectId, Future<void> Function(HomeLayoutStore) change) async {
+    final layout = widget.layout!;
+    await change(layout);
+    final next = await layout.load();
+    if (mounted) setState(() => _placements = next);
+  }
+
+  /// 카드 머리의 핀·묶음 버튼.
+  List<Widget> _placementButtons(Project p) {
+    final placed = _placements[p.id] ?? HomePlacement.none;
+    return [
+      SizedBox(
+        width: 26,
+        height: 26,
+        child: IconButton(
+          padding: EdgeInsets.zero,
+          tooltip: placed.pinned ? '고정 풀기' : '고정하기',
+          onPressed: () => _place(p.id, (l) => l.setPinned(p.id, !placed.pinned)),
+          icon: Icon(placed.pinned ? Icons.push_pin : Icons.push_pin_outlined, size: 15, color: placed.pinned ? C.primary : C.muted),
+        ),
+      ),
+      SizedBox(
+        width: 26,
+        height: 26,
+        child: PopupMenuButton<int>(
+          padding: EdgeInsets.zero,
+          tooltip: '묶음 정하기',
+          icon: const Icon(Icons.more_horiz, size: 16, color: C.muted),
+          // 0~2 는 HomeGroup 순서, 3 은 묶음 없음(null 값은 고르지 않은 것으로 취급돼서 번호로 고른다).
+          onSelected: (i) => _place(p.id, (l) => l.setGroup(p.id, i < HomeGroup.values.length ? HomeGroup.values[i] : null)),
+          itemBuilder: (_) => [
+            for (final (i, g) in HomeGroup.values.indexed) CheckedPopupMenuItem(value: i, checked: placed.group == g, child: Text(g.label)),
+            CheckedPopupMenuItem(value: HomeGroup.values.length, checked: placed.group == null, child: const Text('묶음 없음')),
+          ],
+        ),
+      ),
     ];
   }
 
@@ -323,6 +415,7 @@ class _CatalogScreenState extends State<CatalogScreen> {
         Row(spacing: 10, children: [
           Expanded(child: Text(p.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
           chip,
+          if (widget.layout != null) ..._placementButtons(p),
           SizedBox(
             width: 26,
             height: 26,
