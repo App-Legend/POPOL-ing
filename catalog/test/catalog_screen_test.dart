@@ -74,6 +74,8 @@ void main() {
       expect(find.text('고정'), findsOneWidget);
       expect(shownCards(tester).first, 'shop-clone');
       expect(inCard('shop-clone', find.byTooltip('고정 풀기')), findsOneWidget);
+      expect(tester.getSize(find.byKey(const ValueKey('catalog-card-shop-clone'))).width,
+          tester.getSize(find.byKey(const ValueKey('catalog-card-popoling'))).width, reason: '혼자인 고정 카드도 다른 카드와 폭이 같다');
 
       await tester.ensureVisible(inCard('weather-bot', find.byTooltip('묶음 정하기')));
       await tester.pumpAndSettle();

@@ -262,8 +262,16 @@ class _CatalogScreenState extends State<CatalogScreen> {
   /// 고정한 카드는 자기 묶음에도 보인다(AT-35). 묶음이 없으면 고정에만.
   List<Widget> _sections(List<CatalogEntry> visible, DateTime now) {
     HomePlacement placed(CatalogEntry e) => _placements[e.project.id] ?? HomePlacement.none;
-    Widget grid(Iterable<CatalogEntry> entries) => AutoGrid(minItemWidth: 240, gap: 12, children: [for (final e in entries) _card(e, now)]);
-    if (visible.every((e) => placed(e).isEmpty)) return [grid(visible)];
+    if (visible.every((e) => placed(e).isEmpty)) return [AutoGrid(minItemWidth: 240, gap: 12, children: [for (final e in visible) _card(e, now)])];
+    // 카드가 적은 묶음도 다른 묶음과 카드 폭이 같게, 한 줄에 들어갈 칸 수만큼 빈 칸을 채운다
+    // (AutoGrid 는 칸 수를 카드 수로 줄여서, 고정 카드 하나가 한 줄을 다 차지했다).
+    Widget grid(List<CatalogEntry> entries) => LayoutBuilder(builder: (context, box) {
+          final fit = ((box.maxWidth + 12) / (240 + 12)).floor();
+          return AutoGrid(minItemWidth: 240, gap: 12, children: [
+            for (final e in entries) _card(e, now),
+            for (var i = entries.length; i < fit; i++) const SizedBox.shrink(),
+          ]);
+        });
     final sections = <(String, List<CatalogEntry>)>[
       ('고정', [for (final e in visible) if (placed(e).pinned) e]),
       for (final g in HomeGroup.values) (g.label, [for (final e in visible) if (placed(e).group == g) e]),
