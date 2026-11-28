@@ -185,8 +185,27 @@ void main() {
     final summary = await running;
 
     expect(summary.items.firstWhere((r) => r.item.serviceId == 'b').outcome, ItemOutcome.skipped);
+    expect(o.stateOf(const ItemRef(projectId: 'demo', serviceId: 'b')), ItemState.stopped, reason: '대기 중으로 남지 않는다');
     expect(await count('sleep 37'), 0);
     expect(await count('sleep 38'), 0);
+  });
+
+  test('전체 실행은 차례를 기다리는 항목을 대기 중으로, 앞 항목이 실패하면 건너뜀으로 알린다', () async {
+    final o = orchestrator(demo(tempProject(), api: 'echo boom >&2; exit 1'));
+    addTearDown(() => o.stopAll('demo'));
+    const web = ItemRef(projectId: 'demo', serviceId: 'web');
+    final events = <ItemStateChanged>[];
+    final sub = o.events.listen((e) => e is ItemStateChanged && e.item == web ? events.add(e) : null);
+    await o.runAll('demo');
+    await Future<void>.delayed(Duration.zero);
+    await sub.cancel();
+
+    expect(events.map((e) => e.state), [ItemState.waiting, ItemState.skipped]);
+    expect(events.first.reason, 'api 준비를 기다리는 중');
+    final api = o.causeOf(const ItemRef(projectId: 'demo', serviceId: 'api'));
+    expect(api, isA<CommandFailed>().having((c) => c.exitCode, 'exitCode', 1));
+    expect(api!.evidence, contains('boom'), reason: '근거 로그 줄(종료 코드 줄은 빼고)');
+    expect(api.evidence.any((l) => l.contains('exit')), isFalse);
   });
 
   test('Compose 를 띄우는 중에 멈추면 up 이 늦게 끝나도 다시 내린다', () async {
@@ -300,6 +319,7 @@ void main() {
       expect(r.outcome, ItemOutcome.failed);
       expect(r.reason, '포트 5173 를 shop-clone / web 항목이 쓰고 있어요.');
       expect(o.stateOf(item), ItemState.portBusy);
+      expect(r.cause, isA<PortBusy>().having((c) => c.owner, 'owner', owner).having((c) => c.usage.port, 'port', 5173));
     });
 
     test('포트를 쓰는 프로그램을 아직 찾을 수 없는 OS 면 포트 확인을 건너뛰고 시작한다', () async {
@@ -328,6 +348,21 @@ void main() {
       final r = await o.start(item);
       expect(r.outcome, ItemOutcome.failed);
       expect(r.reason, contains('프로젝트 폴더 밖'));
+    });
+
+    test('.env 파일이 없으면 시작 실패 · .env 없음', () async {
+      final (o, item) = await setUpItem(const ProcessService(id: 'x', command: ['sleep', '30'], envFile: 'api/.env'));
+      final r = await o.start(item);
+      expect(o.stateOf(item), ItemState.startFailed);
+      expect(r.cause, isA<EnvFileMissing>().having((c) => c.path, 'path', 'api/.env'));
+    });
+
+    test('명령을 찾을 수 없으면 시작 실패 · 도구 없음', () async {
+      final (o, item) = await setUpItem(
+          const ProcessService(id: 'x', command: ['no-such-tool-popoling'], ready: LogReady(pattern: 'x', timeout: _s5)));
+      final r = await o.start(item);
+      expect(o.stateOf(item), ItemState.startFailed);
+      expect(r.cause, isA<ToolMissing>().having((c) => c.tool, 'tool', 'no-such-tool-popoling'));
     });
 
     test('.env 값과 env 를 넘기고, env 가 .env 를 덮어쓴다', () async {
@@ -390,9 +425,12 @@ void main() {
     test('준비 완료 뒤 스스로 비정상 종료하면 실패와 종료 코드를 알린다', () async {
       final (o, item) = await setUpItem(
           const ProcessService(id: 'x', command: ['sh', '-c', 'echo ready; sleep 0.3; exit 2'], ready: LogReady(pattern: 'ready')));
-      final failed = o.events.firstWhere((e) => e is ItemStateChanged && e.item == item && e.state == ItemState.failed);
+      final failed = o.events.firstWhere((e) => e is ItemStateChanged && e.item == item && e.state == ItemState.crashed);
       expect((await o.start(item)).outcome, ItemOutcome.ok);
-      expect(((await failed) as ItemStateChanged).exitCode, 2);
+      final crashed = (await failed) as ItemStateChanged;
+      expect(crashed.exitCode, 2);
+      expect(crashed.cause, isA<Crashed>().having((c) => c.exitCode, 'exitCode', 2));
+      expect(o.causeOf(item), same(crashed.cause));
     });
 
     test('준비 시간을 넘기면 실패지만 프로세스는 남겨 두고, 멈추면 그룹째 멈춘다', () async {
@@ -401,10 +439,22 @@ void main() {
       final r = await o.start(item);
       expect(r.outcome, ItemOutcome.failed);
       expect(r.reason, contains('준비 시간'));
+      expect(o.stateOf(item), ItemState.readyTimeout);
+      expect(r.cause, isA<ReadyTimeout>().having((c) => c.timeout, 'timeout', const Duration(milliseconds: 300)));
 
       final stopped = await o.stop(item);
       expect(stopped.outcome, ItemOutcome.ok);
       expect(o.stateOf(item), ItemState.stopped);
+    });
+
+    test('준비 시간 초과 뒤 스스로 비정상 종료하면 멈춤', () async {
+      final (o, item) = await setUpItem(const ProcessService(
+          id: 'x', command: ['sh', '-c', 'sleep 0.6; exit 3'], ready: LogReady(pattern: 'never', timeout: Duration(milliseconds: 300))));
+      final crashed = o.events.firstWhere((e) => e is ItemStateChanged && e.item == item && e.state == ItemState.crashed);
+      expect((await o.start(item)).cause, isA<ReadyTimeout>());
+      final e = (await crashed.timeout(_s5)) as ItemStateChanged;
+      expect(e.cause, isA<Crashed>().having((c) => c.exitCode, 'exitCode', 3));
+      expect(o.stateOf(item), ItemState.crashed);
     });
 
     test('같은 항목을 동시에 두 번 시작해도 프로세스는 하나만 띄운다', () async {
@@ -611,7 +661,7 @@ void main() {
       final log = await logs.fileOf(x);
       log.parent.createSync(recursive: true);
       log.writeAsStringSync('${endLine(2)}\n');
-      final failed = o.events.where((e) => e is ItemStateChanged).cast<ItemStateChanged>().firstWhere((e) => e.state == ItemState.failed);
+      final failed = o.events.where((e) => e is ItemStateChanged).cast<ItemStateChanged>().firstWhere((e) => e.state == ItemState.crashed);
       fake.finish();
       expect((await failed).exitCode, 2);
       expect(await store.processes(), isEmpty);

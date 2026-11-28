@@ -87,7 +87,7 @@ void orchestratorContract(Future<OrchestratorFixture> Function() setUp) {
     expect(summary.items.map((r) => r.item.serviceId), unorderedEquals(f.services.map((s) => s.id)));
 
     for (final s in f.services) {
-      final first = indexOf(events, f.ref(s.id), (_) => true);
+      final first = indexOf(events, f.ref(s.id), (st) => st != ItemState.waiting);
       for (final d in s.dependsOn) {
         expect(first, greaterThan(indexOf(events, f.ref(d), isUp)), reason: '${s.id} 는 $d 가 준비된 뒤에 시작해야 한다');
       }
@@ -113,10 +113,14 @@ void orchestratorContract(Future<OrchestratorFixture> Function() setUp) {
     final byId = {for (final r in summary.items) r.item.serviceId: r};
     expect(byId[f.failingServiceId]!.outcome, ItemOutcome.failed);
     expect(byId[f.failingServiceId]!.reason, isNotNull);
+    expect(byId[f.failingServiceId]!.cause, isNotNull, reason: '실패 원인을 알려야 한다');
+    expect(o.causeOf(f.ref(f.failingServiceId)), same(byId[f.failingServiceId]!.cause));
     expect(o.stateOf(f.ref(f.failingServiceId)).isFailure, isTrue, reason: '${o.stateOf(f.ref(f.failingServiceId))}');
     for (final id in skipped) {
       expect(byId[id]!.outcome, ItemOutcome.skipped, reason: id);
-      expect(changesOf(events, f.ref(id)), isEmpty, reason: '$id 는 시작하지 않아야 한다');
+      expect(changesOf(events, f.ref(id)).where((e) => e.state == ItemState.starting), isEmpty,
+          reason: '$id 는 시작하지 않아야 한다');
+      expect(o.stateOf(f.ref(id)), ItemState.skipped, reason: id);
     }
     for (final s in f.services.where((s) => s.id != f.failingServiceId && !skipped.contains(s.id))) {
       expect(byId[s.id]!.outcome, ItemOutcome.ok, reason: s.id);

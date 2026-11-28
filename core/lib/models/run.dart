@@ -18,8 +18,8 @@ enum ItemState {
   /// 종료 중
   stopping,
 
-  /// 실패: 옛 값. 새 실행기는 [startFailed]·[readyTimeout]·[crashed] 로 나눠 보내고 이 값은 쓰지 않는다.
-  /// 지우면 1.0 계약이 깨져서 남겨 둔다. 화면은 [startFailed] 처럼 다룬다.
+  /// 실패: 시작·준비·실행 중 실패가 아닌 것(멈추지 못함 등). 시작 쪽 실패는 [startFailed]·[readyTimeout]·[crashed] 로 나눠 보낸다.
+  /// 원인([FailureCause])은 없다.
   failed,
 
   /// 연결됨: 원격 항목 전용.
@@ -49,7 +49,7 @@ enum ItemState {
   /// 멈춤: 실행 중·준비 완료·준비 시간 초과였다가 0 이 아닌 종료 코드로 스스로 끝났다.
   crashed;
 
-  /// 실패 안내 카드를 보여 줄 실패 상태다([failed]·[startFailed]·[readyTimeout]·[crashed]).
+  /// 실패로 세는 상태다([failed]·[startFailed]·[readyTimeout]·[crashed]).
   /// `포트 사용 중`·`연결 안 됨` 은 따로 다루므로 넣지 않는다.
   bool get isFailure => this == failed || this == startFailed || this == readyTimeout || this == crashed;
 }

@@ -258,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   MascotPose _pose(List<ItemState> states) {
     if (states.isEmpty) return MascotPose.empty;
     if (states.any((s) => s.isFailure || s == ItemState.portBusy || s == ItemState.disconnected)) return MascotPose.fallen;
-    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return MascotPose.warmup;
+    if (states.any(isStarting)) return MascotPose.warmup;
     final k = states.where((s) => s == ItemState.ready || s == ItemState.connected).length;
     if (k == states.length) return MascotPose.running;
     return k > 0 ? MascotPose.running2 : MascotPose.resting;
@@ -374,7 +374,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ];
       return '일부만 실행 중이에요 · $n개 중 $k개 준비 완료, ${why.join(', ')}';
     }
-    if (states.any((s) => s == ItemState.starting || s == ItemState.running)) return '시작하는 중 · $n개 중 $k개 준비 완료';
+    if (states.any(isStarting)) return '시작하는 중 · $n개 중 $k개 준비 완료';
     if (k == n) return '실행 중 · $n개 항목이 모두 준비됐어요';
     if (k > 0) return '실행 중 · $n개 중 $k개 준비 완료';
     if (_summary case final s?) {

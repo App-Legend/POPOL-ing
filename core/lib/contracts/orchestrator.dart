@@ -12,7 +12,9 @@ import '../models/run.dart';
 ///
 /// 지켜야 할 약속. `package:popoling_core/testing.dart` 의 [orchestratorContract] 로 확인한다.
 /// 1. 전체 실행은 `dependsOn` 순서를 지킨다. 항목은 의존하는 항목이 모두 성공한 뒤에 시작한다.
-/// 2. 항목이 실패하면 그 항목에 의존하는 항목은 시작하지 않고 [ItemOutcome.skipped] 다.
+/// 2. 항목이 실패하면 그 항목에 의존하는 항목은 시작하지 않고 [ItemOutcome.skipped]·[ItemState.skipped] 다.
+///    실패한 항목은 실패 상태([ItemState.isFailure])와 원인([ItemResult.cause]·[causeOf])을 함께 알린다.
+///    차례를 기다리는 항목은 [ItemState.waiting] 으로 알릴 수 있다.
 ///    나머지 독립 항목은 계속하고, 이미 시작한 항목은 자동으로 멈추지 않는다.
 /// 3. 원격 항목은 켜지 않고 연결만 확인한다. 연결 안 됨은 실패와 같이 처리한다. 전체 종료에서는 건드리지 않는다.
 /// 4. 전체 종료는 실행의 역순으로, 포폴링이 띄운 항목만 멈춘다.

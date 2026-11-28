@@ -48,9 +48,13 @@ class FakeOrchestrator implements Orchestrator {
     for (final s in _inOrder(await _services(projectId))) {
       final item = ItemRef(projectId: projectId, serviceId: s.id);
       final failedDep = s.dependsOn.where((d) => results[d] != null && results[d]!.outcome != ItemOutcome.ok);
-      results[s.id] = failedDep.isNotEmpty
-          ? ItemResult(item: item, outcome: ItemOutcome.skipped, reason: '${failedDep.first} 항목이 실패해서 시작하지 않았어요.')
-          : await _up(item, s);
+      if (failedDep.isNotEmpty) {
+        final reason = '${failedDep.first} 항목이 실패해서 시작하지 않았어요.';
+        _set(item, ItemState.skipped, reason: reason);
+        results[s.id] = ItemResult(item: item, outcome: ItemOutcome.skipped, reason: reason);
+      } else {
+        results[s.id] = await _up(item, s);
+      }
     }
     final summary =
         RunSummary(projectId: projectId, startedAt: startedAt, finishedAt: DateTime.now(), items: [...results.values]);
