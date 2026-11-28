@@ -8,7 +8,7 @@ import '../file_project_repository.dart';
 
 /// 프로젝트 추가(FR-01). 개발 홈의 [프로젝트 추가]·[프로젝트 폴더 고르기]가 `/add-project` 로 연다.
 ///
-/// 폴더의 popoling.yaml 에 실행할 명령이 있으면 등록하기 전에 그 목록을 보여 주고 확인받는다.
+/// 폴더의 popoling.yaml 에 실행할 명령이 있으면 등록하기 전에 그 목록을 보여 주고 확인받는다. 형식 문제가 있으면 등록하지 않는다.
 /// 남이 만든 설정의 명령이 확인 없이 실행되지 않게 하려고. 등록되면 그 프로젝트 화면으로 간다.
 class AddProjectScreen extends StatefulWidget {
   const AddProjectScreen({
@@ -67,9 +67,14 @@ class _AddProjectScreenState extends State<AddProjectScreen> {
     });
     try {
       final preview = await widget.readConfig(Project(id: 'preview', name: _name.text, folderPath: folder, registeredAt: DateTime.now()));
+      // 문제가 있는 채로 등록하면 나중에 파일을 고쳤을 때 명령을 확인받지 않고 실행하게 된다
+      if (preview.configIssues case [final issue, ...]) {
+        final at = issue.line == null ? '' : ' (${issue.line}번째 줄)';
+        if (mounted) setState(() => _error = 'popoling.yaml 에 문제가 있어 등록하지 않았어요: ${issue.message}$at. 파일을 고친 뒤 다시 등록해 주세요.');
+        return;
+      }
       final services = preview.config?.services ?? const <ServiceConfig>[];
-      // 형식 문제가 있으면 실행이 막히니 확인할 명령이 없다
-      if (services.isNotEmpty && preview.configIssues.isEmpty && !await _confirm(services)) return;
+      if (services.isNotEmpty && !await _confirm(services)) return;
       final project = await widget.projects.addProject(folder, name: _name.text);
       if (mounted) await Navigator.pushReplacementNamed(context, '/dashboard', arguments: project.id);
     } on ProjectAlreadyRegisteredException catch (e) {

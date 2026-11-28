@@ -92,11 +92,14 @@ void main() {
     expect(opened, [projects.single.id]);
   });
 
-  testWidgets('설정 파일에 문제가 있으면 확인 없이 등록한다', (tester) async {
-    await pump(tester, issues: const [ConfigIssue(path: '', message: '형식이 틀렸어요')]);
+  testWidgets('설정 파일에 문제가 있으면 등록하지 않고 고친 뒤 다시 등록하라고 알린다', (tester) async {
+    // 등록해 두면 나중에 파일을 고쳤을 때 명령을 한 번도 확인받지 않고 실행할 수 있다
+    await pump(tester, issues: const [ConfigIssue(path: 'services[0]', message: '형식이 틀렸어요', line: 3)]);
     await pickAndRegister(tester);
     expect(find.text('이 폴더의 명령을 확인해 주세요'), findsNothing);
-    expect(await repo.listProjects(), hasLength(1));
+    expect(find.textContaining('형식이 틀렸어요 (3번째 줄)'), findsOneWidget);
+    expect(find.textContaining('고친 뒤 다시 등록해 주세요'), findsOneWidget);
+    expect(await repo.listProjects(), isEmpty);
   });
 
   testWidgets('이미 등록된 폴더면 알리고 그 프로젝트로 이동할 수 있다', (tester) async {
