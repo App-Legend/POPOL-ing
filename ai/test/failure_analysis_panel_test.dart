@@ -44,6 +44,28 @@ class HeldLlmClient implements LlmClient {
   }
 }
 
+/// 저장소에 키가 있을 때만 쓸 수 있는 가짜 AI. 키 입력 뒤 이어서 보내는지 시험한다.
+class KeyedLlmClient implements LlmClient {
+  KeyedLlmClient(this.keys, this.reply);
+
+  final ApiKeyStore keys;
+  final String reply;
+  final sent = <String>[];
+
+  @override
+  String get modelName => 'keyed-model';
+
+  @override
+  Future<bool> isConfigured() async => await keys.read() != null;
+
+  @override
+  Future<String> complete(String prompt, {String? system}) async {
+    if (!await isConfigured()) throw LlmException(LlmFailure.missingKey);
+    sent.add(prompt);
+    return reply;
+  }
+}
+
 /// 테스트 중에 로그를 바꿀 수 있는 [LogExcerpt].
 class ChangingLogs implements LogExcerpt {
   ChangingLogs(this.lines);
@@ -212,6 +234,37 @@ void main() {
     expect(find.text('API 키 필요'), findsOneWidget);
     expect(btn('키 입력'), findsOneWidget);
     expect(btn('원인 분석'), findsNothing);
+  });
+
+  testWidgets('#98: 키 없음 창은 [나중에]·[저장하고 계속], 저장하면 하려던 분석이 이어진다', (tester) async {
+    final keys = MemoryApiKeyStore();
+    final client = KeyedLlmClient(keys, goodReply);
+    await open(tester, client: client, keys: keys);
+    await tester.tap(btn('키 입력'));
+    await tester.pumpAndSettle();
+    expect(btn('나중에'), findsOneWidget);
+    expect(btn('저장하고 계속'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('api-key-field')), storedKey);
+    await tester.tap(btn('저장하고 계속'));
+    await tester.pumpAndSettle();
+    expect(btn('보내기'), findsOneWidget, reason: '원래 하려던 [원인 분석]의 보내기 확인 창이 바로 뜬다');
+    await tester.tap(btn('보내기'));
+    await tester.pumpAndSettle();
+    expect(client.sent, hasLength(1));
+    expect(find.text('1. npm install 을 다시 해 주세요.'), findsOneWidget);
+  });
+
+  testWidgets('#98: [나중에]면 아무것도 보내지 않고 API 키 필요 그대로', (tester) async {
+    final keys = MemoryApiKeyStore();
+    final client = KeyedLlmClient(keys, goodReply);
+    await open(tester, client: client, keys: keys);
+    await tester.tap(btn('키 입력'));
+    await tester.pumpAndSettle();
+    await tester.tap(btn('나중에'));
+    await tester.pumpAndSettle();
+    expect(find.text('API 키 필요'), findsOneWidget);
+    expect(btn('보내기'), findsNothing);
+    expect(client.sent, isEmpty);
   });
 
   testWidgets('오류는 llmErrorText 로 안내한다', (tester) async {

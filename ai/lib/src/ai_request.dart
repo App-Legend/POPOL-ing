@@ -181,11 +181,12 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
     _set(_Phase.cancelled);
   }
 
-  Future<void> _openKeys() async {
+  /// 키 입력 창. [resume] 이면 키가 없어 멈춘 분석이라, 저장하면 바로 이어서 보낸다(#98).
+  Future<void> _openKeys({bool resume = false}) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final ApiKeyChange? change;
     try {
-      change = await showApiKeyDialog(context, widget.keys, check: widget.checkKey);
+      change = await showApiKeyDialog(context, widget.keys, check: widget.checkKey, resume: resume);
     } catch (_) {
       messenger?.showSnackBar(const SnackBar(content: Text('보안 저장소를 쓰지 못해 키 입력 창을 열지 못했어요.')));
       return;
@@ -194,10 +195,12 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
       widget.onKeysChanged?.call();
     }
     await _checkKey();
+    if (resume && change == ApiKeyChange.saved && mounted && _phase == _Phase.ready) await _send();
   }
 
   void _onErrorAction(LlmFailure failure) => switch (failure) {
-        LlmFailure.missingKey || LlmFailure.invalidKey => _openKeys(),
+        LlmFailure.missingKey => _openKeys(resume: true),
+        LlmFailure.invalidKey => _openKeys(),
         LlmFailure.quotaExceeded || LlmFailure.network => _send(),
       };
 

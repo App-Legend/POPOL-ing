@@ -13,20 +13,21 @@ typedef ApiKeyCheck = Future<void> Function(String key);
 
 /// "Gemini API 키 입력" 창을 띄운다. 저장·삭제는 창 안에서 [store] 에 바로 한다. 취소하면 null.
 /// [check] 를 주면 [연결 확인] 버튼이 생긴다.
-Future<ApiKeyChange?> showApiKeyDialog(BuildContext context, ApiKeyStore store, {ApiKeyCheck? check}) async {
+/// [resume] 이면 하려던 AI 분석을 멈추고 연 "AI 키 없음" 창이라 버튼이 [나중에]·[저장하고 계속]이다(기획서 §9).
+Future<ApiKeyChange?> showApiKeyDialog(BuildContext context, ApiKeyStore store, {ApiKeyCheck? check, bool resume = false}) async {
   final hasKey = await store.read() != null;
   if (!context.mounted) {
     return null;
   }
   return showDialog<ApiKeyChange>(
     context: context,
-    builder: (_) => Dialog(child: ApiKeyDialog(store: store, hasKey: hasKey, check: check)),
+    builder: (_) => Dialog(child: ApiKeyDialog(store: store, hasKey: hasKey, check: check, resume: resume && !hasKey)),
   );
 }
 
 /// API 키 입력 창. 입력한 키는 가려서 보이고, 이 컴퓨터의 보안 저장소에만 둔다.
 class ApiKeyDialog extends StatefulWidget {
-  const ApiKeyDialog({super.key, required this.store, required this.hasKey, this.check});
+  const ApiKeyDialog({super.key, required this.store, required this.hasKey, this.check, this.resume = false});
 
   final ApiKeyStore store;
 
@@ -35,6 +36,9 @@ class ApiKeyDialog extends StatefulWidget {
 
   /// [연결 확인]에 쓴다. null 이면 버튼이 없다.
   final ApiKeyCheck? check;
+
+  /// 저장하면 하려던 분석을 이어서 한다. 버튼이 [나중에]·[저장하고 계속]이 된다.
+  final bool resume;
 
   @override
   State<ApiKeyDialog> createState() => _ApiKeyDialogState();
@@ -189,8 +193,8 @@ class _ApiKeyDialogState extends State<ApiKeyDialog> {
         const Spacer(),
         if (check != null)
           _checking ? const Btn('확인하는 중…', onPressed: null) : Btn('연결 확인', onPressed: _busy ? null : () => _connect(check)),
-        Btn('취소', onPressed: _busy ? null : () => closeDialog(context)),
-        Btn('저장', primary: true, onPressed: _busy ? null : _save),
+        Btn(widget.resume ? '나중에' : '취소', onPressed: _busy ? null : () => closeDialog(context)),
+        Btn(widget.resume ? '저장하고 계속' : '저장', primary: true, onPressed: _busy ? null : _save),
       ]),
     ]);
   }
