@@ -48,6 +48,7 @@ void main() {
     ai.register(app);
     expect(app.read<LlmClient>(), isA<ai.GeminiLlmClient>());
     expect(app.routes.keys, contains('/ai'));
+    expect(app.routes.keys, contains('/app-settings'));
     expect(app.read<ai.AnalysisHistory>(), isA<ai.AnalysisHistory>());
   });
 

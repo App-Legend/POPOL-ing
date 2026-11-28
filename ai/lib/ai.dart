@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
 import 'src/ai_screen.dart';
+import 'src/app_settings_screen.dart';
 import 'src/analysis_history.dart';
 import 'src/api_key_store.dart';
 import 'src/gemini_client.dart';
@@ -38,4 +39,6 @@ void register(AppRegistry app) {
   app.provide<AnalysisHistory>(history);
   // 키는 늘 Gemini 키라, 나중에 LlmClient 를 바꿔 끼워도 [연결 확인]은 Gemini 로 한다.
   app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey, history: app.read<AnalysisHistory>()));
+  // 왼쪽 메뉴 [앱 설정](#105). 지금은 API 키만 둔다.
+  app.route('/app-settings', (_) => AppSettingsScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey));
 }

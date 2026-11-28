@@ -300,9 +300,12 @@ void main() {
     await tester.tap(btn('키 입력'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('api-key-field')), 'AQ.new-key-1234wxyz');
-    await tester.tap(btn('저장'));
+    await tester.tap(btn('저장하고 계속')); // 키가 없어 연 창이라 저장하면 하려던 요약을 이어서 한다(#98)
     await tester.pumpAndSettle();
     expect(changed, 1);
+    expect(btn('보내기'), findsOneWidget);
+    await tester.tap(btn('취소'));
+    await tester.pumpAndSettle();
     expect(btn('AI 요약'), findsOneWidget);
   });
 
