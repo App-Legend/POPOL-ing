@@ -27,6 +27,7 @@ class AiSender {
     String? system,
     Iterable<String> secrets = const [],
     List<String> notes = const [],
+    String notSent = SendConfirmDialog.defaultNotSent,
     VoidCallback? onConfirmed,
   }) async {
     if (!await client.isConfigured()) {
@@ -40,7 +41,7 @@ class AiSender {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => Dialog(
-        child: SendConfirmDialog(requestName: requestName, content: redacted.text, redactedCount: redacted.count, notes: notes),
+        child: SendConfirmDialog(requestName: requestName, content: redacted.text, redactedCount: redacted.count, notes: notes, notSent: notSent),
       ),
     );
     if (confirmed != true) {

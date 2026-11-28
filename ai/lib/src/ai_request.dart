@@ -6,6 +6,7 @@ import 'ai_sender.dart';
 import 'api_key_dialog.dart';
 import 'api_key_store.dart';
 import 'messages.dart';
+import 'send_confirm_dialog.dart';
 
 const aiWorkingText = '분석하고 있어요. 그동안에도 실행·종료 같은 다른 기능은 그대로 쓸 수 있어요.';
 
@@ -31,6 +32,9 @@ class AiRequestView<T extends Object> extends StatefulWidget {
     this.onKeysChanged,
     this.onDone,
     this.onFailed,
+    this.workingText = aiWorkingText,
+    this.cancelLabel = '취소',
+    this.notSent = SendConfirmDialog.defaultNotSent,
   });
 
   final LlmClient client;
@@ -75,6 +79,13 @@ class AiRequestView<T extends Object> extends StatefulWidget {
 
   /// 보냈는데 실패했을 때 한 번(분석 기록). 키가 없어 보내지 않은 것도 부르지 않는다.
   final void Function(LlmFailure failure)? onFailed;
+
+  /// 분석 중 안내와 그때의 취소 버튼 이름. 예: 코드 점검은 "보통 20초 안에 끝나요…"·[검사 취소].
+  final String workingText;
+  final String cancelLabel;
+
+  /// 보내기 전 확인 창의 "보내지 않는 것".
+  final String notSent;
 
   @override
   State<AiRequestView<T>> createState() => _AiRequestViewState<T>();
@@ -136,6 +147,7 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
         content: content,
         system: widget.system,
         notes: widget.notes,
+        notSent: widget.notSent,
         onConfirmed: () {
           confirmed = true;
           if (attempt == _attempt) _set(_Phase.working);
@@ -223,7 +235,7 @@ class _AiRequestViewState<T extends Object> extends State<AiRequestView<T>> {
           if (description != null) Text(description, style: muted),
           action(widget.startLabel, _send, primary: true),
         ],
-      _Phase.working => [const Text(aiWorkingText, style: body), action('취소', _cancel)],
+      _Phase.working => [Text(widget.workingText, style: body), action(widget.cancelLabel, _cancel)],
       _Phase.unreadable => [const Text('AI 답을 읽지 못했어요.', style: body), action(widget.againLabel, _send)],
       _Phase.keyUnreadable => [const Text('이 컴퓨터의 보안 저장소에서 API 키를 읽지 못했어요.', style: body), action('다시 시도', _checkKey)],
       _Phase.missingKey || _Phase.failed => _error(llmErrorText(_failure!), body),

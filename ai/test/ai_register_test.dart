@@ -54,7 +54,7 @@ void main() {
 
   testWidgets('/ai 는 OS 보안 저장소에 둔 키를 읽어 보여 준다', (tester) async {
     FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
-    final app = TestRegistry();
+    final app = TestRegistry()..provide<ProjectRepository>(FakeProjectRepository.withSamples());
     ai.register(app);
     await openAi(tester, app);
     expect(find.text('${ai.GeminiLlmClient.defaultModel} · 키 ••••••••9876'), findsOneWidget);
@@ -65,7 +65,7 @@ void main() {
 
   testWidgets('/ai 는 register 뒤에 바꿔 끼운 LlmClient 의 모델 이름을 쓴다', (tester) async {
     FlutterSecureStorage.setMockInitialValues({'gemini_api_key': 'AQ.from-keychain-9876'});
-    final app = TestRegistry();
+    final app = TestRegistry()..provide<ProjectRepository>(FakeProjectRepository.withSamples());
     ai.register(app);
     app.provide<LlmClient>(FakeLlmClient(modelName: 'local-model'));
     await openAi(tester, app);

@@ -10,7 +10,8 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:popoling_core/contracts.dart';
 
-import 'src/ai_screen.dart';
+import 'src/code_check.dart';
+import 'src/code_check_screen.dart';
 import 'src/app_settings_screen.dart';
 import 'src/analysis_history.dart';
 import 'src/api_key_store.dart';
@@ -29,7 +30,8 @@ export 'src/send_confirm_dialog.dart' show SendConfirmDialog;
 /// AI 프로젝트 검사의 화면과 구현을 앱에 등록한다.
 ///
 /// API 키는 사용자가 앱에서 넣고 이 컴퓨터의 보안 저장소에만 둔다. 앱 빌드에는 키를 넣지 않는다.
-/// AI 검사(`/ai`) 화면은 키 상태와 분석 기록을 보여 준다. 분석 기록([AnalysisHistory])도 등록해,
+/// AI 검사(`/ai`) 화면은 프로젝트별 코드 점검(AI-04, #108)이다. 결과는 `ai-checks.json` 에 프로젝트마다 마지막 하나만 둔다.
+/// 보낼 파일을 고르는 규칙 검사(C, #107)가 붙기 전에는 검사를 시작할 수 없다. 분석 기록([AnalysisHistory])도 등록해,
 /// 프로젝트 화면의 패널이 결과를 남길 수 있게 한다(`app/` 이 패널의 `onRecord` 에 연결).
 void register(AppRegistry app) {
   final keys = SecureApiKeyStore();
@@ -38,7 +40,11 @@ void register(AppRegistry app) {
   app.provide<LlmClient>(gemini);
   app.provide<AnalysisHistory>(history);
   // 키는 늘 Gemini 키라, 나중에 LlmClient 를 바꿔 끼워도 [연결 확인]은 Gemini 로 한다.
-  app.route('/ai', (_) => AiScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey, history: app.read<AnalysisHistory>()));
+  final checks = CodeCheckStore(() async => File('${(await getApplicationSupportDirectory()).path}${Platform.pathSeparator}ai-checks.json'));
+  app.route(
+    '/ai',
+    (_) => CodeCheckScreen(projects: app.read<ProjectRepository>(), keys: keys, client: app.read<LlmClient>(), store: checks, checkKey: gemini.checkKey),
+  );
   // 왼쪽 메뉴 [앱 설정](#105). 지금은 API 키만 둔다.
   app.route('/app-settings', (_) => AppSettingsScreen(keys: keys, client: app.read<LlmClient>(), checkKey: gemini.checkKey));
 }

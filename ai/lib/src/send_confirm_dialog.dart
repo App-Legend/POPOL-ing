@@ -3,7 +3,10 @@ import 'package:popoling_core/ui.dart';
 
 /// 보내기 전 확인 창(기획서 §2, AT-21). 실제로 보낼 내용을 그대로 보여주고, [보내기]를 눌러야 true.
 class SendConfirmDialog extends StatelessWidget {
-  const SendConfirmDialog({super.key, required this.requestName, required this.content, this.redactedCount = 0, this.notes = const []});
+  const SendConfirmDialog({super.key, required this.requestName, required this.content, this.redactedCount = 0, this.notes = const [], this.notSent = defaultNotSent});
+
+  /// "보내지 않는 것" 줄의 기본값. 코드 점검(AI-04)처럼 파일을 보내면 바꿔 넘긴다.
+  static const defaultNotSent = '.env 값, API 키, 소스 코드';
 
   /// 무엇을 하려고 보내는지. 예: "QA 결과 요약", "실행 실패 원인 분석"
   final String requestName;
@@ -16,6 +19,9 @@ class SendConfirmDialog extends StatelessWidget {
 
   /// 요청마다 덧붙일 안내. 예: "주소는 호스트를 빼고 경로만 보내요."
   final List<String> notes;
+
+  /// 보내지 않는 것.
+  final String notSent;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +41,7 @@ class SendConfirmDialog extends StatelessWidget {
           ),
         ),
       ),
-      const Text('보내지 않는 것: .env 값, API 키, 소스 코드', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.text2)),
+      Text('보내지 않는 것: $notSent', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.text2)),
       Text(
         [...notes, '$hidden.env 값과 API 키는 보내지 않아요.', '무료 등급에서는 보낸 내용이 Google 서비스 개선에 쓰일 수 있어요.'].join(' '),
         style: const TextStyle(fontSize: 12.5, color: C.muted, height: 1.5),
