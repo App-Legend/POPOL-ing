@@ -27,9 +27,9 @@ ProjectPanels projectPanels(AppRegistry app) {
     failure: (_, item, run) => Panel(
       title: '${item.item.serviceId}이 실패한 이유',
       danger: true,
-      // 실행기가 준 원인을 먼저 보인다. AI 분석은 키가 없으면 "API 키 필요"만 나오기 때문.
+      // 실행기가 준 원인으로 만든 실패 안내 카드(#89)를 먼저 보인다. AI 분석은 키가 없으면 "API 키 필요"만 나오기 때문.
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, spacing: 16, children: [
-        if (item.reason != null) Text(item.reason!, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: C.text)),
+        ai.FailureGuideCard(item: item, runner: app.read<Orchestrator>()),
         ai.FailureAnalysisPanel(
           item: item,
           run: run,
